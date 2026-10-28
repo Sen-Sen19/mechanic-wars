@@ -82,14 +82,14 @@
       attack: { type: "melee", damage: 5.2, startup: 3, active: 3, recovery: 3, knockback: 3.2, range: 54 },
     }),
 
-    // Quick striker: faster attack and a longer-reaching shockwave than before, in a lighter,
-    // quicker body (like the Assassin, but slower than the Assassin). Hits harder than the
-    // Assassin but not overwhelmingly so; basic attack is a shockwave projectile.
+    // Gunslinger: quick draw, fast straight bullets, lighter and quicker than the Fighter
+    // (but slower than the Assassin). Bullets fly faster than the Mage bolt but die sooner.
+    // (internal id stays "hitter" so saved references and tools keep working)
     hitter: define({
       id: "hitter",
-      name: "Hitter",
+      name: "Gunner",
       color: "#ff7a3d",
-      look: "spikes",
+      look: "gun",
       width: 36,
       height: 74,
       maxHP: 76,
@@ -104,7 +104,7 @@
         startup: 5,
         recovery: 28,
         knockback: 3.8,
-        projectile: { speed: 8.5, range: 420, size: 16 },
+        projectile: { speed: 13, range: 420, size: 10, style: "bullet" },
       },
     }),
 

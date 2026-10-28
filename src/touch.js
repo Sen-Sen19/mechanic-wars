@@ -4,38 +4,54 @@
 (function (g) {
   const MW = (g.MW = g.MW || {});
 
+  const ICONS = {
+    attack: '<svg viewBox="0 0 24 24" width="60%" height="60%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>',
+    jump: '<svg viewBox="0 0 24 24" width="60%" height="60%" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12l6-6 6 6"/><path d="M6 19l6-6 6 6"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>',
+    play: '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+    reload: '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
+    menu: '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    full: '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  };
+
   const CSS = `
     #mw-touch { position: fixed; inset: 0; pointer-events: none; z-index: 10;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
     #mw-touch * { touch-action: none; -webkit-tap-highlight-color: transparent; }
-    .mw-stick { position: absolute; left: calc(28px + env(safe-area-inset-left, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-      width: 160px; height: 160px; border-radius: 50%; pointer-events: auto;
-      background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.28); }
-    .mw-knob { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px;
-      border-radius: 50%; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.6); }
+
+    /* joystick: small, glassy */
+    .mw-stick { position: absolute; left: calc(22px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+      width: 104px; height: 104px; border-radius: 50%; pointer-events: auto;
+      background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 100%);
+      border: 2px solid rgba(255,255,255,0.28);
+      box-shadow: inset 0 0 18px rgba(127,216,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .mw-knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px;
+      border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), rgba(160,200,255,0.5));
+      border: 2px solid rgba(255,255,255,0.75); box-shadow: 0 2px 10px rgba(0,0,0,0.45), 0 0 12px rgba(127,216,255,0.45); }
+
+    /* round action buttons */
     .mw-btn { position: absolute; pointer-events: auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font: 700 18px monospace; color: #fff; background: rgba(74,163,255,0.30); border: 2px solid rgba(74,163,255,0.8); }
-    .mw-btn.active { background: rgba(74,163,255,0.65); }
-    .mw-jump { right: calc(32px + env(safe-area-inset-right, 0px)); bottom: calc(44px + env(safe-area-inset-bottom, 0px)); width: 120px; height: 120px; }
-    .mw-attack { right: calc(164px + env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); width: 104px; height: 104px;
-      background: rgba(255,90,90,0.30); border-color: rgba(255,90,90,0.85); }
-    .mw-attack.active { background: rgba(255,90,90,0.65); }
-    .mw-reset { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: 52px; height: 52px; font-size: 14px;
-      background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); }
-    .mw-full { left: calc(16px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: 52px; height: 52px; font-size: 13px;
-      background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); }
-    .mw-menu { left: calc(16px + env(safe-area-inset-left, 0px)); top: calc(72px + env(safe-area-inset-top, 0px)); width: 52px; height: 52px; font-size: 12px;
-      background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); }
-    .mw-chars { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-      display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-    .mw-row, .mw-slots { display: flex; gap: 6px; }
-    .mw-slot { pointer-events: auto; padding: 0 16px; height: 28px; display: flex; align-items: center; border-radius: 8px;
-      font: 700 11px monospace; color: #fff; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,255,255,0.6); }
-    .mw-slot.sel { background: #fff; color: #0b0d12; }
-    .mw-chip { pointer-events: auto; padding: 0 6px; height: 36px; display: flex; align-items: center; border-radius: 8px;
-      font: 700 10px monospace; color: #fff; background: rgba(0,0,0,0.35); border: 2px solid var(--c); }
-    .mw-chip.sel { background: var(--c); color: #0b0d12; }
-    @media (orientation: portrait) { .mw-chars { bottom: calc(200px + env(safe-area-inset-bottom, 0px)); } }
+      color: #fff; border: 2px solid rgba(255,255,255,0.55); background: rgba(20,24,44,0.55);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+      transition: transform 0.06s, background 0.06s; }
+    .mw-btn svg { display: block; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+    .mw-btn.active { transform: scale(0.9); }
+    .mw-jump { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 68px; height: 68px;
+      background: rgba(74,163,255,0.35); border-color: rgba(120,190,255,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(74,163,255,0.4); }
+    .mw-jump.active { background: rgba(74,163,255,0.75); }
+    .mw-attack { right: calc(100px + env(safe-area-inset-right, 0px)); bottom: calc(62px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px;
+      background: rgba(255,90,90,0.35); border-color: rgba(255,130,130,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(255,90,90,0.4); }
+    .mw-attack.active { background: rgba(255,90,90,0.75); }
+
+    /* top-centre control pill: pause / restart / menu / fullscreen */
+    .mw-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px));
+      display: flex; gap: 8px; padding: 5px 8px; border-radius: 999px; pointer-events: none;
+      background: rgba(10,12,26,0.5); border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .mw-bar .mw-btn { position: relative; width: 38px; height: 38px; box-shadow: none; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.35); }
+    .mw-bar .mw-btn.active { background: rgba(127,216,255,0.45); }
+
     .mw-hint { display: none; position: absolute; left: 0; right: 0; top: 56%; text-align: center; color: #8b94ab;
       font: 14px monospace; pointer-events: none; }
     @media (orientation: portrait) { .mw-hint { display: block; } }
@@ -45,6 +61,13 @@
     const d = document.createElement("div");
     d.className = cls;
     if (text) d.textContent = text;
+    return d;
+  }
+  function iconBtn(cls, icon, label) {
+    const d = el(cls);
+    d.innerHTML = ICONS[icon];
+    d.setAttribute("role", "button");
+    d.setAttribute("aria-label", label);
     return d;
   }
 
@@ -57,20 +80,15 @@
       );
     }
 
-    // opts.characters: [{ id, name, color }] -> a row of tap-to-select chips.
     constructor(parent, opts = {}) {
-      this.pickQueued = null; // { slot, id } for a tapped chip
-      this.slot = 0; // which fighter the chips pick for: 0 = P1, 1 = P2 (dummy)
-      this.selected = [null, null]; // selected character id per slot
-      this.slotBtns = [];
       this.attackQueued = false;
-      this.chips = {};
       this.nx = 0; // joystick, -1..1
       this.ny = 0;
       this.jumpQueued = false;
       this.resetQueued = false;
       this.menuQueued = false;
-      this.aiQueued = false;
+      this.pauseQueued = false;
+      this.paused = false;
       this.prevDown = false;
       this.stickId = null;
 
@@ -86,52 +104,26 @@
       this.knob = el("mw-knob");
       this.stick.appendChild(this.knob);
 
-      this.jumpBtn = el("mw-btn mw-jump", "JUMP");
-      this.resetBtn = el("mw-btn mw-reset", "RESET");
-      this.attackBtn = el("mw-btn mw-attack", "ATTACK");
-      this.menuBtn = el("mw-btn mw-menu", "MENU");
+      this.jumpBtn = iconBtn("mw-btn mw-jump", "jump", "Jump");
+      this.attackBtn = iconBtn("mw-btn mw-attack", "attack", "Attack");
+      this.pauseBtn = iconBtn("mw-btn", "pause", "Pause");
+      this.resetBtn = iconBtn("mw-btn", "reload", "Restart");
+      this.menuBtn = iconBtn("mw-btn", "menu", "Menu");
       this.root = root;
       const hint = el("mw-hint", "Tip: rotate your phone to landscape for a bigger view");
 
-      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, this.resetBtn, this.menuBtn);
-      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, this.resetBtn, this.menuBtn];
+      this.bar = el("mw-bar");
+      this.bar.append(this.pauseBtn, this.resetBtn, this.menuBtn);
 
-      if (opts.characters && opts.characters.length) {
-        const wrap = el("mw-chars");
-        const slots = el("mw-slots");
-        ["P1", "P2"].forEach((label, i) => {
-          const b = el("mw-slot", label);
-          this.slotBtns.push(b);
-          this.bindButton(b, () => {
-            this.slot = i;
-            this.refreshChips();
-          });
-          slots.appendChild(b);
-        });
-        // Opponent AI button: tap to cycle dummy / aggressive / spacing.
-        this.aiBtn = el("mw-slot", "AI");
-        this.bindButton(this.aiBtn, () => (this.aiQueued = true));
-        slots.appendChild(this.aiBtn);
-        const row = el("mw-row");
-        for (const c of opts.characters) {
-          const chip = el("mw-chip", c.name.toUpperCase());
-          chip.style.setProperty("--c", c.color);
-          this.chips[c.id] = chip;
-          this.bindButton(chip, () => (this.pickQueued = { slot: this.slot, id: c.id }));
-          row.appendChild(chip);
-        }
-        wrap.append(slots, row);
-        root.appendChild(wrap);
-        this.gameEls.push(wrap);
-        this.refreshChips();
-      }
+      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, this.bar);
+      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, this.pauseBtn, this.resetBtn, this.menuBtn];
 
       // Fullscreen hides the browser bars. Not available everywhere (iOS Safari
       // only allows it for installed web apps), so the button only appears when supported.
       const de = document.documentElement;
       if (document.fullscreenEnabled && de.requestFullscreen) {
-        this.fullBtn = el("mw-btn mw-full", "FULL");
-        root.appendChild(this.fullBtn);
+        this.fullBtn = iconBtn("mw-btn", "full", "Fullscreen");
+        this.bar.appendChild(this.fullBtn);
         this.bindButton(this.fullBtn, () => {
           if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -151,6 +143,7 @@
       this.bindStick();
       this.bindButton(this.jumpBtn, () => (this.jumpQueued = true));
       this.bindButton(this.attackBtn, () => (this.attackQueued = true));
+      this.bindButton(this.pauseBtn, () => (this.pauseQueued = true));
       this.bindButton(this.resetBtn, () => (this.resetQueued = true));
       this.bindButton(this.menuBtn, () => (this.menuQueued = true));
     }
@@ -159,6 +152,8 @@
     // FULL stays, so fullscreen still works from the select screen.
     setGameControls(visible) {
       for (const e of this.gameEls) e.style.display = visible ? "" : "none";
+      // the top bar only holds fullscreen on the select screen
+      this.bar.style.display = visible || this.fullBtn ? "" : "none";
       if (!visible) {
         this.nx = this.ny = 0;
         this.stickId = null;
@@ -166,10 +161,23 @@
       }
     }
 
-    // Text on the AI button, e.g. "AGGRESSIVE" -> "AI: AGGRESSIVE".
-    setAiLabel(text) {
-      if (this.aiBtn) this.aiBtn.textContent = "AI: " + text;
+    // Swap the pause button icon between pause and play.
+    setPaused(on) {
+      this.paused = on;
+      this.pauseBtn.innerHTML = ICONS[on ? "play" : "pause"];
+      this.pauseBtn.setAttribute("aria-label", on ? "Resume" : "Pause");
     }
+
+    consumePause() {
+      const r = this.pauseQueued;
+      this.pauseQueued = false;
+      return r;
+    }
+
+    // The character / AI picker was removed from the on-screen controls; these stay as no-ops
+    // so main.js and older callers keep working.
+    setAiLabel() {}
+    setSelected() {}
 
     consumeMenu() {
       const r = this.menuQueued;
@@ -178,9 +186,7 @@
     }
 
     consumeAi() {
-      const r = this.aiQueued;
-      this.aiQueued = false;
-      return r;
+      return false;
     }
 
     bindStick() {
@@ -257,23 +263,8 @@
       return r;
     }
 
-    // Returns { slot, id } for a tapped chip, or null.
     consumePick() {
-      const p = this.pickQueued;
-      this.pickQueued = null;
-      return p;
-    }
-
-    // Record which character a slot (0 = P1, 1 = P2) is using and refresh the highlight.
-    setSelected(slot, id) {
-      this.selected[slot] = id;
-      this.refreshChips();
-    }
-
-    refreshChips() {
-      const id = this.selected[this.slot];
-      for (const k in this.chips) this.chips[k].classList.toggle("sel", k === id);
-      this.slotBtns.forEach((b, i) => b.classList.toggle("sel", i === this.slot));
+      return null;
     }
   }
 

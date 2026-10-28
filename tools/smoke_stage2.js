@@ -53,7 +53,7 @@ check("hitter is lighter and smaller than fighter (fighter is the big body)", h.
 check("fighter is bigger than every other non-tank character", order.every((id) => id === "fighter" || id === "tank" || (C[id].width < f.width && C[id].height < f.height)));
 check("mage has the slowest basic attack of all (startup + recovery)", order.every((id) => id === "mage" || (C[id].attack.startup + C[id].attack.recovery) < m.attack.startup + m.attack.recovery));
 check("mage + hitter are projectile, rest melee", m.attack.type === "projectile" && h.attack.type === "projectile" && [f, a, t].every((c) => c.attack.type === "melee"));
-check("mage bolt out-ranges and out-speeds hitter shockwave", m.attack.projectile.range > h.attack.projectile.range && m.attack.projectile.speed > h.attack.projectile.speed);
+check("mage bolt out-ranges the gunner bullet; the bullet flies faster", m.attack.projectile.range > h.attack.projectile.range && h.attack.projectile.speed > m.attack.projectile.speed);
 check("hitter shockwave reaches well beyond melee range", h.attack.projectile.range > 2 * Math.max(f.attack.range, a.attack.range, t.attack.range));
 check("mage is less durable than fighter", m.maxHP < f.maxHP && m.armor < f.armor);
 

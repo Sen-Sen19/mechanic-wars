@@ -22,7 +22,7 @@
     fighter: { main: "#3f8cff", dark: "#1d4fa8", light: "#8fc0ff", accent: "#ffd24a", skin: "#f0c8a0", hair: "#5a3a22", pants: "#25304e", boot: "#e8ecf5" },
     mage: { main: "#8c52ff", dark: "#4b2a96", light: "#c3a0ff", accent: "#ffd479", skin: "#f3d4b8", hair: "#e8e8f5", pants: "#3a2370", boot: "#2a1a55", glow: "#d6b8ff" },
     assassin: { main: "#1fb676", dark: "#0c5a3d", light: "#6df0b4", accent: "#5dfff0", skin: "#14221c", hair: "#0f1a15", pants: "#10382a", boot: "#0b1511", scarf: "#ff3b5c" },
-    hitter: { main: "#ff7a3d", dark: "#b8431a", light: "#ffb48a", accent: "#ffd24a", skin: "#e9b98f", hair: "#ffb02e", pants: "#2a2f45", boot: "#f4f4f4", metal: "#3a3f55" },
+    hitter: { main: "#ff7a3d", dark: "#b8431a", light: "#ffb48a", accent: "#ffd24a", skin: "#e9b98f", hair: "#3a2414", pants: "#2f3a5a", boot: "#5a3a22", shirt: "#efe3cc", hat: "#8a5428", hatDark: "#4e2e14", band: "#d6342f", metal: "#aeb4c2", wood: "#6a3a1a" },
     tank: { main: "#8a96a8", dark: "#4d586b", light: "#d2dae6", accent: "#ff6a3a", skin: "#c9a98a", hair: "#303642", pants: "#3b4252", boot: "#2e3442" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
@@ -30,7 +30,7 @@
     fighter: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.72, hw: 0.52, lw: 0.22, aw: 0.19, arm: 0.33, stride: 0.45 },
     mage: { leg: 0.36, tor: 0.33, hr: 0.115, sw: 0.66, hw: 0.56, lw: 0.17, aw: 0.15, arm: 0.32, stride: 0.30 },
     assassin: { leg: 0.43, tor: 0.27, hr: 0.105, sw: 0.66, hw: 0.46, lw: 0.21, aw: 0.17, arm: 0.34, stride: 0.55 },
-    hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.24, arm: 0.30, stride: 0.42 },
+    hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.19, arm: 0.32, stride: 0.42 },
     tank: { leg: 0.36, tor: 0.33, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
@@ -47,7 +47,7 @@
     ],
     tank: [{ wind: kf([-0.1, -1.0], [0.0, -0.9], -0.35, -4, 0), strike: kf([0.9, 0.6], [0.85, 0.55], 0.5, 8, 0.08) }],
     mage: [{ wind: kf([0.15, -0.55], [0.2, 0.5], -0.16, -2, 0.02), strike: kf([0.95, -0.2], [0.2, 0.5], 0.2, 3, 0.02) }],
-    hitter: [{ wind: kf([-0.4, 0.45], [-0.3, 0.5], -0.2, -3, 0.05), strike: kf([1.0, 0.1], [0.9, 0.2], 0.3, 5, 0.04) }],
+    hitter: [{ wind: kf([0.75, -0.2], [0.0, 0.5], -0.05, -1, 0.02), strike: kf([1.0, -0.1], [0.1, 0.5], 0.1, -3, 0.02) }],
   };
 
   // ── small drawing helpers ──────────────────────────────────────────
@@ -172,6 +172,10 @@
       if (spawn && vxa > 2.5 && ++A.dust % 7 === 0) spawn(cx - d * Wd * 0.3, fy - 2, -d * 0.8, -0.3, "#8f98ad", 12, 2.2);
       if (spawn && id === "assassin" && vxa > 5) spawn(cx - d * 6, f.y + H * 0.5, 0, 0, P.accent, 9, 3);
     }
+    if (id === "hitter") { // muzzle flash lingers a few frames after the shot
+      if (st === S.ATTACK_ACTIVE) { if (!A.muzzle) A.fireFx = true; A.muzzle = 7; }
+      else A.muzzle = Math.max(0, (A.muzzle || 0) - 1);
+    }
     A.ko = ko ? A.ko + 1 : 0;
     if (st === S.ATTACK_STARTUP && A.pst !== S.ATTACK_STARTUP) A.atkN++;
     A.pst = st;
@@ -268,7 +272,7 @@
     // everything below uses local coords mapped through M (x flipped by facing)
     const M = (p) => [p[0] * d, p[1]];
     const MP = (arr) => arr.map(M);
-    const ctxState = { ctx, M, MP, d, P, col, hr, hc, sh, hip, shF, shB, hF, hB, armF, armB, legF, legB, aw, lw, sw, hw, torL, armL, H, Wd, lean, now, A, f, isFlash, st, attacking, vx, vy, now2: now, lunge, legL, fh, bh };
+    const ctxState = { spawn, ctx, M, MP, d, P, col, hr, hc, sh, hip, shF, shB, hF, hB, armF, armB, legF, legB, aw, lw, sw, hw, torL, armL, H, Wd, lean, now, A, f, isFlash, st, attacking, vx, vy, now2: now, lunge, legL, fh, bh };
 
     // ground shadow (world space, un-scaled feel)
     if (!airborne) {
@@ -443,32 +447,71 @@
       return;
     }
 
-    // ───────────── HITTER ─────────────
+    // ───────────── GUNNER (id "hitter") ─────────────
     if (id === "hitter") {
-      limb(ctx, armBw, k.aw, col(P.metal));
-      circle(ctx, armBw[2][0], armBw[2][1], k.aw * 0.78, col(P.metal), 2.2);
-      ctx.strokeStyle = col(P.accent); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(armBw[2][0], armBw[2][1], k.aw * 0.45, 0, 7); ctx.stroke();
+      const strikeNow = st === S.ATTACK_ACTIVE, recov = st === S.ATTACK_RECOVERY;
+      limb(ctx, armBw, k.aw, col(P.shirt));
+      hand(k, armBw[2], k.aw * 0.8, P.skin);
       legsAndFeet(k, P.pants, P.boot);
-      torsoShape(k, k.sw * 0.84, k.hw, 0, 0, "#2a2f45", "#0b0e1a", 5);
-      // open jacket with orange panels
+      torsoShape(k, k.sw * 0.84, k.hw, 0, 0, P.shirt, "#8a7a60", 5);
+      // leather vest panels, belt + gold buckle
       for (const sgn of [-1, 1]) { const px = shW[0] + sgn * k.sw * 0.3; ctx.beginPath(); ctx.moveTo(px - 5, shW[1]); ctx.lineTo(px + 5, shW[1]); ctx.lineTo(hipW[0] + sgn * k.hw * 0.4 + 4, hipW[1]); ctx.lineTo(hipW[0] + sgn * k.hw * 0.4 - 4, hipW[1]); ctx.closePath(); fillOut(ctx, col(P.main), 1.8); }
-      ctx.fillStyle = col(P.accent); ctx.beginPath(); ctx.arc(shW[0], shW[1] + k.torL * 0.45, 3.2, 0, 7); ctx.fill();
-      // head + wild spiky hair
+      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.5, hipW[1] - 6, k.hw, 5); fillOut(ctx, col("#3a2414"), 1.4);
+      ctx.fillStyle = col(P.accent); ctx.fillRect(hipW[0] - 2.5, hipW[1] - 6, 5, 5);
+      // bandana: knot tail + neckerchief
+      const bt = ribbon(A, "bandana", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.85, 6, hr * 0.9, -d * 2.2 - k.vx * d * 0.2, 0.3 + Math.sin(now * 9) * 0.3);
+      drawRibbon(ctx, bt, 6, col(P.band));
+      poly(ctx, [[hcw[0] - hr * 0.85, hcw[1] + hr * 0.65], [hcw[0] + hr * 0.85, hcw[1] + hr * 0.65], [hcw[0] + d * hr * 0.1, hcw[1] + hr * 1.75]]); fillOut(ctx, col(P.band), 1.8);
+      // head + squinting eye
       circle(ctx, hcw[0], hcw[1], hr, col(P.skin), 2.4);
-      for (let i = 0; i < 6; i++) { const a = Math.PI * (1.05 + i * 0.18); const bx = hcw[0] + Math.cos(a) * hr * 0.95, by = hcw[1] + Math.sin(a) * hr * 0.95; const len = hr * (1.0 + (i % 2) * 0.55); ctx.beginPath(); ctx.moveTo(bx - Math.sin(a) * 4, by + Math.cos(a) * 4); ctx.lineTo(hcw[0] + Math.cos(a - d * 0.25) * (hr + len) - d * 3 - d * k.vx * 0.2, hcw[1] + Math.sin(a) * (hr + len) + Math.sin(now * 9 + i) * 1.2); ctx.lineTo(bx + Math.sin(a) * 4, by - Math.cos(a) * 4); ctx.closePath(); fillOut(ctx, col(i % 2 ? P.hair : "#ff8a1f"), 1.8); }
-      ctx.beginPath(); ctx.arc(hcw[0], hcw[1] - hr * 0.1, hr * 1.02, Math.PI * 1.05, Math.PI * 1.95); ctx.closePath(); fillOut(ctx, col(P.hair), 1.8);
-      const ex = hcw[0] + d * hr * 0.45, ey = hcw[1] + hr * 0.1;
-      ctx.fillStyle = col("#fff"); ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.3, hr * 0.26, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = stunned ? "#ff3030" : "#10131a"; ctx.beginPath(); ctx.arc(ex + d * 1.4, ey, hr * 0.14, 0, 7); ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(ex - hr * 0.35, ey - hr * 0.5); ctx.lineTo(ex + hr * 0.4, ey - hr * 0.2); ctx.stroke();
-      // front gauntlet: glows and grows during wind-up, ring on strike
-      limb(ctx, armFw, k.aw, col(P.metal));
-      const g = armFw[2], gr = k.aw * (0.85 + 0.5 * windU);
-      ctx.save(); ctx.shadowColor = P.accent; ctx.shadowBlur = k.isFlash ? 0 : 4 + 16 * windU + (strike ? 12 : 0);
-      circle(ctx, g[0], g[1], gr, col(P.metal), 2.4);
-      ctx.strokeStyle = col(windU > 0.4 || strike ? "#fff2a0" : P.accent); ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(g[0], g[1], gr * 0.55, 0, 7); ctx.stroke();
+      const ex = hcw[0] + d * hr * 0.45, ey = hcw[1] + hr * 0.12;
+      ctx.fillStyle = col("#fff"); ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.3, hr * 0.22, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = stunned ? "#ff3030" : "#10131a"; ctx.beginPath(); ctx.arc(ex + d * 1.4, ey, hr * 0.13, 0, 7); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(ex - hr * 0.35, ey - hr * 0.4); ctx.lineTo(ex + hr * 0.4, ey - hr * 0.25); ctx.stroke();
+      // cowboy hat: crown, dent, band, wide brim
+      const hx = hcw[0], hy = hcw[1] - hr * 0.5;
+      ctx.beginPath(); ctx.moveTo(hx - hr * 0.95, hy); ctx.lineTo(hx - hr * 0.8, hy - hr * 1.0); ctx.quadraticCurveTo(hx, hy - hr * 1.3, hx + hr * 0.8, hy - hr * 1.0); ctx.lineTo(hx + hr * 0.95, hy); ctx.closePath(); fillOut(ctx, col(P.hat), 2.2);
+      ctx.strokeStyle = col(P.hatDark); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx - hr * 0.4, hy - hr * 1.1); ctx.quadraticCurveTo(hx, hy - hr * 0.85, hx + hr * 0.4, hy - hr * 1.1); ctx.stroke();
+      ctx.beginPath(); ctx.rect(hx - hr * 0.93, hy - hr * 0.34, hr * 1.86, hr * 0.3); fillOut(ctx, col("#2a1a0c"), 1.4);
+      ctx.beginPath(); ctx.ellipse(hx, hy + 1, hr * 1.9, hr * 0.3, -d * 0.08, 0, 7); fillOut(ctx, col(P.hatDark), 2.2);
+      // front arm + revolver. Carried low, raised to aim during the wind-up, kicks up on the shot.
+      limb(ctx, armFw, k.aw, col(P.shirt));
+      const gh = armFw[2], gs = k.H / 74;
+      const aimT = strikeNow ? -0.32 : windU > 0 ? lerp(0.85, 0.0, easeOut(windU)) : recov ? 0.2 : 0.85;
+      A.aim = A.aim == null ? aimT : lerp(A.aim, aimT, 0.4);
+      const ux = d * Math.cos(A.aim), uy = Math.sin(A.aim);
+      ctx.save();
+      ctx.translate(gh[0], gh[1]);
+      ctx.rotate(Math.atan2(uy, ux));
+      ctx.scale(gs, d * gs);
+      ctx.beginPath(); ctx.moveTo(-3, -1); ctx.lineTo(4, -1); ctx.lineTo(3, 10); ctx.lineTo(-5, 9); ctx.closePath(); fillOut(ctx, col(P.wood), 1.8); // grip
+      ctx.beginPath(); ctx.rect(6, -6, 19, 4.5); fillOut(ctx, col(P.metal), 1.8); // barrel
+      ctx.beginPath(); ctx.rect(-5, -7, 13, 8); fillOut(ctx, col("#8a90a0"), 1.8); // frame
+      ctx.beginPath(); ctx.ellipse(3, -3, 4.2, 4.8, 0, 0, 7); fillOut(ctx, col("#6a7080"), 1.6); // cylinder
+      ctx.beginPath(); ctx.moveTo(-5, -7); ctx.lineTo(-8, -11); ctx.lineTo(-2, -8); ctx.closePath(); fillOut(ctx, col("#6a7080"), 1.4); // hammer
+      ctx.fillStyle = col("#3a3f55"); ctx.fillRect(22, -8.5, 2, 2.5); // front sight
+      if (A.muzzle > 0 && !k.isFlash) { // muzzle flash
+        const m = A.muzzle / 7;
+        ctx.save(); ctx.globalAlpha = m; ctx.shadowColor = "#ffb02e"; ctx.shadowBlur = 16;
+        for (const [r0, r1, c] of [[15, 5, "#ffb02e"], [8, 3, "#fff3b0"]]) {
+          ctx.fillStyle = c; ctx.beginPath();
+          for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, r = (i % 2 ? r1 : r0 * (0.6 + 0.4 * m)) ; ctx.lineTo(28 + Math.cos(a) * r, -4 + Math.sin(a) * r * 0.75); }
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
       ctx.restore();
-      if (strike) { ctx.strokeStyle = col("#ffe08a"); ctx.lineWidth = 2.5; for (let i = 1; i <= 2; i++) { ctx.beginPath(); ctx.arc(g[0] + d * i * 7, g[1], gr * (1 + i * 0.55), -0.9 + (d < 0 ? Math.PI : 0), 0.9 + (d < 0 ? Math.PI : 0)); ctx.stroke(); } }
+      hand(k, gh, k.aw * 0.8, P.skin);
+      if (A.fireFx) { // brass casing, sparks and a little smoke
+        A.fireFx = false;
+        const sp = k.spawn;
+        if (sp) {
+          const wx = A.ox + gh[0] + ux * 27 * gs, wy = A.oy + gh[1] + uy * 27 * gs;
+          sp(A.ox + gh[0], A.oy + gh[1] - 4, -d * 1.3, -2.8, "#ffd24a", 26, 2.4);
+          for (let i = 0; i < 4; i++) sp(wx, wy, ux * (2 + Math.random() * 3), uy * 2 + (Math.random() - 0.5) * 2, "#ffcf5a", 8, 2);
+          for (let i = 0; i < 3; i++) sp(wx + ux * 4, wy + uy * 4, ux * 1.4 + (Math.random() - 0.5), uy * 1.4 - 0.5, "#d8dce6", 22, 3.2);
+        }
+      }
       return;
     }
 

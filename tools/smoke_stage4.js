@@ -42,8 +42,8 @@ function fire(sim, max = 200) {
 
 // --- data sanity: bolt is the fast long-range one, shockwave the slow short one ---
 const mp = C.mage.attack.projectile, hp = C.hitter.attack.projectile;
-check("bolt is faster and longer-ranged than shockwave", mp.speed > hp.speed && mp.range > hp.range);
-check("shockwave is bigger than the bolt", hp.size > mp.size);
+check("bullet is faster than the bolt, but the bolt is longer-ranged", hp.speed > mp.speed && mp.range > hp.range);
+check("bullet is smaller than the bolt", hp.size < mp.size);
 
 // --- each projectile character hits each dummy; numbers match the formulas ---
 for (const aid of ["mage", "hitter"]) {
@@ -83,7 +83,7 @@ for (const aid of ["mage", "hitter"]) {
   check("hitter shockwave lands sooner than mage bolt at 120px (mage wind-up is slow)", tm > 0 && th > 0 && th < tm, "mage " + tm + "t, hitter " + th + "t");
   const tm2 = fire(duel(C.mage, C.tank, 600));
   const th2 = fire(duel(C.hitter, C.tank, 400));
-  check("mage bolt flies faster than shockwave after launch", (tm2 - C.mage.attack.startup) / 600 < (th2 - C.hitter.attack.startup) / 400);
+  check("gunner bullet flies faster than the mage bolt after launch", (th2 - C.hitter.attack.startup) / 400 < (tm2 - C.mage.attack.startup) / 600);
 }
 
 // --- shared behaviour ---

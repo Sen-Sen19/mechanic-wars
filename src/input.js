@@ -11,6 +11,7 @@
   };
   const BLOCKED = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
   const MENU_KEYS = ["KeyM", "Escape"]; // back to the character select screen
+  const PAUSE_KEYS = ["KeyP"];
   const AI_KEY = "KeyB"; // cycle the opponent: dummy -> aggressive -> spacing
   // Keys the character select screen listens to (turned into named actions).
   const NAV_KEYS = {
@@ -29,6 +30,7 @@
       this.pickQueued = null; // { slot, index } from number keys: 1-5 = P1, 6-9 and 0 = P2 (dummy)
       this.menuQueued = false;
       this.aiQueued = false;
+      this.pauseQueued = false;
       this.navQueued = []; // menu actions: left / right / up / down / confirm
 
       target.addEventListener("keydown", (e) => {
@@ -38,6 +40,7 @@
           if (e.code === "KeyR") this.resetQueued = true;
           if (MENU_KEYS.includes(e.code)) this.menuQueued = true;
           if (e.code === AI_KEY) this.aiQueued = true;
+          if (PAUSE_KEYS.includes(e.code)) this.pauseQueued = true;
           if (NAV_KEYS[e.code]) this.navQueued.push(NAV_KEYS[e.code]);
           const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
           if (m) {
@@ -85,6 +88,12 @@
     consumeMenu() {
       const r = this.menuQueued;
       this.menuQueued = false;
+      return r;
+    }
+
+    consumePause() {
+      const r = this.pauseQueued;
+      this.pauseQueued = false;
       return r;
     }
 

@@ -21,6 +21,13 @@
   let sim = null; // created when a match starts
   let kindIndex = select.ai; // which opponent AI is active (index into kinds)
   let bot = null; // P2 brain
+  let paused = false;
+
+  function setPaused(on) {
+    paused = on;
+    renderer.paused = on;
+    if (touch) touch.setPaused(on);
+  }
 
   if (touch) {
     renderer.helpText = ""; // on-screen controls cover the bottom corners; skip the text hint
@@ -47,6 +54,8 @@
     }
     keyboard.clearPresses();
     select.active = false;
+    renderer.randomTheme(); // new random arena for every match
+    setPaused(false);
     mode = "arena";
   }
 
@@ -66,6 +75,15 @@
     sim.setCharacter(slot, roster[index]);
     if (touch) touch.setSelected(slot, roster[index].id);
   }
+
+  // T = shuffle to a new arena theme on demand
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyT" && mode === "arena") renderer.randomTheme();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && mode === "arena" && !paused) setPaused(true);
+  });
 
   const STEP_MS = 1000 / MW.CONFIG.tickRate;
   let last = performance.now();
@@ -94,6 +112,8 @@
     const tPick = touch ? touch.consumePick() : null;
     const kMenu = keyboard.consumeMenu();
     const tMenu = touch ? touch.consumeMenu() : false;
+    const kPause = keyboard.consumePause();
+    const tPause = touch ? touch.consumePause() : false;
     const kAi = keyboard.consumeAi();
     const tAi = touch ? touch.consumeAi() : false;
     const nav = keyboard.consumeNav();
@@ -112,15 +132,23 @@
       openMenu();
       return;
     }
+    if (kPause || tPause) setPaused(!paused);
+    if (kReset || tReset) {
+      sim.reset();
+      makeBot(); // same seed again, so a reset really repeats
+      renderer.randomTheme(); // restart = fresh scenery too
+      if (paused) setPaused(false);
+    }
+    if (paused) {
+      keyboard.clearPresses();
+      if (touch) touch.poll(); // swallow taps made while paused
+      return;
+    }
     if (kPick !== null) pickCharacter(kPick.slot, kPick.index);
     if (tPick !== null) pickCharacter(tPick.slot, order.indexOf(tPick.id));
     if (kAi || tAi) {
       kindIndex = (kindIndex + 1) % kinds.length;
       makeBot();
-    }
-    if (kReset || tReset) {
-      sim.reset();
-      makeBot(); // same seed again, so a reset really repeats
     }
 
     sim.step([pollP1(), bot(sim, 1)]);
