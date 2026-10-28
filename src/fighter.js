@@ -74,6 +74,7 @@
       this.comboQueued = false;
       this.hitTargets = new Set(); // fighter ids already hit by the current swing
       this.pendingProjectile = null; // attack data to fire this tick (Sim turns it into a Projectile)
+      this.swingFx = false; // set on the first active tick of a melee swing (visual events only)
       this.flash = 0;
       this.heldDir = 0;
       this.jumpBuf = 0; // buffered jump / attack presses (ticks left)
@@ -149,6 +150,7 @@
             this.state = STATE.ATTACK_ACTIVE;
             this.stateTimer = this.hit.active || 1;
             if (this.hit.type === "projectile") this.pendingProjectile = this.hit;
+            else if (this.hit.fxStyle) this.swingFx = true;
           }
           break;
         case STATE.ATTACK_ACTIVE:

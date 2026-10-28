@@ -21,7 +21,7 @@
   const PAL = {
     fighter: { main: "#3f8cff", dark: "#1d4fa8", light: "#8fc0ff", accent: "#ffd24a", skin: "#f0c8a0", hair: "#5a3a22", pants: "#25304e", boot: "#e8ecf5" },
     mage: { main: "#8c52ff", dark: "#4b2a96", light: "#c3a0ff", accent: "#ffd479", skin: "#f3d4b8", hair: "#e8e8f5", pants: "#3a2370", boot: "#2a1a55", glow: "#d6b8ff" },
-    assassin: { main: "#1fb676", dark: "#0c5a3d", light: "#6df0b4", accent: "#5dfff0", skin: "#14221c", hair: "#0f1a15", pants: "#10382a", boot: "#0b1511", scarf: "#ff3b5c" },
+    assassin: { main: "#2a2d3a", dark: "#10121a", light: "#ff6b82", accent: "#ff2a45", skin: "#2b2230", hair: "#0f0f15", pants: "#181b26", boot: "#0c0d12", scarf: "#e4203f", scarfDark: "#8f1228", steel: "#e6ecf8", wrap: "#555c72", strap: "#5b2a2e" },
     hitter: { main: "#ff7a3d", dark: "#b8431a", light: "#ffb48a", accent: "#ffd24a", skin: "#e9b98f", hair: "#3a2414", pants: "#2f3a5a", boot: "#5a3a22", shirt: "#efe3cc", hat: "#8a5428", hatDark: "#4e2e14", band: "#d6342f", metal: "#aeb4c2", wood: "#6a3a1a" },
     tank: { main: "#8a96a8", dark: "#4d586b", light: "#d2dae6", accent: "#ff6a3a", skin: "#c9a98a", hair: "#303642", pants: "#3b4252", boot: "#2e3442" },
   };
@@ -348,6 +348,7 @@
     const armBw = MP(k.armB), armFw = MP(k.armF);
     const windU = st === S.ATTACK_STARTUP && f.hit ? clamp(1 - f.stateTimer / Math.max(1, f.hit.startup), 0, 1) : 0;
     const strike = st === S.ATTACK_ACTIVE;
+    const attackingNow = st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE || st === S.ATTACK_RECOVERY;
     const pulse = 0.5 + 0.5 * Math.sin(now * 8);
 
     // ───────────── FIGHTER ─────────────
@@ -409,6 +410,7 @@
       const hF = armFw[2];
       const tipX = hF[0] + d * (windU * -4 + (strike ? 9 : 0)), tipY = hF[1] - k.H * 0.34 + (strike ? 6 : 0);
       ctx.beginPath(); ctx.moveTo(hF[0] - d * 2, hF[1] + k.H * 0.16); ctx.lineTo(tipX, tipY); ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = col("#8a5a34"); ctx.lineWidth = 3; ctx.stroke();
+      A.orb = [A.ox + tipX, A.oy + tipY]; // staff orb position, used by mage_fx.js
       const orbR = hr * (0.55 + 0.55 * windU + (strike ? 0.5 : 0) + 0.06 * pulse);
       ctx.save(); ctx.shadowColor = P.glow; ctx.shadowBlur = k.isFlash ? 0 : 10 + 14 * windU; circle(ctx, tipX, tipY, orbR, col(strike || windU > 0.5 ? "#ffffff" : P.glow), 2); ctx.restore();
       limb(ctx, armFw, k.aw, col(P.dark));
@@ -417,33 +419,116 @@
     }
 
     // ───────────── ASSASSIN ─────────────
+    // Dark hooded killer: charcoal clothes, grey wraps, knife strap, long crimson scarf, red eyes.
+    // fr = bloodlust 0..1 (set by assassin_fx.js): brighter eyes and blades while it is high.
     if (id === "assassin") {
+      const fr = f._frenzy || 0;
+      const vxa = Math.abs(k.vx);
+      const glowOn = !k.isFlash;
+      const mid = (p, q, u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
+      const hotEye = stunned ? "#ffe3e3" : P.accent;
+
+      // tattered coat tail (behind everything), streams back when running
+      const drift = -clamp(k.vx * d, -6, 8) * 1.2 + Math.sin(now * 5) * 1.5;
+      const cy0 = k.sh[1] + 2, cy1 = k.hip[1] + k.legL * 0.42;
+      const coat = [
+        [k.sh[0] - 3, cy0], [k.sh[0] + k.sw * 0.22, cy0], [k.hip[0] + k.hw * 0.3 + drift * 0.4, cy1 - 2],
+        [k.hip[0] + drift * 0.7 + 6, cy1 + 5], [k.hip[0] - k.hw * 0.2 + drift, cy1 - 1],
+        [k.hip[0] - k.hw * 0.55 + drift, cy1 + 8], [k.hip[0] - k.hw * 0.78 + drift, cy1 - 3], [k.sh[0] - 3 - k.sw * 0.12, cy0 + 4],
+      ];
+      poly(ctx, MP(coat)); fillOut(ctx, col(P.dark), 2);
+
+      // back arm: dark sleeve, grey wrap on the forearm, gloved hand, reverse-grip dagger
       limb(ctx, armBw, k.aw, col(P.main));
+      limb(ctx, [mid(armBw[1], armBw[2], 0.1), armBw[2]], k.aw * 1.08, col(P.wrap));
       const bhd = armBw[2];
       hand(k, bhd, k.aw * 0.8, P.hair);
-      // back dagger (reverse grip)
-      ctx.beginPath(); ctx.moveTo(bhd[0], bhd[1]); ctx.lineTo(bhd[0] - d * 3, bhd[1] + 12); ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = col("#c8f5ff"); ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bhd[0], bhd[1]); ctx.lineTo(bhd[0] - d * 3, bhd[1] + 13); ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = col(P.steel); ctx.lineWidth = 2.4; ctx.stroke();
+
+      // legs with grey shin wraps
       legsAndFeet(k, P.pants, P.boot, k.lw * 1.4);
-      torsoShape(k, k.sw * 0.82, k.hw * 0.9, 0, 0, P.main, P.dark, 5);
-      ctx.beginPath(); ctx.moveTo(shW[0] - k.sw * 0.38, shW[1] + 2); ctx.lineTo(hipW[0] + k.hw * 0.4, hipW[1] - 2); ctx.strokeStyle = col("#0f1f19"); ctx.lineWidth = 3; ctx.stroke();
-      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.45, hipW[1] - 5, k.hw * 0.9, 4); fillOut(ctx, col(P.scarf), 1.4);
-      const sc = ribbon(A, "scarf", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.85, 9, hr * 1.15, -d * 2.4 - k.vx * d * 0.2, 0.3 + Math.sin(now * 9) * 0.3);
-      drawRibbon(ctx, sc, 7, col(P.scarf));
-      // hooded head with glowing eyes
-      circle(ctx, hcw[0], hcw[1], hr * 1.06, col(P.main), 2.4);
-      ctx.beginPath(); ctx.moveTo(hcw[0] - hr * 1.0, hcw[1] - hr * 0.3); ctx.quadraticCurveTo(hcw[0] - d * hr * 1.9, hcw[1] - hr * 0.6, hcw[0] - d * hr * 1.5, hcw[1] + hr * 0.9); ctx.lineTo(hcw[0] - d * hr * 0.4, hcw[1] + hr * 0.4); ctx.closePath(); fillOut(ctx, col(P.dark), 2);
-      ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.32, hcw[1] + hr * 0.08, hr * 0.7, hr * 0.5, 0, 0, 7); fillOut(ctx, col("#0b1511"), 1.6);
-      ctx.save(); ctx.shadowColor = P.accent; ctx.shadowBlur = k.isFlash ? 0 : 9;
-      ctx.fillStyle = col(stunned ? "#ff5050" : P.accent);
-      for (const ox of [0.1, 0.62]) { ctx.beginPath(); ctx.moveTo(hcw[0] + d * hr * ox - 3, hcw[1] - hr * 0.08); ctx.lineTo(hcw[0] + d * hr * (ox + 0.38) + 2, hcw[1] - hr * 0.2); ctx.lineTo(hcw[0] + d * hr * (ox + 0.3), hcw[1] + hr * 0.12); ctx.closePath(); ctx.fill(); }
+      for (const leg of [k.legB, k.legF]) {
+        const lp = MP(leg);
+        limb(ctx, [mid(lp[1], lp[2], 0.3), mid(lp[1], lp[2], 0.8)], k.lw * 1.0, col(P.wrap));
+      }
+
+      // torso + diagonal knife strap with three throwing knives
+      torsoShape(k, k.sw * 0.8, k.hw * 0.9, 0, 0, P.main, P.dark, 5);
+      const sA = [shW[0] - k.sw * 0.36, shW[1] + 2], sB = [hipW[0] + k.hw * 0.4, hipW[1] - 3];
+      ctx.beginPath(); ctx.moveTo(sA[0], sA[1]); ctx.lineTo(sB[0], sB[1]); ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 7.5; ctx.stroke(); ctx.strokeStyle = col(P.strap); ctx.lineWidth = 4.5; ctx.stroke();
+      for (const u of [0.3, 0.52, 0.74]) {
+        const kx = sA[0] + (sB[0] - sA[0]) * u, ky = sA[1] + (sB[1] - sA[1]) * u;
+        poly(ctx, [[kx - 2.2, ky - 5], [kx + 2.2, ky - 5], [kx, ky + 3.5]]); fillOut(ctx, col(P.steel), 1.2);
+      }
+
+      // crimson sash with a hanging tail
+      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.46, hipW[1] - 6, k.hw * 0.92, 5); fillOut(ctx, col(P.scarf), 1.4);
+      const sash = ribbon(A, "sash", hipW[0] - d * k.hw * 0.4, hipW[1] - 3, 5, 5.5, -d * 1.4 - k.vx * d * 0.15, 0.7);
+      drawRibbon(ctx, sash, 4, col(P.scarfDark));
+
+      // long scarf (the signature) + a second short tail + neck wrap
+      const sc2 = ribbon(A, "scarf2", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.95, 7, hr * 1.0, -d * 2.0 - k.vx * d * 0.2, 0.55 + Math.sin(now * 7 + 1) * 0.3);
+      drawRibbon(ctx, sc2, 5, col(P.scarfDark));
+      const sc = ribbon(A, "scarf", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.85, 10, hr * 1.15, -d * 2.4 - k.vx * d * 0.2, 0.3 + Math.sin(now * 9) * 0.3);
+      drawRibbon(ctx, sc, 8, col(P.scarf));
+      ctx.beginPath(); ctx.ellipse(hcw[0], hcw[1] + hr * 0.95, hr * 1.05, hr * 0.42, 0, 0, 7); fillOut(ctx, col(P.scarf), 2);
+
+      // hood: round cowl + a sharp peak swept backwards
+      circle(ctx, hcw[0], hcw[1], hr * 1.08, col(P.main), 2.4);
+      ctx.beginPath();
+      ctx.moveTo(hcw[0] - d * hr * 0.2, hcw[1] - hr * 1.0);
+      ctx.quadraticCurveTo(hcw[0] - d * hr * 1.2, hcw[1] - hr * 1.5, hcw[0] - d * hr * 2.2, hcw[1] - hr * 1.2 + Math.sin(now * 6) * 1.2);
+      ctx.quadraticCurveTo(hcw[0] - d * hr * 1.5, hcw[1] - hr * 0.1, hcw[0] - d * hr * 1.0, hcw[1] + hr * 0.5);
+      ctx.closePath(); fillOut(ctx, col(P.dark), 2);
+      // dark face opening + cloth mask over the lower face
+      ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.32, hcw[1] + hr * 0.02, hr * 0.74, hr * 0.5, 0, 0, 7); fillOut(ctx, col("#07070b"), 1.6);
+      ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.32, hcw[1] + hr * 0.42, hr * 0.72, hr * 0.3, 0, 0, 7); fillOut(ctx, col("#181a24"), 1.4);
+      // angry red eyes (slanted slits), brighter with frenzy
+      ctx.save();
+      ctx.shadowColor = P.accent; ctx.shadowBlur = glowOn ? 8 + 16 * fr : 0;
+      ctx.fillStyle = col(hotEye);
+      for (const ox of [0.1, 0.62]) {
+        ctx.beginPath();
+        ctx.moveTo(hcw[0] + d * hr * ox - 2, hcw[1] - hr * 0.22);
+        ctx.lineTo(hcw[0] + d * hr * (ox + 0.4) + 2, hcw[1] - hr * 0.02);
+        ctx.lineTo(hcw[0] + d * hr * (ox + 0.28), hcw[1] + hr * 0.14);
+        ctx.closePath(); ctx.fill();
+      }
+      if (fr > 0.45 && glowOn) { // white-hot cores at high frenzy
+        ctx.fillStyle = "#fff"; ctx.globalAlpha = (fr - 0.45) * 1.4;
+        for (const ox of [0.2, 0.7]) { ctx.beginPath(); ctx.arc(hcw[0] + d * hr * ox + d * 2, hcw[1] - hr * 0.03, 1.6, 0, 7); ctx.fill(); }
+      }
       ctx.restore();
+      // eye trails: thin red streaks behind the eyes while dashing, attacking or frenzied
+      if (vxa > 3.5 || fr > 0.3 || attackingNow) {
+        const et = ribbon(A, "eyetr", hcw[0] + d * hr * 0.8, hcw[1] - hr * 0.05, 5, 3.2, -d * 1.3 - k.vx * d * 0.25, 0.04);
+        ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = col(P.accent); ctx.globalCompositeOperation = "lighter";
+        for (let i = 1; i < et.length; i++) {
+          const u = 1 - i / et.length;
+          ctx.globalAlpha = u * (0.45 + 0.5 * fr); ctx.lineWidth = 0.5 + 1.8 * u;
+          ctx.beginPath(); ctx.moveTo(et[i - 1][0], et[i - 1][1]); ctx.lineTo(et[i][0], et[i][1]); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // front arm: sleeve + wrap + glove + blade with a red glowing edge
       limb(ctx, armFw, k.aw, col(P.main));
+      limb(ctx, [mid(armFw[1], armFw[2], 0.1), armFw[2]], k.aw * 1.08, col(P.wrap));
       const fhd = armFw[2];
       hand(k, fhd, k.aw * 0.8, P.hair);
-      // front dagger extends along the forearm direction
       const ax = fhd[0] - armFw[1][0], ay = fhd[1] - armFw[1][1], al = Math.hypot(ax, ay) || 1;
-      const bl = k.H * 0.22;
-      ctx.beginPath(); ctx.moveTo(fhd[0], fhd[1]); ctx.lineTo(fhd[0] + (ax / al) * bl, fhd[1] + (ay / al) * bl); ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = col("#d8fbff"); ctx.lineWidth = 3; ctx.stroke();
+      const bl = k.H * 0.27, ux = ax / al, uy = ay / al;
+      const tx = fhd[0] + ux * bl, ty = fhd[1] + uy * bl;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(fhd[0], fhd[1]); ctx.lineTo(tx, ty); ctx.strokeStyle = OUT; ctx.lineWidth = 6.5; ctx.stroke();
+      ctx.strokeStyle = col(P.steel); ctx.lineWidth = 3.2; ctx.stroke();
+      ctx.save();
+      ctx.shadowColor = P.accent; ctx.shadowBlur = glowOn ? 6 + 12 * fr + (strike ? 8 : 0) : 0;
+      ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 6, fhd[1] + uy * 6); ctx.lineTo(tx, ty);
+      ctx.strokeStyle = col(strike ? "#ffd0d8" : P.accent); ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+      // crossguard
+      ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 3 - uy * 4, fhd[1] + uy * 3 + ux * 4); ctx.lineTo(fhd[0] + ux * 3 + uy * 4, fhd[1] + uy * 3 - ux * 4); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
       return;
     }
 

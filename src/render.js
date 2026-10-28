@@ -224,6 +224,11 @@
       ctx.restore();
       return;
     }
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "arcane" && MW.MageFx) {
+      MW.MageFx.drawBolt(ctx, p);
+      ctx.restore();
+      return;
+    }
     const r = p.size / 2;
     const [cr, cg, cb] = hexToRgb(p.color);
 
@@ -1280,6 +1285,17 @@
       // tick effects
       tickParticles();
       tickTrails();
+      if (MW.MageFx || MW.AssassinFx) {
+        // sim events (fire / hit / fizzle / swing) -> effects
+        if (!sim.fx) sim.fx = [];
+        for (const ev of sim.fx) {
+          if (MW.MageFx) MW.MageFx.event(ev);
+          if (MW.AssassinFx) MW.AssassinFx.event(ev);
+        }
+        sim.fx.length = 0;
+        if (MW.MageFx) MW.MageFx.tick();
+        if (MW.AssassinFx) { MW.AssassinFx.update(sim); MW.AssassinFx.tick(); }
+      }
 
       if (!this.bg && typeof document !== "undefined") {
         this.bg = document.createElement("canvas");
@@ -1296,6 +1312,7 @@
 
       // trails (behind characters)
       drawTrails(ctx);
+      if (MW.AssassinFx) MW.AssassinFx.drawBehind(ctx); // red dash ghosts
 
       // fighters
       const S = MW.STATE;
@@ -1328,16 +1345,20 @@
         ctx.globalAlpha = f.state === S.KO ? 0.5 : 1;
         const isFlash = f.flash > 0;
 
+        if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(ctx, f);
         // draw the full character body
         drawCharacterBody(ctx, f, isFlash);
 
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
+        if (s.id === "mage" && MW.MageFx) MW.MageFx.drawFighter(ctx, f);
         ctx.restore();
       }
 
       // particles (between characters and projectiles for depth)
       drawParticles(ctx);
+      if (MW.MageFx) MW.MageFx.draw(ctx);
+      if (MW.AssassinFx) MW.AssassinFx.draw(ctx);
 
       // projectiles
       for (const p of sim.projectiles) {

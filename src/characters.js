@@ -61,7 +61,7 @@
         startup: 20,
         recovery: 26,
         knockback: 4,
-        projectile: { speed: 11, range: 700, size: 12 },
+        projectile: { speed: 11, range: 700, size: 12, style: "arcane" },
       },
     }),
 
@@ -69,7 +69,7 @@
     assassin: define({
       id: "assassin",
       name: "Assassin",
-      color: "#3ddc97",
+      color: "#ff3355", // crimson: slash arcs, select card, chips
       look: "scarf",
       width: 32,
       height: 70,
@@ -79,7 +79,7 @@
       runSpeed: 6.8,
       jumpStrength: 13.8,
       airJumpStrength: 12.2,
-      attack: { type: "melee", damage: 5.2, startup: 3, active: 3, recovery: 3, knockback: 3.2, range: 54 },
+      attack: { type: "melee", damage: 5.2, startup: 3, active: 3, recovery: 3, knockback: 3.2, range: 54, fxStyle: "blood" },
     }),
 
     // Gunslinger: quick draw, fast straight bullets, lighter and quicker than the Fighter
