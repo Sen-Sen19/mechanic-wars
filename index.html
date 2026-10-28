@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Mechanic Wars</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; overscroll-behavior: none; touch-action: none; }
+    body { display: flex; align-items: center; justify-content: center; height: 100vh; height: 100dvh; }
+    canvas { width: min(100vw, calc(100vh * 16 / 9)); width: min(100vw, calc(100dvh * 16 / 9)); height: auto; aspect-ratio: 16 / 9; display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <script src="src/config.js"></script>
+  <script src="src/characters.js"></script>
+  <script src="src/arena.js"></script>
+  <script src="src/fighter.js"></script>
+  <script src="src/projectiles.js"></script>
+  <script src="src/sim.js"></script>
+  <script src="src/bots.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/touch.js"></script>
+  <script src="src/character_art.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/select.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
