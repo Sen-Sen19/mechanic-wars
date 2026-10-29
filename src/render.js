@@ -133,9 +133,52 @@
 
   // ─── character body drawing ─────────────────────────────────────
   // Art lives in character_art.js (procedural IK rig). Dust / jump rings go through the shared particles.
-  const artFx = { spawn: spawnParticle };
+  const artFx = { spawn: spawnParticle, trail: addTrail };
   function drawCharacterBody(ctx, f, isFlash) {
     MW.CharacterArt.draw(ctx, f, isFlash, artFx);
+  }
+
+  // ─── Combat Momentum (Fighter passive) ──────────────────────────
+  const MOM = "#ff9a3c", MOM_HOT = "#ffe08a";
+
+  // Glow behind the body while momentum is full: the next skill is empowered.
+  function drawMomentumAura(ctx, f) {
+    if (!f.momentumFull() || f.state === MW.STATE.KO) return;
+    const s = f.stats;
+    const pulse = 0.65 + 0.35 * Math.sin(Date.now() * 0.012);
+    const cx = f.x + s.width / 2, cy = f.y + s.height * 0.55;
+    ctx.save();
+    ctx.globalAlpha = 0.5 * pulse;
+    ctx.fillStyle = safeRadialGrad(ctx, cx, cy, 6, cx, cy, s.height * 0.8, [[0, rgba(MOM_HOT, 0.9)], [0.5, rgba(MOM, 0.45)], [1, rgba(MOM, 0)]]);
+    ctx.fillRect(cx - s.height, cy - s.height, s.height * 2, s.height * 2);
+    ctx.restore();
+    if (Math.random() < 0.35) {
+      spawnParticle(cx + (Math.random() - 0.5) * s.width, f.y + s.height * (0.5 + Math.random() * 0.5), (Math.random() - 0.5) * 0.6, -0.8 - Math.random() * 1.2, MOM, 22, 2.2);
+    }
+  }
+
+  // Pips under the floating HP bar: one per momentum point; they blaze when full.
+  function drawMomentumPips(ctx, f, y) {
+    const P = f.stats.passive;
+    if (!P || P.type !== "momentum") return;
+    const r = 4.2, gap = 11.5;
+    const x0 = f.x + f.stats.width / 2 - ((P.max - 1) * gap) / 2;
+    const full = f.momentumFull();
+    const pulse = full ? 0.7 + 0.3 * Math.sin(Date.now() * 0.015) : 1;
+    for (let i = 0; i < P.max; i++) {
+      const on = i < f.momentum;
+      ctx.beginPath();
+      ctx.arc(x0 + i * gap, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = on ? (full ? MOM_HOT : MOM) : "rgba(20,24,40,0.75)";
+      ctx.globalAlpha = on ? pulse : 1;
+      if (on && full) { ctx.shadowColor = MOM; ctx.shadowBlur = 10; }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = on ? "rgba(255,255,255,0.8)" : "rgba(255,154,60,0.45)";
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
   }
 
   // ─── attack effects drawing ─────────────────────────────────────
@@ -146,7 +189,38 @@
     const cx = f.x + s.width / 2;
     const cy = f.y + s.height * 0.45;
 
-    if (f.state === S.ATTACK_STARTUP) {
+    if (f.state === S.ATTACK_STARTUP && f.hit.dashSpeed) {
+      // Fist Rush dash: speed streaks trail behind and dust kicks up
+      const col = f.hit.empowered ? "#ff6a2a" : MOM_HOT;
+      ctx.save();
+      ctx.lineCap = "round";
+      for (let i = 0; i < 4; i++) {
+        const yy = f.y + s.height * (0.28 + i * 0.17);
+        const len = 34 + i * 9 + Math.random() * 14;
+        const x0 = cx - f.facing * (s.width * 0.45 + 6 + Math.random() * 6);
+        ctx.strokeStyle = rgba(col, 0.55 - i * 0.07);
+        ctx.lineWidth = 3 - i * 0.4;
+        ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 - f.facing * len, yy); ctx.stroke();
+      }
+      ctx.restore();
+      if (f.grounded && Math.random() < 0.7) spawnParticle(cx - f.facing * 14, f.y + s.height - 2, -f.facing * (1 + Math.random() * 2), -0.4 - Math.random() * 0.6, "#c9c2b0", 14, 2.6);
+    } else if (f.state === S.ATTACK_STARTUP && f.hit.isSkill) {
+      // skill wind-up: energy gathers at the fist and a ring closes in (the opponent's tell)
+      const prog = 1 - f.stateTimer / Math.max(1, f.hit.startup);
+      const col = f.hit.empowered ? "#ff4a1f" : MOM;
+      const ox = cx + f.facing * (s.width * 0.1), oy = cy;
+      ctx.save();
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = rgba(col, 0.55 + 0.3 * prog);
+      ctx.beginPath(); ctx.arc(ox, oy, 5 + 15 * prog, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = rgba(MOM_HOT, 0.4 + 0.5 * prog);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(ox, oy, 12 + 46 * (1 - prog), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      if (Math.random() < 0.6) spawnParticle(ox + (Math.random() - 0.5) * 50, oy + (Math.random() - 0.5) * 50, 0, 0, col, 10, 2);
+    } else if (f.state === S.ATTACK_STARTUP) {
       // wind-up glow on the attacking hand
       const glowX = cx + f.facing * (s.width * 0.5 + 8);
       const [r, g, b] = hexToRgb(s.color);
@@ -158,45 +232,76 @@
       ctx.fill();
       ctx.shadowBlur = 0;
     } else if (f.state === S.ATTACK_ACTIVE) {
-      if (f.hit.type === "melee") {
-        const box = f.meleeBox();
-        // animated slash arc
-        const [r, g, b] = hexToRgb(s.color);
-        // outer glow
-        ctx.shadowColor = s.color;
-        ctx.shadowBlur = 16;
-        ctx.strokeStyle = "rgba(" + r + "," + g + "," + b + ",0.7)";
-        ctx.lineWidth = 4;
-        ctx.lineCap = "round";
+      if (f.hit.type === "melee") drawMeleeShape(ctx, f);
+    }
+  }
 
-        // slash sweep arc
-        const arcCx = f.facing > 0 ? box.x : box.x + box.w;
-        const arcCy = box.y + box.h / 2;
-        const arcR = box.w * 0.9;
-        const startAng = f.facing > 0 ? -0.7 : Math.PI - 0.7;
-        const endAng = f.facing > 0 ? 0.7 : Math.PI + 0.7;
+  // Shaped melee effect. It follows the real hit shape (f.meleeShape(): a half-ellipse), so what you
+  // see is what hits: no square. fxShape picks the look: jab / hook / upper / slam.
+  // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
+  function drawMeleeShape(ctx, f) {
+    const h = f.hit;
+    if (h.fxStyle) return;
+    const s = f.stats;
+    const e = f.meleeShape();
+    const d = e.dir;
+    const total = h.active || 1;
+    const t = 1 - f.stateTimer / total; // 0 -> 1 across the active frames
+    const shape = h.fxShape || "hook";
+    const fxCol = shape === "power" ? (h.empowered ? "#ff4a1f" : "#ffa040") : shape === "rush" ? (h.empowered ? "#ff4a1f" : "#ffd479") : s.color;
+    const thick = shape === "power" ? 0.55 : shape === "rush" ? 0.38 : shape === "slam" ? 0.42 : shape === "jab" ? 0.5 : 0.3; // crescent thickness (fraction of reach)
+    const grow = 0.82 + 0.18 * Math.min(1, t * 2);
+    const rx = e.rx * grow, ry = e.ry * grow;
+    // crescent between the outer ellipse and an inner one pulled back toward the fighter
+    ctx.save();
+    ctx.translate(e.cx, e.cy);
+    if (shape === "upper") ctx.rotate(-d * 0.35); // rising swing
+    ctx.scale(d, 1);
+    const N = 18;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const a = -Math.PI / 2 + (Math.PI * i) / N;
+      ctx.lineTo(Math.cos(a) * rx, Math.sin(a) * ry);
+    }
+    for (let i = N; i >= 0; i--) {
+      const a = -Math.PI / 2 + (Math.PI * i) / N;
+      ctx.lineTo(Math.cos(a) * rx * (1 - thick) + rx * thick * 0.35, Math.sin(a) * ry * (1 - thick * 0.7));
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 0.85 * (1 - t * 0.55);
+    ctx.fillStyle = safeLinearGrad(ctx, 0, 0, rx, 0, [[0, rgba(fxCol, 0.05)], [0.7, rgba(fxCol, 0.55)], [1, "rgba(255,255,255,0.95)"]]);
+    ctx.shadowColor = fxCol;
+    ctx.shadowBlur = 14;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // bright leading edge
+    ctx.globalAlpha = 0.9 * (1 - t * 0.5);
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = shape === "slam" || shape === "power" || shape === "rush" ? 4.5 : 2.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 2; i <= N - 2; i++) {
+      const a = -Math.PI / 2 + (Math.PI * i) / N;
+      const px = Math.cos(a) * rx, py = Math.sin(a) * ry;
+      if (i === 2) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    if (shape === "slam" || shape === "power" || shape === "rush") {
+      // shield-bash shock rings
+      ctx.strokeStyle = rgba(fxCol, 0.55);
+      ctx.lineWidth = 2;
+      for (const k of [0.62, 0.8]) {
         ctx.beginPath();
-        ctx.arc(arcCx, arcCy, arcR, startAng, endAng);
+        ctx.ellipse(0, 0, rx * k, ry * k, 0, -Math.PI / 2, Math.PI / 2);
         ctx.stroke();
-
-        // inner bright slash line
-        ctx.strokeStyle = "rgba(255,255,255,0.8)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(arcCx, arcCy, arcR * 0.7, startAng + 0.1, endAng - 0.1);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // add trail
-        addTrail(box.x, box.y, box.w, box.h, s.color, 8);
-
-        // sparks at the tip
-        const tipX = f.facing > 0 ? box.x + box.w : box.x;
-        const tipY = box.y + box.h / 2;
-        if (Math.random() < 0.5) {
-          spawnParticle(tipX, tipY, f.facing * (1 + Math.random() * 2), (Math.random() - 0.5) * 3, s.color, 10, 2);
-        }
       }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    if (h.empowered && Math.random() < 0.8) spawnBurst(e.cx + d * e.rx * 0.9, e.cy, "#ff6a2a", 2, 5); // empowered: extra embers
+    // sparks off the tip
+    if (Math.random() < 0.5) {
+      spawnParticle(e.cx + d * e.rx, e.cy, d * (1 + Math.random() * 2), (Math.random() - 0.5) * 3, fxCol, 10, 2);
     }
   }
 
@@ -352,6 +457,37 @@
     ctx.fillStyle = "#fff";
     ctx.fillText(Math.ceil(f.hp) + " / " + s.maxHP, x + PANEL_W / 2, by + 4);
     ctx.textAlign = "left";
+
+    // mana bar (ultimate meter): fills with every hit landed, pulses when full
+    const maxMana = MW.CONFIG.combat.maxMana;
+    const mf = Math.max(0, Math.min(1, f.mana / maxMana));
+    const my = by + 25, mh = 10;
+    ctx.fillStyle = "#141a2a";
+    roundRect(ctx, x, my, PANEL_W, mh, 5);
+    ctx.fill();
+    if (mf > 0) {
+      const mw = PANEL_W * mf;
+      const ready = mf >= 1;
+      const pulse = ready ? 0.75 + 0.25 * Math.sin(Date.now() * 0.012) : 1;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = ready ? "#ffd479" : "#4aa8ff";
+      if (ready) { ctx.shadowColor = "#ffd479"; ctx.shadowBlur = 12; }
+      roundRect(ctx, rightAlign ? x + PANEL_W - mw : x, my, mw, mh, 5);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = mf >= 1 ? "#ffd479" : "rgba(160,190,255,0.45)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x, my, PANEL_W, mh, 5);
+    ctx.stroke();
+    if (mf >= 1) {
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#1a1200";
+      ctx.fillText("ULTIMATE READY", x + PANEL_W / 2, my + 1);
+      ctx.textAlign = "left";
+    }
   }
 
   // ─── themed arenas ──────────────────────────────────────────────
@@ -1193,13 +1329,19 @@
       this.p2Label = "P2 DUMMY";
       this.paused = false;
       this.helpText =
-        "A/D move   W jump   S drop   J attack   P pause   R restart   M menu";
+        "A/D move   W jump   S drop   J attack   U I O L skills   Y ultimate   P pause   R restart   M menu";
       const b = arena.blastZone;
       this.offsetX = -b.left;
       this.offsetY = -b.top;
       canvas.width = b.right - b.left;
       canvas.height = b.bottom - b.top;
       this.setTheme(0);
+    }
+
+    // New platform layout: the cached background has the platforms baked in, so rebuild it.
+    setArena(arena) {
+      this.arena = arena;
+      this.bg = null;
     }
 
     // Pick a theme by index (or name) and rebuild its cached background.
@@ -1337,6 +1479,8 @@
           ctx.fill();
         }
 
+        drawMomentumPips(ctx, f, bY + 15);
+
         if (f.invuln > 0 && Math.floor(sim.tick / 4) % 2 === 0) {
           ctx.restore();
           continue;
@@ -1346,6 +1490,7 @@
         const isFlash = f.flash > 0;
 
         if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(ctx, f);
+        drawMomentumAura(ctx, f);
         // draw the full character body
         drawCharacterBody(ctx, f, isFlash);
 

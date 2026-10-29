@@ -47,11 +47,13 @@ check("tank has highest armor and weight", order.every((id) => id === "tank" || 
 check("tank armor stays modest (<= 40% reduction)", 100 / (100 + t.armor) >= 0.6, "takes " + (100 / (100 + t.armor) * 100).toFixed(0) + "% damage");
 check("hitter hits harder than assassin, with stronger knockback than assassin and fighter", h.attack.damage > a.attack.damage && h.attack.knockback > f.attack.knockback && h.attack.knockback > a.attack.knockback);
 // Total cycle cap raised 18 -> 33 ticks in Stage 7: a 18-tick shockwave cycle out-traded every matchup in the balance sim.
-check("hitter attacks quickly: shorter startup than fighter, committed recovery", h.attack.startup < f.attack.startup && h.attack.startup + h.attack.recovery <= 33);
+// Brawler (id fighter) is now the fastest starter on purpose (4 ticks), so the gunner is compared with the slower attackers.
+check("hitter attacks quickly: shorter startup than mage and bulwark, committed recovery", h.attack.startup < m.attack.startup && h.attack.startup < t.attack.startup && h.attack.startup + h.attack.recovery <= 33);
 check("hitter is quick but slower than assassin", h.runSpeed > f.runSpeed && h.runSpeed < a.runSpeed);
 check("hitter is lighter and smaller than fighter (fighter is the big body)", h.width < f.width && h.height < f.height && h.weight < f.weight);
 check("fighter is bigger than every other non-tank character", order.every((id) => id === "fighter" || id === "tank" || (C[id].width < f.width && C[id].height < f.height)));
-check("mage has the slowest basic attack of all (startup + recovery)", order.every((id) => id === "mage" || (C[id].attack.startup + C[id].attack.recovery) < m.attack.startup + m.attack.recovery));
+// The Bulwark bash (18 + 34) is slower than the Mage on purpose: it is the price of super armor.
+check("mage has the slowest basic attack of all but the Bulwark (startup + recovery)", order.every((id) => id === "mage" || id === "tank" || (C[id].attack.startup + C[id].attack.recovery) < m.attack.startup + m.attack.recovery));
 check("mage + hitter are projectile, rest melee", m.attack.type === "projectile" && h.attack.type === "projectile" && [f, a, t].every((c) => c.attack.type === "melee"));
 check("mage bolt out-ranges the gunner bullet; the bullet flies faster", m.attack.projectile.range > h.attack.projectile.range && h.attack.projectile.speed > m.attack.projectile.speed);
 check("hitter shockwave reaches well beyond melee range", h.attack.projectile.range > 2 * Math.max(f.attack.range, a.attack.range, t.attack.range));

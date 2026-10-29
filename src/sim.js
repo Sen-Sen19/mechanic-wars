@@ -13,7 +13,7 @@
       this.fighters = statsList.map((stats, i) => new MW.Fighter(i, stats, arena));
       this.kills = statsList.map(() => 0);
       this.projectiles = [];
-      this.fx = null; // visual events (fire / hit / fizzle). The renderer sets this to [] and drains it; headless runs leave it null.
+      this.fx = null; // visual events (fire / hit / fizzle / swing). The renderer sets this to [] and drains it; headless runs leave it null.
       this.koTimer = 0; // >0 while the KO pause is running
       this.tick = 0;
     }
@@ -21,6 +21,14 @@
     step(intents) {
       for (let i = 0; i < this.fighters.length; i++) {
         this.fighters[i].step(intents[i] || MW.IDLE_INTENT, this.arena);
+      }
+      // A dashing skill (Fist Rush) stops its dash as soon as the punch can reach an enemy,
+      // so it never runs through them.
+      for (const f of this.fighters) {
+        if (f.state !== MW.STATE.ATTACK_STARTUP || !f.hit || !f.hit.dashSpeed || f.stateTimer <= 1) continue;
+        for (const t of this.fighters) {
+          if (t !== f && t.state !== MW.STATE.KO && f.hitsRect(t.rect())) { f.stateTimer = 1; f.vx = 0; break; }
+        }
       }
       for (const f of this.fighters) {
         if (f.swingFx) { f.swingFx = false; this.emitMelee("swing", f, null); }
@@ -43,12 +51,12 @@
       const S = MW.STATE;
       for (const a of this.fighters) {
         if (a.state !== S.ATTACK_ACTIVE || a.hit.type !== "melee") continue;
-        const box = a.meleeBox();
         for (const t of this.fighters) {
           if (t === a || t.state === S.KO || t.invuln > 0 || a.hitTargets.has(t.id)) continue;
-          if (overlap(box, t.rect())) {
+          if (a.hitsRect(t.rect())) {
             a.hitTargets.add(t.id);
             t.takeHit(a, a.hit);
+            a.onHitLanded(a.hit);
             this.emitMelee("hit", a, t);
           }
         }
@@ -78,6 +86,7 @@
             if (t.id === p.ownerId || t.state === MW.STATE.KO || t.invuln > 0) continue;
             if (overlap(box, t.rect())) {
               t.takeHit(owner, p.hit, p.dir);
+              owner.onHitLanded(p.hit);
               p.alive = false;
               this.emit("hit", p);
               break;
@@ -134,6 +143,12 @@
       this.projectiles = this.projectiles.filter((p) => p.ownerId !== slot);
     }
 
+    // Swap in a new layout and restart the match on it.
+    setArena(arena) {
+      this.arena = arena;
+      this.reset();
+    }
+
     // Manual reset: everything back to the start, counters cleared.
     reset() {
       for (const f of this.fighters) {
@@ -157,6 +172,8 @@
     downPressed: false,
     downHeld: false,
     attackPressed: false,
+    ultPressed: false, // ultimate button (needs a full mana meter)
+    skillPressed: Object.freeze([false, false, false, false]), // skill slots 1-4 (edge-triggered)
   });
 
   MW.Sim = Sim;

@@ -37,12 +37,33 @@
       transition: transform 0.06s, background 0.06s; }
     .mw-btn svg { display: block; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
     .mw-btn.active { transform: scale(0.9); }
-    .mw-jump { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 68px; height: 68px;
+    .mw-jump { width: 58px; height: 58px;
       background: rgba(74,163,255,0.35); border-color: rgba(120,190,255,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(74,163,255,0.4); }
     .mw-jump.active { background: rgba(74,163,255,0.75); }
-    .mw-attack { right: calc(100px + env(safe-area-inset-right, 0px)); bottom: calc(62px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px;
+    .mw-attack { width: 80px; height: 80px;
       background: rgba(255,90,90,0.35); border-color: rgba(255,130,130,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(255,90,90,0.4); }
     .mw-attack.active { background: rgba(255,90,90,0.75); }
+
+    /* skill slots: fan of 4 around the attack button */
+    .mw-skill { width: 46px; height: 46px; flex-direction: column; font: 700 11px/1 monospace; letter-spacing: 0.02em;
+      background: rgba(176,108,255,0.30); border-color: rgba(200,160,255,0.9); box-shadow: 0 3px 10px rgba(0,0,0,0.4), 0 0 10px rgba(176,108,255,0.35); }
+    .mw-skill .mw-slot-n { position: absolute; top: -3px; right: -3px; width: 15px; height: 15px; border-radius: 50%;
+      background: rgba(10,12,26,0.85); border: 1px solid rgba(255,255,255,0.5); font-size: 9px; line-height: 13px; text-align: center; }
+    .mw-skill.empty { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.28); border-style: dashed; color: rgba(255,255,255,0.4);
+      box-shadow: none; }
+    .mw-skill.active { background: rgba(176,108,255,0.75); }
+    .mw-ult { width: 52px; height: 52px; font: 800 10px/1 monospace; letter-spacing: 0.04em;
+      background: rgba(255,212,121,0.10); border-color: rgba(255,212,121,0.35); color: rgba(255,255,255,0.45); box-shadow: none; }
+    .mw-ult.ready { background: rgba(255,212,121,0.45); border-color: #ffd479; color: #fff;
+      box-shadow: 0 0 18px rgba(255,212,121,0.8), 0 4px 12px rgba(0,0,0,0.4); animation: mwUltPulse 0.9s ease-in-out infinite; }
+    .mw-ult.active { background: rgba(255,212,121,0.8); }
+    @keyframes mwUltPulse { 50% { box-shadow: 0 0 28px rgba(255,212,121,1), 0 4px 12px rgba(0,0,0,0.4); } }
+    .mw-skill { overflow: hidden; }
+    .mw-skill .mw-cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+    .mw-skill .mw-cdt { position: absolute; font: 800 14px/1 monospace; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+    .mw-skill .mw-slot-n { z-index: 2; }
+    .mw-skill.cooling { filter: saturate(0.4); }
+    .mw-skill.empty.active { background: rgba(255,255,255,0.18); }
 
     /* top-centre control pill: pause / restart / menu / fullscreen */
     .mw-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px));
@@ -106,6 +127,17 @@
 
       this.jumpBtn = iconBtn("mw-btn mw-jump", "jump", "Jump");
       this.attackBtn = iconBtn("mw-btn mw-attack", "attack", "Attack");
+      this.ultQueued = false;
+      this.ultBtn = el("mw-btn mw-ult", "ULT");
+      this.ultBtn.setAttribute("role", "button");
+      this.ultBtn.setAttribute("aria-label", "Ultimate");
+      this.skillQueued = [false, false, false, false];
+      this.skillBtns = [0, 1, 2, 3].map((i) => {
+        const b = el("mw-btn mw-skill empty");
+        b.setAttribute("role", "button");
+        b.setAttribute("aria-label", "Skill " + (i + 1));
+        return b;
+      });
       this.pauseBtn = iconBtn("mw-btn", "pause", "Pause");
       this.resetBtn = iconBtn("mw-btn", "reload", "Restart");
       this.menuBtn = iconBtn("mw-btn", "menu", "Menu");
@@ -115,8 +147,10 @@
       this.bar = el("mw-bar");
       this.bar.append(this.pauseBtn, this.resetBtn, this.menuBtn);
 
-      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, this.bar);
-      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, this.pauseBtn, this.resetBtn, this.menuBtn];
+      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.bar);
+      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.pauseBtn, this.resetBtn, this.menuBtn];
+      this.layoutButtons();
+      this.setSkills(null);
 
       // Fullscreen hides the browser bars. Not available everywhere (iOS Safari
       // only allows it for installed web apps), so the button only appears when supported.
@@ -143,9 +177,73 @@
       this.bindStick();
       this.bindButton(this.jumpBtn, () => (this.jumpQueued = true));
       this.bindButton(this.attackBtn, () => (this.attackQueued = true));
+      this.skillBtns.forEach((b, i) => this.bindButton(b, () => (this.skillQueued[i] = true)));
+      this.bindButton(this.ultBtn, () => (this.ultQueued = true));
       this.bindButton(this.pauseBtn, () => (this.pauseQueued = true));
       this.bindButton(this.resetBtn, () => (this.resetQueued = true));
       this.bindButton(this.menuBtn, () => (this.menuQueued = true));
+    }
+
+    // Right-hand cluster. Everything is placed by its centre, measured from the bottom-right corner:
+    // big attack in the corner, jump to its left, 4 skill slots fanned on an arc around the attack button.
+    // Tweak the numbers below to re-layout.
+    layoutButtons() {
+      const LAYOUT = {
+        attack: { x: 64, y: 64 }, // centre of the attack button
+        jump: { x: 160, y: 42 },
+        ult: { x: 232, y: 44 }, // ultimate: glows when the mana meter is full
+        arc: { radius: 112, angles: [22, 50, 78, 106] }, // degrees, 0 = straight left of attack, 90 = straight up
+      };
+      const size = { attack: 80, jump: 58, skill: 46 }; // keep in step with the CSS sizes
+      const put = (elm, cx, cy, w) => {
+        elm.style.right = "calc(" + (cx - w / 2) + "px + env(safe-area-inset-right, 0px))";
+        elm.style.bottom = "calc(" + (cy - w / 2) + "px + env(safe-area-inset-bottom, 0px))";
+      };
+      put(this.attackBtn, LAYOUT.attack.x, LAYOUT.attack.y, size.attack);
+      put(this.jumpBtn, LAYOUT.jump.x, LAYOUT.jump.y, size.jump);
+      put(this.ultBtn, LAYOUT.ult.x, LAYOUT.ult.y, 52);
+      this.skillBtns.forEach((b, i) => {
+        const a = (LAYOUT.arc.angles[i] * Math.PI) / 180;
+        put(b, LAYOUT.attack.x + LAYOUT.arc.radius * Math.cos(a), LAYOUT.attack.y + LAYOUT.arc.radius * Math.sin(a), size.skill);
+      });
+    }
+
+    // Light the ULT button when the mana meter is full (main.js calls this every frame).
+    setUltReady(on) {
+      if (this._ultOn === on) return;
+      this._ultOn = on;
+      this.ultBtn.classList.toggle("ready", on);
+    }
+
+    // Cooldown overlay on each skill button. cds[i] = ticks left, max[i] = full cooldown ticks (main.js, every frame).
+    setSkillCooldowns(cds, max) {
+      this.skillBtns.forEach((b, i) => {
+        const left = cds[i] || 0, tot = max[i] || 0;
+        const key = tot > 0 ? Math.ceil(left / 3) : 0; // redraw at most ~20x/s
+        if (this._cdKey && this._cdKey[i] === key) return;
+        (this._cdKey = this._cdKey || [])[i] = key;
+        const ring = b.querySelector(".mw-cd"), txt = b.querySelector(".mw-cdt");
+        if (!ring || !txt) return;
+        if (left > 0 && tot > 0) {
+          ring.style.background = "conic-gradient(rgba(0,0,0,0.65) " + (left / tot) * 360 + "deg, transparent 0)";
+          txt.textContent = (left / 60).toFixed(left > 600 ? 0 : 1);
+          b.classList.add("cooling");
+        } else {
+          ring.style.background = "";
+          txt.textContent = "";
+          b.classList.remove("cooling");
+        }
+      });
+    }
+
+    // Label the 4 slots from the character's `skills` array (null = empty slot).
+    setSkills(list) {
+      this.skillBtns.forEach((b, i) => {
+        const def = list && list[i];
+        b.classList.toggle("empty", !def);
+        b.innerHTML = '<span>' + (def ? (def.icon || def.name || "").slice(0, 4) : "") + '</span><span class="mw-cd"></span><span class="mw-cdt"></span><span class="mw-slot-n">' + (i + 1) + "</span>";
+        this._cdKey = [];
+      });
     }
 
     // Show or hide the arena controls (the select screen uses plain canvas taps instead).
@@ -250,10 +348,14 @@
         downPressed: downHeld && !this.prevDown,
         downHeld: downHeld,
         attackPressed: this.attackQueued,
+        ultPressed: this.ultQueued,
+        skillPressed: this.skillQueued.slice(),
       };
       this.prevDown = downHeld;
       this.jumpQueued = false;
       this.attackQueued = false;
+      this.skillQueued.fill(false);
+      this.ultQueued = false;
       return intent;
     }
 

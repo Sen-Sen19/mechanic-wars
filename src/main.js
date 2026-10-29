@@ -43,13 +43,16 @@
   }
 
   function startMatch(choice) {
-    sim = new MW.Sim(MW.ARENA, [roster[choice.p1], roster[choice.p2]]);
+    const arena = MW.makeArena(); // random platforms; P1 spawns left, P2 right
+    sim = new MW.Sim(arena, [roster[choice.p1], roster[choice.p2]]);
+    renderer.setArena(arena);
     kindIndex = choice.ai;
     makeBot();
     if (touch) {
       touch.setGameControls(true);
       touch.setSelected(0, roster[choice.p1].id);
       touch.setSelected(1, roster[choice.p2].id);
+      touch.setSkills(roster[choice.p1].skills); // slot buttons show the picked character's skills
       touch.poll(); // drop any press left over from the menu
     }
     keyboard.clearPresses();
@@ -73,7 +76,10 @@
   function pickCharacter(slot, index) {
     if (index < 0 || index >= roster.length) return;
     sim.setCharacter(slot, roster[index]);
-    if (touch) touch.setSelected(slot, roster[index].id);
+    if (touch) {
+      touch.setSelected(slot, roster[index].id);
+      if (slot === 0) touch.setSkills(roster[index].skills);
+    }
   }
 
   // T = shuffle to a new arena theme on demand
@@ -101,6 +107,8 @@
       downPressed: k.downPressed || t.downPressed,
       downHeld: k.downHeld || t.downHeld,
       attackPressed: k.attackPressed || t.attackPressed,
+      ultPressed: k.ultPressed || t.ultPressed,
+      skillPressed: k.skillPressed.map((v, i) => v || t.skillPressed[i]),
     };
   }
 
@@ -134,9 +142,11 @@
     }
     if (kPause || tPause) setPaused(!paused);
     if (kReset || tReset) {
-      sim.reset();
+      const arena = MW.makeArena(); // restart = new platform layout and new scenery
+      sim.setArena(arena);
+      renderer.setArena(arena);
       makeBot(); // same seed again, so a reset really repeats
-      renderer.randomTheme(); // restart = fresh scenery too
+      renderer.randomTheme();
       if (paused) setPaused(false);
     }
     if (paused) {
@@ -162,7 +172,14 @@
       acc -= STEP_MS;
     }
     if (mode === "select") select.draw(canvas.getContext("2d"));
-    else renderer.draw(sim, acc / STEP_MS); // alpha: how far we are between the last two ticks
+    else {
+      renderer.draw(sim, acc / STEP_MS);
+      if (touch) {
+        const me = sim.fighters[0];
+        touch.setUltReady(me.manaReady());
+        touch.setSkillCooldowns(me.cooldowns, me.stats.skills.map((d) => (d ? d.cooldown : 0)));
+      }
+    } // alpha: how far we are between the last two ticks
     requestAnimationFrame(frame);
   }
 

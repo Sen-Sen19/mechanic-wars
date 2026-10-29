@@ -2,40 +2,72 @@
 // All characters share one movement/combat system (fighter.js); they differ only by these numbers.
 //
 // Units: distances in px, speeds in px per tick (60 ticks/sec), times in ticks (frames).
-// Fighter is the baseline; the others are balanced around it.
+// Brawler (id "fighter") is the movement baseline; the others are balanced around it.
 // Combat values (hp, armor, weight, attack) are defined now but first used in Stage 3+,
 // and will be tuned from balance-sim results.
 (function (g) {
   const MW = (g.MW = g.MW || {});
 
   function define(overrides) {
-    return Object.assign({}, MW.MOVEMENT_DEFAULTS, overrides);
+    // skills: 4 slots (touch pad / keys U I O L). null = empty. Filled per character later,
+    // e.g. skills: [{ name: "Dash", cooldown: 180 }, null, null, null].
+    return Object.assign({ skills: [null, null, null, null] }, MW.MOVEMENT_DEFAULTS, overrides);
   }
 
   MW.CHARACTERS = {
-    // Balanced melee baseline.
+    // BRAWLER (internal id stays "fighter"): close-range combo specialist.
+    // Fast short-reach jab > hook > uppercut. The uppercut launches straight UP (launchH small,
+    // launchV big), which sets up follow-ups and punishes jumpers. Low reach is the trade-off.
     fighter: define({
       id: "fighter",
-      name: "Fighter",
+      name: "Brawler",
       color: "#4aa3ff",
-      look: "headband",
+      look: "boxer",
       width: 52,
       height: 88,
       maxHP: 100,
       armor: 20,
       weight: 100,
+      // PASSIVE - Combat Momentum: every hit you LAND adds 1 momentum (whiffs add nothing).
+      // At max, the next momentumBonus skill spends it all for +bonus damage (once).
+      // Momentum fades after decayDelay ticks without landing a hit (then 1 per decayStep ticks)
+      // and hurtLoss is lost every time the Fighter takes a hit.
+      passive: { type: "momentum", max: 5, decayDelay: 150, decayStep: 60, hurtLoss: 2, bonus: 0.5 },
+      skills: [
+        // SKILL 1 - Power Strike: slow heavy punch, big damage + stagger (fixed stun, little launch).
+        // Cooldown in ticks (60 = 1 s). Punishable on a miss: long startup + recovery.
+        {
+          id: "power_strike", name: "Power", icon: "PWR", cooldown: 240,
+          attack: {
+            type: "melee", isSkill: true, momentumBonus: true, fxShape: "power", pose: 3,
+            damage: 24, startup: 16, active: 5, recovery: 30,
+            knockback: 3.5, launchH: 0.35, launchV: 0.2, stun: 34, // stagger, not a launch
+            range: 66, boxH: 0.85, advance: 1.6, manaGain: 18,
+          },
+        },
+        // SKILL 2 - Fist Rush: short explosive dash (the startup), then a straight punch.
+        // The dash stops early when the punch reaches an enemy. Shorter and slower than a charge/dash-slash.
+        {
+          id: "fist_rush", name: "Rush", icon: "RSH", cooldown: 300,
+          attack: {
+            type: "melee", isSkill: true, momentumBonus: true, fxShape: "rush", pose: 4,
+            damage: 14, startup: 10, active: 4, recovery: 26, // startup = the dash itself
+            dashSpeed: 9, // px per tick while dashing (about 90 px total)
+            knockback: 4, launchH: 0.6, launchV: 0.2, stun: 20, // brief hit-stun
+            range: 56, advance: 3, manaGain: 12,
+          },
+        },
+        null, null,
+      ],
       runSpeed: 5.2,
       jumpStrength: 12.8,
       airJumpStrength: 11.5,
-      // 3-hit chain: tap attack again during a swing to continue. The base numbers are hit 1;
-      // chain[i] overrides them for hit i+1. Light hits barely push the target (so the next
-      // hit connects); the finisher launches. "advance" = forward step-in speed while swinging.
       attack: {
-        type: "melee", damage: 7, startup: 6, active: 4, recovery: 4, knockback: 2.5, range: 60, advance: 2.5,
+        type: "melee", damage: 6, startup: 4, active: 4, recovery: 4, knockback: 2.5, range: 52, advance: 2.5, fxShape: "jab",
         chain: [
           {},
-          { startup: 3 },
-          { damage: 10, startup: 6, active: 5, recovery: 20, knockback: 9, range: 70 },
+          { startup: 3, damage: 7, fxShape: "hook" },
+          { damage: 10, startup: 7, active: 5, recovery: 20, knockback: 9, range: 58, launchH: 0.15, launchV: 1.7, fxShape: "upper", boxH: 0.9, lift: 12 },
         ],
       },
     }),
@@ -108,22 +140,23 @@
       },
     }),
 
-    // Durable and slow: wins by surviving and holding space, not by damage.
-    // Armor kept modest on purpose; weight carries the knockback resistance.
+    // BULWARK (internal id stays "tank"): immovable shield-bearer.
+    // One slow shield bash with SUPER ARMOR while winding up and swinging: hits still hurt him,
+    // but cannot interrupt or launch him (lethal hits still KO). A miss is very punishable.
     tank: define({
       id: "tank",
-      name: "Tank",
+      name: "Bulwark",
       color: "#8a96a8",
-      look: "helmet",
+      look: "shield",
       width: 60,
       height: 92,
-      maxHP: 170,
-      armor: 30,
+      maxHP: 130,
+      armor: 22,
       weight: 150,
       runSpeed: 3.8,
       jumpStrength: 12.6,
       airJumpStrength: 11.2,
-      attack: { type: "melee", damage: 10, startup: 9, active: 5, recovery: 16, knockback: 6, range: 74 },
+      attack: { type: "melee", damage: 10, startup: 18, active: 6, recovery: 34, knockback: 10, range: 70, advance: 1.4, superArmor: true, fxShape: "slam", boxH: 0.85 },
     }),
   };
 

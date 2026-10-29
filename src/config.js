@@ -20,6 +20,8 @@
       hitstunMax: 45,
       hitFlashFrames: 6,
       meleeBoxHeight: 0.7, // melee hitbox height as a fraction of the attacker's height
+      maxMana: 100, // ultimate meter size
+      manaPerHit: 10, // mana gained for every hit you LAND (an attack may override with manaGain)
       koFrames: 45, // pause after a KO before both fighters reset
       blastPenalty: 0.25, // fraction of MAX HP lost when leaving the arena (fixed, armor does not apply)
     },

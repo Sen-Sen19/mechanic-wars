@@ -2,7 +2,7 @@
 // Usage: node tools/run_all.js
 const { spawnSync } = require("child_process");
 const path = require("path");
-const suites = ["smoke_feel", "smoke_stage1", "smoke_stage2", "smoke_stage3", "smoke_stage4", "smoke_stage5", "smoke_mage_fx", "smoke_assassin_fx", "balance_sim"];
+const suites = ["smoke_feel", "smoke_stage1", "smoke_stage2", "smoke_stage3", "smoke_stage4", "smoke_stage5", "smoke_redesign", "smoke_mage_fx", "smoke_assassin_fx", "smoke_fighter_kit", "balance_sim"];
 let failed = 0;
 for (const name of suites) {
   const r = spawnSync(process.execPath, [path.join(__dirname, name + ".js")], { encoding: "utf8" });

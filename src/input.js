@@ -8,6 +8,8 @@
     jump: ["KeyW", "ArrowUp", "Space", "KeyX"],
     down: ["KeyS", "ArrowDown"],
     attack: ["KeyJ", "KeyF", "KeyZ", "KeyK"],
+    ult: ["KeyY"],
+    skills: [["KeyU"], ["KeyI"], ["KeyO"], ["KeyL"]], // skill slots 1-4
   };
   const BLOCKED = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
   const MENU_KEYS = ["KeyM", "Escape"]; // back to the character select screen
@@ -74,6 +76,8 @@
         downPressed: this.tapped(P1_KEYS.down),
         downHeld: this.held(P1_KEYS.down),
         attackPressed: this.tapped(P1_KEYS.attack),
+        ultPressed: this.tapped(P1_KEYS.ult),
+        skillPressed: P1_KEYS.skills.map((k) => this.tapped(k)),
       };
       this.pressed.clear();
       return intent;
