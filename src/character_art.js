@@ -44,6 +44,12 @@
       { wind: kf([-0.6, 0.3], [0.25, 0.5], -0.34, -7, 0.07), strike: kf([1.25, 0.0], [0.0, 0.6], 0.52, 15, 0.1) },
       // 5 = Fist Rush (skill 2): body already leaning into the dash, fist cocked low, then a flat straight punch
       { wind: kf([0.0, 0.25], [0.35, 0.45], 0.4, 6, 0.05), strike: kf([1.22, -0.04], [-0.1, 0.55], 0.6, 14, 0.09) },
+      // 6 = Rising Fist (skill 3): low crouching wind-up, then a vertical-lift punch
+      { wind: kf([-0.2, 0.8], [0.2, 0.6], -0.25, -4, 0.08), strike: kf([0.8, -0.7], [0.1, 0.6], 0.4, 10, 0.05) },
+      // 7 = Iron Guard (skill 4): brace pose
+      { wind: kf([-0.1, 0.4], [0.1, 0.6], -0.05, -1, 0.04), strike: kf([0.1, 0.5], [-0.1, 0.7], 0.0, 0, 0.02) },
+      // 8 = Meteor Breaker (ultimate): long, heavy wind-up, then a massive forward slam
+      { wind: kf([-0.8, 0.2], [0.3, 0.7], -0.4, -10, 0.12), strike: kf([1.4, 0.0], [-0.2, 0.7], 0.7, 20, 0.15) },
     ],
     assassin: [
       { wind: kf([-0.3, -0.45], [0.1, 0.6], -0.2, -3, 0.04), strike: kf([1.05, 0.05], [0.1, 0.5], 0.4, 9, 0.05) },

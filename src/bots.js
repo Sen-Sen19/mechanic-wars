@@ -209,12 +209,30 @@
       const early = prelude(me, real, sim.arena, st);
       if (early) return early;
 
+      const S = MW.STATE;
       const cfg = MW.CONFIG.bots;
       const nav = navigate(me, t, sim.arena, st);
       const d = geometry(me, t);
       const intent = I({ left: nav.move < 0, right: nav.move > 0, jumpPressed: nav.jump, downPressed: nav.down });
-      if (d.gap <= startReach(me.stats) && lined(me, t) && rng() < cfg.aggressiveAttackChance) {
-        intent.attackPressed = true;
+
+      // Strategy:
+      // 1. If mana is full, use ultimate (Meteor Breaker) if target is low HP.
+      // 2. If target is in range and we have Rising Fist/Fist Rush off cooldown, use them.
+      // 3. Use Iron Guard if target is close and winding up an attack.
+
+      const skills = me.stats.skills || [];
+      if (me.manaReady() && real.hp < real.stats.maxHP * 0.3 && rng() < 0.2) intent.ultPressed = true;
+
+      if (d.gap <= startReach(me.stats) && lined(me, t)) {
+          if (rng() < 0.2 && me.cooldowns[2] === 0) intent.skillPressed = [false, false, true, false]; // Rising Fist
+          else if (rng() < 0.2 && me.cooldowns[1] === 0) intent.skillPressed = [false, true, false, false]; // Fist Rush
+          else if (rng() < 0.3) intent.attackPressed = true;
+      }
+
+      const enemyWinding = real.state === S.ATTACK_STARTUP || real.state === S.ATTACK_ACTIVE;
+      if (enemyWinding && d.gap < 60 && me.cooldowns[3] === 0) intent.skillPressed = [false, false, false, true]; // Iron Guard
+
+      if (intent.attackPressed) {
         intent.left = d.dir < 0; // face the target when the swing starts
         intent.right = d.dir > 0;
       }

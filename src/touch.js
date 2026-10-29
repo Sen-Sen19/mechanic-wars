@@ -139,16 +139,17 @@
         return b;
       });
       this.pauseBtn = iconBtn("mw-btn", "pause", "Pause");
+      this.refreshBtn = iconBtn("mw-btn", "reload", "Hard Refresh");
       this.resetBtn = iconBtn("mw-btn", "reload", "Restart");
       this.menuBtn = iconBtn("mw-btn", "menu", "Menu");
       this.root = root;
       const hint = el("mw-hint", "Tip: rotate your phone to landscape for a bigger view");
 
       this.bar = el("mw-bar");
-      this.bar.append(this.pauseBtn, this.resetBtn, this.menuBtn);
+      this.bar.append(this.pauseBtn, this.refreshBtn, this.resetBtn, this.menuBtn);
 
       root.append(hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.bar);
-      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.pauseBtn, this.resetBtn, this.menuBtn];
+      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.pauseBtn, this.refreshBtn, this.resetBtn, this.menuBtn];
       this.layoutButtons();
       this.setSkills(null);
 
@@ -180,6 +181,10 @@
       this.skillBtns.forEach((b, i) => this.bindButton(b, () => (this.skillQueued[i] = true)));
       this.bindButton(this.ultBtn, () => (this.ultQueued = true));
       this.bindButton(this.pauseBtn, () => (this.pauseQueued = true));
+      this.bindButton(this.refreshBtn, () => {
+        // Hard refresh - reload the page completely
+        window.location.reload(true);
+      });
       this.bindButton(this.resetBtn, () => (this.resetQueued = true));
       this.bindButton(this.menuBtn, () => (this.menuQueued = true));
     }
@@ -196,6 +201,7 @@
       };
       const size = { attack: 80, jump: 58, skill: 46 }; // keep in step with the CSS sizes
       const put = (elm, cx, cy, w) => {
+        if (!elm) return; // Guard against undefined elements
         elm.style.right = "calc(" + (cx - w / 2) + "px + env(safe-area-inset-right, 0px))";
         elm.style.bottom = "calc(" + (cy - w / 2) + "px + env(safe-area-inset-bottom, 0px))";
       };
@@ -210,7 +216,7 @@
 
     // Light the ULT button when the mana meter is full (main.js calls this every frame).
     setUltReady(on) {
-      if (this._ultOn === on) return;
+      if (!this.ultBtn || this._ultOn === on) return; // never let a missing button stop the game loop
       this._ultOn = on;
       this.ultBtn.classList.toggle("ready", on);
     }

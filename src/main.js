@@ -108,7 +108,7 @@
       downHeld: k.downHeld || t.downHeld,
       attackPressed: k.attackPressed || t.attackPressed,
       ultPressed: k.ultPressed || t.ultPressed,
-      skillPressed: k.skillPressed.map((v, i) => v || t.skillPressed[i]),
+      skillPressed: k.skillPressed ? k.skillPressed.map((v, i) => v || (t.skillPressed ? t.skillPressed[i] : false)) : [false, false, false, false],
     };
   }
 

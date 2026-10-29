@@ -53,6 +53,13 @@
       this.momentum = 0; // passive (Fighter): consecutive landed hits
       this.momentumIdle = 0; // ticks since the last landed hit
       this.cooldowns = [0, 0, 0, 0]; // skill cooldowns (ticks left)
+      this.guardEmpowered = false; // after blocking with Iron Guard: next basic punch is stronger
+      this.guardEmpowerLeft = 0; // ticks left to use it
+      this.guardEmpowerCfg = null;
+      this.counterTarget = null; // set when Iron Guard blocks a hit: the Sim answers with a counter shockwave
+      this.blockFx = null; // visual event for a blocked hit (the Sim turns it into an effect)
+      this.castFx = null; // visual event for a skill that just started
+      this.advanceStopped = false;
       this.lastHit = null; // readout of the last hit taken (see takeHit)
       this.respawn(arena);
       this.invuln = 0; // no blink on the very first spawn
@@ -119,6 +126,9 @@
       this.momentum = 0;
       this.momentumIdle = 0;
       this.cooldowns = [0, 0, 0, 0];
+      this.guardEmpowered = false;
+      this.guardEmpowerLeft = 0;
+      this.counterTarget = null;
       this.respawn(arena);
     }
 
@@ -132,6 +142,20 @@
       const a = this.stats.attack;
       this.chainIndex = index;
       this.hit = a.chain && a.chain[index] ? Object.assign({}, a, a.chain[index]) : a;
+      if (this.guardEmpowered && index === 0) {
+        // Iron Guard bonus: the next basic punch hits harder (numbers come from the guard's "empower" data)
+        const E = this.guardEmpowerCfg || { damage: 2, knockback: 1.5, stun: 12 };
+        this.guardEmpowered = false;
+        this.guardEmpowerLeft = 0;
+        this.hit = Object.assign({}, this.hit, {
+          damage: this.hit.damage * E.damage,
+          knockback: this.hit.knockback * E.knockback,
+          stun: (this.hit.stun || 20) + E.stun,
+          empowered: true,
+          impactFx: "counter",
+        });
+      }
+      this.advanceStopped = false;
       this.state = STATE.ATTACK_STARTUP;
       this.stateTimer = this.hit.startup;
       this.comboQueued = false;
@@ -247,12 +271,12 @@
       return this.mana >= MW.CONFIG.combat.maxMana;
     }
 
-    // Ultimate button. Needs a full meter. Placeholder until each character gets `ultimate` data
-    // in characters.js: with none defined nothing happens and the meter stays full.
+    // Ultimate button. Needs a full meter.
     useUltimate() {
       if (!this.manaReady() || !this.stats.ultimate) return false;
       this.mana = 0;
-      return true; // TODO: run this.stats.ultimate here
+      this.startSkill(-1, this.stats.ultimate.attack);
+      return true;
     }
 
     // Skill slots 0..3 (touch pad / U I O L). Returns true when the skill started.
@@ -277,6 +301,8 @@
       this.chainIndex = 0;
       this.hit = hit;
       this.skillSlot = slot;
+      this.advanceStopped = false;
+      this.castFx = { id: hit.id || "", slot: slot };
       this.state = STATE.ATTACK_STARTUP;
       this.stateTimer = hit.startup;
       this.comboQueued = false;
@@ -291,8 +317,27 @@
       const s = this.stats;
       const C = MW.CONFIG.combat;
       const P = s.passive;
-      if (P && P.type === "momentum") this.momentum = Math.max(0, this.momentum - (P.hurtLoss || 0));
-      const dmg = Combat.damageTaken(hit.damage, s.armor);
+      // Iron Guard is up while it winds up and while it is active.
+      const guarding = !!(this.hit && this.hit.id === "iron_guard" &&
+        (this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE));
+      // a blocked hit does not break Combat Momentum
+      if (P && P.type === "momentum" && !guarding) this.momentum = Math.max(0, this.momentum - (P.hurtLoss || 0));
+      const reduction = guarding ? (this.hit.damageReduction || 1) : 1;
+      const dmg = Combat.damageTaken(hit.damage, s.armor) * reduction;
+      if (guarding) {
+        const G = this.hit;
+        this.guardEmpowered = true;
+        this.guardEmpowerCfg = G.empower || null;
+        this.guardEmpowerLeft = (G.empower && G.empower.window) || 300;
+        this.addMana({ manaGain: G.blockMana || 0 });
+        this.blockFx = { dir: attacker.x > this.x ? 1 : -1 };
+        // counter shockwave: only for attackers that are close, and never answers another counter
+        if (G.counter && !hit.isCounter && attacker && attacker !== this) {
+          const gap = Math.abs(attacker.x + attacker.stats.width / 2 - (this.x + s.width / 2)) - (attacker.stats.width + s.width) / 2;
+          if (gap <= G.counter.range) this.counterTarget = attacker;
+        }
+      }
+
       this.hp = Math.max(0, this.hp - dmg);
       const lost = 1 - this.hp / s.maxHP;
       const kb = Combat.knockback(hit.knockback, lost, s.weight);
@@ -390,6 +435,7 @@
 
       // cooldowns tick down; passive momentum fades while no hit lands
       for (let i = 0; i < 4; i++) if (this.cooldowns[i] > 0) this.cooldowns[i]--;
+      if (this.guardEmpowered && --this.guardEmpowerLeft <= 0) this.guardEmpowered = false; // bonus runs out
       const PM = s.passive;
       if (PM && PM.type === "momentum" && this.momentum > 0 && ++this.momentumIdle >= PM.decayDelay) {
         this.momentum--;
@@ -411,7 +457,9 @@
       if (this.state === STATE.ATTACK_STARTUP && this.hit.dashSpeed) {
         this.vx = this.facing * this.hit.dashSpeed; // skill dash (Fist Rush)
       } else if ((this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE) && this.hit.advance) {
-        this.vx = this.facing * this.hit.advance;
+        // stopOnContact (Meteor Breaker): the Sim sets advanceStopped when the enemy is in reach,
+        // so the charge never runs THROUGH the enemy and whiffs.
+        this.vx = this.advanceStopped ? 0 : this.facing * this.hit.advance;
       }
 
       // --- jump / air jump ---

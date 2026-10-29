@@ -57,8 +57,54 @@
             range: 56, advance: 3, manaGain: 12,
           },
         },
-        null, null,
+        // SKILL 3 - Rising Fist: powerful upward punch that launches the opponent high.
+        // Tall hit area (also catches jumpers), big damage, and a real launch (about 190 px up)
+        // so the Brawler can jump after them for a follow-up. impactFx = flame pillar + shake.
+        {
+          id: "rising_fist", name: "Rising", icon: "RIS", cooldown: 300,
+          attack: {
+            id: "rising_fist", type: "melee", isSkill: true, momentumBonus: true, fxShape: "rising", pose: 6,
+            impactFx: "rising",
+            damage: 22, startup: 12, active: 6, recovery: 26,
+            knockback: 8, launchH: 0.25, launchV: 2.0, stun: 40, // sends them straight up
+            range: 66, boxH: 1.4, lift: 30, advance: 1.5, manaGain: 15,
+          },
+        },
+        // SKILL 4 - Iron Guard: brace for impact (about 1 second).
+        //  - cuts incoming damage by 65% (damageReduction 0.35 = you take 35%)
+        //  - cannot be interrupted or launched (super armor)
+        //  - every hit you block gives mana and sends a COUNTER shockwave at close attackers
+        //  - after you block, your next basic punch is EMPOWERED (2x damage, more knockback)
+        // Damage reduction is handled in takeHit() (see fighter.js).
+        {
+          id: "iron_guard", name: "Guard", icon: "GRD", cooldown: 300,
+          attack: {
+            id: "iron_guard", type: "buff", isSkill: true, fxShape: "guard", pose: 7,
+            damage: 0, startup: 6, active: 54, recovery: 12, // active is the guard duration
+            damageReduction: 0.35,
+            momentumBonus: false, // does not consume momentum
+            manaGain: 0,
+            blockMana: 12, // mana gained for every hit blocked
+            superArmor: true, // cannot be interrupted while guarding
+            counter: { damage: 10, knockback: 7, launchH: 1, launchV: 0.5, range: 130, impactFx: "counter" },
+            empower: { damage: 2, knockback: 1.5, stun: 12, window: 300 }, // next basic punch (window in ticks)
+          },
+        },
       ],
+      // ULTIMATE - Meteor Breaker: needs a full mana bar. The Brawler charges forward (and stops
+      // when he reaches the enemy), then smashes the ground with a huge crater slam.
+      // Super armor the whole time. Big damage, big launch, big screen effect.
+      ultimate: {
+        id: "meteor_breaker", name: "Meteor", icon: "ULT",
+        attack: {
+          id: "meteor_breaker", type: "melee", isSkill: true, fxShape: "meteor", pose: 8,
+          impactFx: "meteor",
+          damage: 45, startup: 28, active: 10, recovery: 38,
+          knockback: 6, launchH: 1.0, launchV: 0.9,
+          range: 110, boxH: 1.2, advance: 6, stopOnContact: true, superArmor: true,
+          manaGain: 0, momentumGain: 0, // the ultimate does not refill mana or build momentum
+        },
+      },
       runSpeed: 5.2,
       jumpStrength: 12.8,
       airJumpStrength: 11.5,

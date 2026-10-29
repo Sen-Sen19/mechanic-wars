@@ -30,8 +30,20 @@
           if (t !== f && t.state !== MW.STATE.KO && f.hitsRect(t.rect())) { f.stateTimer = 1; f.vx = 0; break; }
         }
       }
+      // stopOnContact attacks (Meteor Breaker): stop walking forward once an enemy is in reach.
+      for (const f of this.fighters) {
+        if (!f.hit || !f.hit.stopOnContact || f.advanceStopped) continue;
+        if (f.state !== MW.STATE.ATTACK_STARTUP && f.state !== MW.STATE.ATTACK_ACTIVE) continue;
+        for (const t of this.fighters) {
+          if (t !== f && t.state !== MW.STATE.KO && f.hitsRect(t.rect())) { f.advanceStopped = true; f.vx = 0; break; }
+        }
+      }
       for (const f of this.fighters) {
         if (f.swingFx) { f.swingFx = false; this.emitMelee("swing", f, null); }
+        if (f.castFx) { // a skill just started: tell the renderer (visual only)
+          this.emitFx({ type: "cast", id: f.castFx.id, x: f.x + f.stats.width / 2, y: f.y + f.stats.height * 0.45, fy: f.y + f.stats.height, dir: f.facing, ownerId: f.id });
+          f.castFx = null;
+        }
       }
       this.spawnProjectiles();
       if (this.koTimer > 0) {
@@ -40,6 +52,7 @@
       } else {
         this.resolveHits();
         this.stepProjectiles(true);
+        this.resolveCounters();
         this.checkKO();
       }
       this.tick++;
@@ -58,6 +71,7 @@
             t.takeHit(a, a.hit);
             a.onHitLanded(a.hit);
             this.emitMelee("hit", a, t);
+            this.emitImpact(a.hit, a, t);
           }
         }
       }
@@ -99,6 +113,43 @@
         }
       }
       this.projectiles = this.projectiles.filter((p) => p.alive);
+    }
+
+    // Iron Guard: every hit it blocked answers with a counter shockwave on the attacker (if close).
+    // Also reports blocked hits to the renderer.
+    resolveCounters() {
+      const S = MW.STATE;
+      for (const f of this.fighters) {
+        if (f.blockFx) {
+          this.emitFx({ type: "block", x: f.x + f.stats.width / 2, y: f.y + f.stats.height * 0.45, fy: f.y + f.stats.height, dir: f.blockFx.dir, ownerId: f.id });
+          f.blockFx = null;
+        }
+        const t = f.counterTarget;
+        f.counterTarget = null;
+        if (!t || f.state === S.KO || t.state === S.KO || t.invuln > 0) continue;
+        const c = f.hit && f.hit.counter;
+        if (!c) continue;
+        const hit = Object.assign({ isCounter: true }, c);
+        t.takeHit(f, hit, t.x > f.x ? 1 : -1);
+        f.addMana({ manaGain: 0 });
+        this.emitImpact(hit, f, t);
+      }
+    }
+
+    // Visual-only event for the renderer (any type). Does nothing unless sim.fx is an array.
+    emitFx(ev) {
+      if (!this.fx || this.fx.length > 100) return;
+      this.fx.push(ev);
+    }
+
+    // Big-hit effect for attacks that carry impactFx (Rising Fist, Meteor Breaker, counters).
+    emitImpact(hit, a, t) {
+      if (!hit || !hit.impactFx) return;
+      const info = t.lastHit || {};
+      this.emitFx({
+        type: "impact", fx: hit.impactFx, x: t.x + t.stats.width / 2, y: t.y + t.stats.height * 0.45, fy: t.y + t.stats.height,
+        dir: a.x < t.x ? 1 : -1, ownerId: a.id, targetId: t.id, dmg: info.dmg || 0, empowered: !!hit.empowered,
+      });
     }
 
     // Visual-only event for the renderer. Does nothing unless sim.fx is an array.

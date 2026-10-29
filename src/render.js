@@ -131,6 +131,170 @@
     ctx.globalAlpha = 1;
   }
 
+  // ─── big skill effects (Rising Fist, Iron Guard, Meteor Breaker) ─
+  // The Sim sends visual events (cast / impact / block). This part turns them into rings, flame
+  // pillars, ground cracks, floating damage numbers, screen shake, a screen flash and a dark
+  // screen for the ultimate. Visual only: nothing here changes the fight.
+  const rings = [];   // {x,y,r0,r1,life,maxLife,color,lw,sy}  expanding / shrinking rings
+  const pillars = []; // {x,fy,w,h,life,maxLife,color}          upward flame spikes
+  const cracks = [];  // {x,y,life,maxLife,lines}               cracks in the floor
+  const floats = [];  // {x,y,text,life,maxLife,size,color}     floating damage numbers
+  let shakeMag = 0, flashA = 0, flashCol = "#ffffff", darkLife = 0, banner = null;
+  const DARK_MAX = 110;
+
+  function addRing(x, y, r0, r1, life, color, lw, sy) {
+    if (rings.length > 40) rings.shift();
+    rings.push({ x, y, r0, r1, life, maxLife: life, color, lw: lw || 3, sy: sy === undefined ? 1 : sy });
+  }
+  function addShake(n) { shakeMag = Math.max(shakeMag, n); }
+  function addFlash(a, col) { flashA = Math.max(flashA, a); flashCol = col || "#ffffff"; }
+  function addFloat(ev, big) {
+    if (!ev.dmg || ev.dmg < 1) return;
+    if (floats.length > 12) floats.shift();
+    floats.push({ x: ev.x, y: ev.y - 30, text: String(Math.round(ev.dmg)), life: 54, maxLife: 54, size: big ? 46 : 30, color: big ? "#ff6a4a" : "#ffe27a" });
+  }
+
+  function onSkillEvent(ev) {
+    if (!ev) return;
+    if (ev.type === "cast") {
+      if (ev.id === "rising_fist") {
+        addRing(ev.x + ev.dir * 20, ev.fy, 8, 70, 18, "#ffcc44", 3, 0.22);
+        for (let i = 0; i < 8; i++) spawnParticle(ev.x + (Math.random() - 0.5) * 40, ev.fy - 2, (Math.random() - 0.5) * 3, -0.5 - Math.random() * 1.2, "#c9c2b0", 16, 2.6);
+      } else if (ev.id === "iron_guard") {
+        addRing(ev.x, ev.y, 14, 84, 18, "#ffd700", 4, 1);
+        addShake(2);
+      } else if (ev.id === "meteor_breaker") {
+        banner = { text: "METEOR BREAKER", life: 80, maxLife: 80 };
+        darkLife = DARK_MAX;
+        addRing(ev.x, ev.fy, 190, 20, 28, "#ff3a2a", 4, 0.3); // closes in on the Brawler: the tell
+        addRing(ev.x, ev.fy, 120, 10, 28, "#ffb066", 3, 0.3);
+        addShake(4);
+      }
+    } else if (ev.type === "block") {
+      const bx = ev.x + ev.dir * 30;
+      addRing(bx, ev.y, 6, 46, 12, "#fff3b0", 3, 1);
+      spawnBurst(bx, ev.y, "#ffe27a", 10, 5);
+      spawnBurst(bx, ev.y, "#ffffff", 4, 3);
+      addShake(3);
+    } else if (ev.type === "impact") {
+      if (ev.fx === "rising") {
+        pillars.push({ x: ev.x, fy: ev.fy, w: 70, h: 260, life: 24, maxLife: 24, color: "#ffb02e" });
+        addRing(ev.x, ev.fy, 10, 120, 22, "#ffcc44", 4, 0.25);
+        addRing(ev.x, ev.y, 8, 90, 16, "#ffffff", 3, 1);
+        for (let i = 0; i < 24; i++) spawnParticle(ev.x + (Math.random() - 0.5) * 40, ev.fy - Math.random() * 40, (Math.random() - 0.5) * 3, -4 - Math.random() * 6, i % 3 ? "#ffcc44" : "#ff7a3d", 26 + (Math.random() * 12 | 0), 2.5 + Math.random() * 2.5);
+        spawnBurst(ev.x, ev.y, "#ffffff", 8, 5);
+        addShake(8); addFlash(0.14, "#fff2c0"); addFloat(ev, false);
+      } else if (ev.fx === "meteor") {
+        addRing(ev.x, ev.fy, 10, 300, 36, "#ff3a2a", 8, 0.3);
+        addRing(ev.x, ev.fy, 10, 230, 30, "#ff9a3c", 6, 0.3);
+        addRing(ev.x, ev.fy, 10, 160, 24, "#ffffff", 4, 0.3);
+        addRing(ev.x, ev.y, 10, 170, 22, "#ffd479", 5, 1);
+        const lines = [];
+        for (let i = 0; i < 9; i++) lines.push([(i / 8) * Math.PI - Math.PI, 70 + Math.random() * 110, (Math.random() - 0.5) * 0.5]);
+        cracks.push({ x: ev.x, y: ev.fy, life: 70, maxLife: 70, lines });
+        for (let i = 0; i < 42; i++) {
+          const a = Math.random() * Math.PI, sp = 2 + Math.random() * 7;
+          spawnParticle(ev.x, ev.fy - 6, Math.cos(a) * sp * (Math.random() < 0.5 ? -1 : 1), -Math.sin(a) * sp - 2, i % 3 === 0 ? "#6b5a4a" : i % 3 === 1 ? "#ff7a3d" : "#ffd479", 30 + (Math.random() * 20 | 0), 2.5 + Math.random() * 3.5);
+        }
+        spawnBurst(ev.x, ev.y, "#ff4444", 16, 7);
+        spawnBurst(ev.x, ev.y, "#ffffff", 10, 5);
+        addShake(20); addFlash(0.55, "#ffe0c0"); addFloat(ev, true);
+      } else if (ev.fx === "counter") {
+        addRing(ev.x, ev.y, 10, ev.empowered ? 100 : 130, 18, ev.empowered ? "#ff9a3c" : "#ffd700", 5, 1);
+        spawnBurst(ev.x, ev.y, "#ffe27a", 14, 6);
+        spawnBurst(ev.x, ev.y, "#ffffff", 6, 4);
+        addShake(ev.empowered ? 6 : 8); addFloat(ev, false);
+      }
+    }
+  }
+
+  function tickSkillFx() {
+    shakeMag *= 0.88; if (shakeMag < 0.3) shakeMag = 0;
+    flashA *= 0.82; if (flashA < 0.01) flashA = 0;
+    if (darkLife > 0) darkLife--;
+    if (banner && --banner.life <= 0) banner = null;
+    for (const arr of [rings, pillars, cracks, floats]) {
+      for (let i = arr.length - 1; i >= 0; i--) if (--arr[i].life <= 0) arr.splice(i, 1);
+    }
+  }
+
+  // dark screen for the ultimate: drawn before the fighters so they stay bright
+  function drawDarken(ctx, ox, oy, w, h) {
+    if (darkLife <= 0) return;
+    const a = 0.42 * Math.min(1, darkLife / 25, (DARK_MAX - darkLife) / 8 + 0.2);
+    ctx.fillStyle = "rgba(20,0,10," + a.toFixed(3) + ")";
+    ctx.fillRect(-ox, -oy, w, h);
+  }
+
+  function drawSkillFxWorld(ctx) {
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const c of cracks) {
+      const a = Math.min(1, c.life / 25);
+      ctx.strokeStyle = rgba("#ffb066", a); ctx.lineWidth = 3.5;
+      ctx.shadowColor = "#ff5a1f"; ctx.shadowBlur = 12;
+      for (const L of c.lines) {
+        const ang = L[0], len = L[1] * (1 - 0.35 * (c.life / c.maxLife));
+        const mx = c.x + Math.cos(ang) * len * 0.55, my = c.y + 2 + L[2] * 18 * Math.sign(Math.sin(ang) || 1);
+        ctx.beginPath(); ctx.moveTo(c.x, c.y + 2); ctx.lineTo(mx, my); ctx.lineTo(c.x + Math.cos(ang) * len, c.y + 3 + Math.abs(L[2]) * 8); ctx.stroke();
+      }
+    }
+    ctx.shadowBlur = 0;
+    for (const p of pillars) {
+      const k = 1 - p.life / p.maxLife; // 0 -> 1
+      const h = p.h * Math.min(1, k * 3.2), w = p.w * (1 - 0.55 * k);
+      const a = Math.min(1, p.life / 10);
+      for (const [ww, col, aa] of [[w, p.color, 0.75], [w * 0.45, "#ffffff", 0.9]]) {
+        ctx.globalAlpha = a * aa;
+        ctx.fillStyle = safeLinearGrad(ctx, 0, p.fy, 0, p.fy - h, [[0, rgba(col, 0.95)], [1, rgba(col, 0)]]);
+        ctx.beginPath();
+        ctx.moveTo(p.x - ww / 2, p.fy);
+        ctx.quadraticCurveTo(p.x - ww * 0.4, p.fy - h * 0.55, p.x, p.fy - h);
+        ctx.quadraticCurveTo(p.x + ww * 0.4, p.fy - h * 0.55, p.x + ww / 2, p.fy);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    for (const r of rings) {
+      const k = 1 - r.life / r.maxLife;
+      const rad = r.r0 + (r.r1 - r.r0) * (1 - (1 - k) * (1 - k)); // fast start, slow end
+      ctx.globalAlpha = Math.min(1, r.life / (r.maxLife * 0.6));
+      ctx.strokeStyle = r.color; ctx.lineWidth = Math.max(1, r.lw * (1 - k * 0.6));
+      ctx.shadowColor = r.color; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, Math.max(1, rad), Math.max(1, rad * r.sy), 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const f of floats) {
+      const k = 1 - f.life / f.maxLife;
+      const pop = k < 0.15 ? 0.6 + k * 2.7 : 1;
+      ctx.globalAlpha = Math.min(1, f.life / 18);
+      ctx.font = "bold " + Math.round(f.size * pop) + "px monospace";
+      ctx.lineWidth = 5; ctx.strokeStyle = "rgba(20,10,10,0.9)";
+      ctx.strokeText(f.text, f.x, f.y - k * 46);
+      ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y - k * 46);
+    }
+    ctx.restore();
+  }
+
+  function drawSkillFxScreen(ctx, w, h) {
+    if (flashA > 0) { ctx.globalAlpha = Math.min(0.7, flashA); ctx.fillStyle = flashCol; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1; }
+  }
+  function drawBanner(ctx, w, h) {
+    if (!banner) return;
+    const k = 1 - banner.life / banner.maxLife;
+    const pop = k < 0.12 ? 1.6 - (k / 0.12) * 0.6 : 1;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, banner.life / 20);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "bold " + Math.round(64 * pop) + "px monospace";
+    ctx.lineWidth = 8; ctx.strokeStyle = "rgba(40,0,0,0.9)";
+    ctx.shadowColor = "#ff2a2a"; ctx.shadowBlur = 24;
+    ctx.strokeText(banner.text, w / 2, h * 0.26);
+    ctx.fillStyle = "#ffe9c4"; ctx.fillText(banner.text, w / 2, h * 0.26);
+    ctx.restore();
+  }
+
   // ─── character body drawing ─────────────────────────────────────
   // Art lives in character_art.js (procedural IK rig). Dust / jump rings go through the shared particles.
   const artFx = { spawn: spawnParticle, trail: addTrail };
@@ -204,6 +368,10 @@
       }
       ctx.restore();
       if (f.grounded && Math.random() < 0.7) spawnParticle(cx - f.facing * 14, f.y + s.height - 2, -f.facing * (1 + Math.random() * 2), -0.4 - Math.random() * 0.6, "#c9c2b0", 14, 2.6);
+    } else if (f.state === S.ATTACK_STARTUP && f.hit.id === "iron_guard") {
+      // the shield dome (drawGuardAura) is the whole effect
+    } else if (f.state === S.ATTACK_STARTUP && f.hit.id === "meteor_breaker") {
+      drawUltCharge(ctx, f);
     } else if (f.state === S.ATTACK_STARTUP && f.hit.isSkill) {
       // skill wind-up: energy gathers at the fist and a ring closes in (the opponent's tell)
       const prog = 1 - f.stateTimer / Math.max(1, f.hit.startup);
@@ -236,6 +404,29 @@
     }
   }
 
+  // Meteor Breaker charge: red fire ring on the floor, glowing fist, rising embers, red body glow.
+  function drawUltCharge(ctx, f) {
+    const s = f.stats;
+    const prog = 1 - f.stateTimer / Math.max(1, f.hit.startup);
+    const cx = f.x + s.width / 2, cy = f.y + s.height * 0.5, fy = f.y + s.height;
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.03);
+    ctx.save();
+    ctx.globalAlpha = (0.35 + 0.4 * prog) * pulse;
+    ctx.fillStyle = safeRadialGrad(ctx, cx, cy, 8, cx, cy, s.height * (0.7 + 0.5 * prog), [[0, rgba("#ffe0a0", 0.9)], [0.45, rgba("#ff3a2a", 0.5)], [1, rgba("#ff3a2a", 0)]]);
+    ctx.fillRect(cx - s.height * 1.3, cy - s.height * 1.3, s.height * 2.6, s.height * 2.6);
+    ctx.globalAlpha = 0.5 + 0.4 * prog;
+    ctx.strokeStyle = "#ff5a2a"; ctx.lineWidth = 4; ctx.shadowColor = "#ff2a00"; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.ellipse(cx, fy, 34 + 46 * prog, 9 + 12 * prog, 0, 0, Math.PI * 2); ctx.stroke();
+    const ox = cx + f.facing * (s.width * 0.55), oy = f.y + s.height * 0.42;
+    ctx.globalAlpha = 0.6 + 0.35 * prog;
+    ctx.fillStyle = "#ff6a3a"; ctx.shadowBlur = 24;
+    ctx.beginPath(); ctx.arc(ox, oy, 8 + 20 * prog, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff3d0"; ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(ox, oy, 3 + 8 * prog, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (Math.random() < 0.9) spawnParticle(cx + (Math.random() - 0.5) * s.width * 1.6, fy - 4, (Math.random() - 0.5) * 1.2, -1.5 - Math.random() * 2.5, Math.random() < 0.5 ? "#ff6a2a" : "#ffd479", 24, 2.5 + Math.random() * 2);
+  }
+
   // Shaped melee effect. It follows the real hit shape (f.meleeShape(): a half-ellipse), so what you
   // see is what hits: no square. fxShape picks the look: jab / hook / upper / slam.
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
@@ -248,7 +439,11 @@
     const total = h.active || 1;
     const t = 1 - f.stateTimer / total; // 0 -> 1 across the active frames
     const shape = h.fxShape || "hook";
-    const fxCol = shape === "power" ? (h.empowered ? "#ff4a1f" : "#ffa040") : shape === "rush" ? (h.empowered ? "#ff4a1f" : "#ffd479") : s.color;
+    const fxCol = shape === "power" ? (h.empowered ? "#ff4a1f" : "#ffa040")
+                : shape === "rush" ? (h.empowered ? "#ff4a1f" : "#ffd479")
+                : shape === "rising" ? "#ffcc44"
+                : shape === "meteor" ? "#ff2a2a"
+                : s.color;
     const thick = shape === "power" ? 0.55 : shape === "rush" ? 0.38 : shape === "slam" ? 0.42 : shape === "jab" ? 0.5 : 0.3; // crescent thickness (fraction of reach)
     const grow = 0.82 + 0.18 * Math.min(1, t * 2);
     const rx = e.rx * grow, ry = e.ry * grow;
@@ -256,6 +451,7 @@
     ctx.save();
     ctx.translate(e.cx, e.cy);
     if (shape === "upper") ctx.rotate(-d * 0.35); // rising swing
+    // (rising / meteor: no extra scaling, so what you see is the real hit area: range, boxH, lift)
     ctx.scale(d, 1);
     const N = 18;
     ctx.beginPath();
@@ -302,6 +498,93 @@
     // sparks off the tip
     if (Math.random() < 0.5) {
       spawnParticle(e.cx + d * e.rx, e.cy, d * (1 + Math.random() * 2), (Math.random() - 0.5) * 3, fxCol, 10, 2);
+    }
+
+    // Rising Fist: three flame tongues shoot up from the fist, sparks fly upward
+    if (shape === "rising") {
+      ctx.save();
+      const fade = 1 - t * 0.5;
+      for (let i = 0; i < 3; i++) {
+        const bx = e.cx + d * e.rx * (0.3 + i * 0.22), top = e.cy - e.ry * (0.9 + 0.25 * (i === 1 ? 1 : 0)), base = e.cy + e.ry * 0.6;
+        const w = 20 - i * 3;
+        ctx.globalAlpha = 0.85 * fade;
+        ctx.fillStyle = safeLinearGrad(ctx, 0, base, 0, top, [[0, rgba("#ff7a1f", 0.9)], [0.6, rgba("#ffcc44", 0.85)], [1, rgba("#ffffff", 0)]]);
+        ctx.beginPath();
+        ctx.moveTo(bx - w / 2, base);
+        ctx.quadraticCurveTo(bx - w * 0.4, (base + top) / 2, bx, top);
+        ctx.quadraticCurveTo(bx + w * 0.4, (base + top) / 2, bx + w / 2, base);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      if (Math.random() < 0.8) spawnParticle(e.cx + d * e.rx * (0.3 + Math.random() * 0.5), e.cy + e.ry * 0.3, (Math.random() - 0.5) * 2, -3 - Math.random() * 5, Math.random() < 0.5 ? "#ffcc44" : "#ff7a3d", 20, 2.5 + Math.random() * 2);
+    }
+    // Meteor Breaker: a fireball at the fist and a shock ring along the floor
+    if (shape === "meteor") {
+      const fx = e.cx + d * e.rx * 0.6, fyb = f.y + s.height;
+      const R = 34 + 46 * t;
+      ctx.save();
+      ctx.fillStyle = safeRadialGrad(ctx, fx, e.cy, 4, fx, e.cy, R, [[0, "rgba(255,255,255,0.95)"], [0.35, rgba("#ffb02e", 0.85)], [0.75, rgba("#ff3a2a", 0.55)], [1, rgba("#ff3a2a", 0)]]);
+      ctx.fillRect(fx - R, e.cy - R, R * 2, R * 2);
+      ctx.strokeStyle = rgba("#ffd479", 0.8 * (1 - t * 0.5)); ctx.lineWidth = 5;
+      ctx.shadowColor = "#ff3a2a"; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.ellipse(fx, fyb, 40 + 120 * t, 10 + 22 * t, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      if (Math.random() < 0.9) spawnBurst(fx, e.cy, Math.random() < 0.5 ? "#ff4444" : "#ffcc44", 3, 6);
+    }
+  }
+
+  // Iron Guard: a gold shield dome with a spinning hex ring (grows in, fades out), a white flash
+  // when it takes a hit, and a glowing fist after a block (the next punch is empowered).
+  function drawGuardAura(ctx, f) {
+    const S = MW.STATE, s = f.stats;
+    if (f.state === S.KO) return;
+    const cx = f.x + s.width / 2, cy = f.y + s.height * 0.5;
+    const now = Date.now() * 0.001;
+    const guarding = f.hit && f.hit.id === "iron_guard" &&
+      (f.state === S.ATTACK_STARTUP || f.state === S.ATTACK_ACTIVE || f.state === S.ATTACK_RECOVERY);
+    if (guarding) {
+      let k = 1;
+      if (f.state === S.ATTACK_STARTUP) k = 1 - f.stateTimer / Math.max(1, f.hit.startup);
+      else if (f.state === S.ATTACK_RECOVERY) k = f.stateTimer / Math.max(1, f.hit.recovery);
+      const R = s.height * 0.66 * (0.6 + 0.4 * k);
+      const pulse = 0.85 + 0.15 * Math.sin(now * 14);
+      ctx.save();
+      ctx.globalAlpha = 0.9 * k;
+      ctx.fillStyle = safeRadialGrad(ctx, cx, cy, R * 0.3, cx, cy, R, [[0, rgba("#ffd700", 0.04)], [0.75, rgba("#ffd700", 0.2 * pulse)], [1, rgba("#fff3b0", 0.55 * pulse)]]);
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#ffd700"; ctx.lineWidth = 4; ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.lineWidth = 2.5; ctx.strokeStyle = rgba("#fff3b0", 0.85);
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = now * 0.9 + (i * Math.PI) / 3;
+        const px = cx + Math.cos(a) * R * 0.9, py = cy + Math.sin(a) * R * 0.9;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      if (f.armorHit > 0) { // took a hit: the whole dome flashes white
+        ctx.globalAlpha = f.armorHit / 8;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      if (f.state === S.ATTACK_ACTIVE && Math.random() < 0.3) {
+        const a = Math.random() * Math.PI * 2;
+        spawnParticle(cx + Math.cos(a) * R, cy + Math.sin(a) * R, Math.cos(a) * 0.5, Math.sin(a) * 0.5 - 0.4, "#ffe27a", 14, 2);
+      }
+    }
+    if (f.guardEmpowered && !guarding) {
+      // empowered fist: glowing orb on the front hand
+      const ox = cx + f.facing * (s.width * 0.55), oy = f.y + s.height * 0.42;
+      const pulse = 0.7 + 0.3 * Math.sin(now * 16);
+      ctx.save();
+      ctx.shadowColor = "#ff9a3c"; ctx.shadowBlur = 22;
+      ctx.fillStyle = rgba("#ffb02e", 0.75 * pulse);
+      ctx.beginPath(); ctx.arc(ox, oy, 11 + 4 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff3d0"; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      if (Math.random() < 0.4) spawnParticle(ox, oy, (Math.random() - 0.5) * 1.5, -1 - Math.random(), "#ffb02e", 16, 2);
     }
   }
 
@@ -1427,12 +1710,14 @@
       // tick effects
       tickParticles();
       tickTrails();
+      tickSkillFx();
       if (MW.MageFx || MW.AssassinFx) {
         // sim events (fire / hit / fizzle / swing) -> effects
         if (!sim.fx) sim.fx = [];
         for (const ev of sim.fx) {
           if (MW.MageFx) MW.MageFx.event(ev);
           if (MW.AssassinFx) MW.AssassinFx.event(ev);
+          onSkillEvent(ev);
         }
         sim.fx.length = 0;
         if (MW.MageFx) MW.MageFx.tick();
@@ -1450,7 +1735,10 @@
       else this.drawStatic(ctx);
       if (this.amb) this.drawAmbient(ctx, width, height);
 
-      ctx.setTransform(1, 0, 0, 1, this.offsetX, this.offsetY);
+      const shx = shakeMag > 0 ? (Math.random() - 0.5) * 2 * shakeMag : 0;
+      const shy = shakeMag > 0 ? (Math.random() - 0.5) * 2 * shakeMag : 0;
+      ctx.setTransform(1, 0, 0, 1, this.offsetX + shx, this.offsetY + shy);
+      drawDarken(ctx, this.offsetX + shx, this.offsetY + shy, width, height); // ultimate: dim the arena
 
       // trails (behind characters)
       drawTrails(ctx);
@@ -1494,6 +1782,9 @@
         // draw the full character body
         drawCharacterBody(ctx, f, isFlash);
 
+        // Iron Guard aura
+        drawGuardAura(ctx, f);
+
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
         if (s.id === "mage" && MW.MageFx) MW.MageFx.drawFighter(ctx, f);
@@ -1502,6 +1793,7 @@
 
       // particles (between characters and projectiles for depth)
       drawParticles(ctx);
+      drawSkillFxWorld(ctx);
       if (MW.MageFx) MW.MageFx.draw(ctx);
       if (MW.AssassinFx) MW.AssassinFx.draw(ctx);
 
@@ -1512,10 +1804,12 @@
 
       // HUD (screen space)
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      drawSkillFxScreen(ctx, width, height);
       ctx.textBaseline = "top";
       drawPanel(ctx, sim.fighters[0], 40, "P1", sim.kills[0], false);
       if (sim.fighters[1]) drawPanel(ctx, sim.fighters[1], width - 40 - PANEL_W, this.p2Label, sim.kills[1], true);
 
+      drawBanner(ctx, width, height); // "METEOR BREAKER" title
       if (sim.koTimer > 0) {
         ctx.textAlign = "center";
         ctx.font = "bold 72px monospace";
