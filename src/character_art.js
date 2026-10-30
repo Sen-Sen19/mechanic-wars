@@ -65,6 +65,14 @@
       { wind: kf([-0.65, 0.2], [-0.2, 0.5], -0.36, -8, 0.1), strike: kf([1.28, 0.1], [0.2, 0.5], 0.62, 16, 0.11) },
       // 4 = Chained Scythe: arm cocked back, then thrown straight out and held while the chain drags the enemy in
       { wind: kf([-0.5, -0.3], [0.1, 0.6], -0.25, -4, 0.06), strike: kf([1.2, -0.15], [0.1, 0.55], 0.45, 12, 0.07) },
+      // 5 = Rupture / illusion slash: low wide sweep with the lead blade, rear blade trailing
+      { wind: kf([-0.45, 0.55], [-0.2, 0.7], -0.22, -4, 0.1), strike: kf([1.15, 0.45], [0.2, 0.6], 0.5, 12, 0.12) },
+      // 6 = Phantom Onslaught: arms crossed back, then an upward diagonal cut
+      { wind: kf([-0.35, 0.2], [-0.3, 0.1], -0.3, -5, 0.05), strike: kf([1.05, -0.5], [0.5, 0.3], 0.5, 10, 0.03) },
+      // 7 = Death Sentence: arm raised high behind the head, then thrown forward (also the illusions' shuriken throw)
+      { wind: kf([-0.2, -0.95], [0.1, 0.6], -0.34, -3, 0.0), strike: kf([1.1, -0.15], [0.1, 0.55], 0.4, 9, 0.04) },
+      // 8 = Phantom Decoy: crouched, both blades drawn in across the body (the cast)
+      { wind: kf([0.45, 0.35], [0.4, 0.35], 0.1, 0, 0.14), strike: kf([0.5, 0.3], [0.45, 0.3], 0.15, 2, 0.16) },
     ],
     tank: [{ wind: kf([-0.3, 0.05], [0.0, 0.5], -0.32, -5, 0.03), strike: kf([1.0, 0.1], [0.1, 0.5], 0.46, 8, 0.07) }],
     mage: [{ wind: kf([0.15, -0.55], [0.2, 0.5], -0.16, -2, 0.02), strike: kf([0.95, -0.2], [0.2, 0.5], 0.2, 3, 0.02) }],

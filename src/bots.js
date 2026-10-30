@@ -74,6 +74,24 @@
     return y1 > t.y && y0 < t.y + t.stats.height;
   }
 
+  // Void Mage skill logic (data comes from characters.js; slots: 0 Wraiths, 1 Transit, 2 Spikes, 3 Grasp). Mutates the intent.
+  function voidMageSkills(me, real, d, intent, rng) {
+    const cd = me.cooldowns;
+    const X = me.stats.ultimate && me.stats.ultimate.attack.execution;
+    const sk = [false, false, false, false];
+    let any = false;
+    const press = (i) => { sk[i] = true; any = true; };
+    if (X && me.manaReady() && d.gap < X.range * 0.8 && rng() < 0.08) intent.ultPressed = true; // enemy in range: execute
+    else if (cd[0] === 0 && d.gap > 120 && d.gap < 420 && !real.root && rng() < 0.03) press(0); // wraiths at mid range
+    else if (cd[1] === 0 && me.hp < me.stats.maxHP * 0.4 && d.gap < 140 && rng() < 0.06) press(1); // transit: escape when hurt and cornered
+    else if (cd[2] === 0 && d.gap < 150 && Math.abs(d.rise) < 40 && me.grounded && rng() < 0.05) press(2); // spikes on a close enemy
+    else if (cd[3] === 0 && d.gap < 260 && me.grounded && rng() < 0.03) press(3); // grasp: control the floor
+    if (any) {
+      intent.skillPressed = sk;
+      intent.attackPressed = false;
+    }
+  }
+
   // Do not walk off the open edge of the main stage on purpose.
   function guardEdge(me, arena, move) {
     const main = lowestPlatform(arena);
@@ -221,16 +239,20 @@
       // 3. Use Iron Guard if target is close and winding up an attack.
 
       const skills = me.stats.skills || [];
-      if (me.manaReady() && real.hp < real.stats.maxHP * 0.3 && rng() < 0.2) intent.ultPressed = true;
+      const isMage = me.stats.id === "mage"; // the Vanguard skill script below must not drive the Void Mage's slots
+      if (!isMage && me.manaReady() && real.hp < real.stats.maxHP * 0.3 && rng() < 0.2) intent.ultPressed = true;
 
       if (d.gap <= startReach(me.stats) && lined(me, t)) {
+        if (isMage) { if (rng() < 0.3) intent.attackPressed = true; }
+        else
           if (rng() < 0.2 && me.cooldowns[2] === 0) intent.skillPressed = [false, false, true, false]; // Rising Fist
           else if (rng() < 0.2 && me.cooldowns[1] === 0) intent.skillPressed = [false, true, false, false]; // Fist Rush
           else if (rng() < 0.3) intent.attackPressed = true;
       }
 
       const enemyWinding = real.state === S.ATTACK_STARTUP || real.state === S.ATTACK_ACTIVE;
-      if (enemyWinding && d.gap < 60 && me.cooldowns[3] === 0) intent.skillPressed = [false, false, false, true]; // Iron Guard
+      if (!isMage && enemyWinding && d.gap < 60 && me.cooldowns[3] === 0) intent.skillPressed = [false, false, false, true]; // Iron Guard
+      if (isMage) voidMageSkills(me, real, d, intent, rng);
 
       if (intent.attackPressed) {
         intent.left = d.dir < 0; // face the target when the swing starts
@@ -282,6 +304,7 @@
       }
 
       const intent = I({ left: move < 0, right: move > 0, jumpPressed: jump, downPressed: down });
+      if (me.stats.id === "mage") voidMageSkills(me, real, d, intent, rng);
       const free = me.state === S.IDLE || me.state === S.RUN || me.state === S.RISING || me.state === S.FALLING;
       if (free && d.gap <= startReach(me.stats) && lined(me, t) && rng() < cfg.spacingAttackChance) {
         intent.attackPressed = true;

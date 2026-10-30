@@ -23,6 +23,7 @@
       this.px = this.x; // previous-tick position, for render interpolation
       this.py = this.y;
       this.color = s.color;
+      this.kind = p.kind || "shard"; // Void Mage: shard | singularity | orb (visual + damage riders live in the attack data)
     }
 
     box() {

@@ -22,7 +22,15 @@
   let kindIndex = select.ai; // which opponent AI is active (index into kinds)
   let bot = null; // P2 brain
   let paused = false;
-
+  renderer.tapUlt = !!touch; // touch devices: the P1 health panel is the ultimate button
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!touch || mode !== "arena" || paused || !renderer.ultRect || !sim.fighters[0].manaReady()) return;
+    const b = canvas.getBoundingClientRect();
+    const cx = ((e.clientX - b.left) * canvas.width) / b.width;
+    const cy = ((e.clientY - b.top) * canvas.height) / b.height;
+    const r = renderer.ultRect;
+    if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) touch.fireUlt();
+  });
   function setPaused(on) {
     paused = on;
     renderer.paused = on;
@@ -107,8 +115,10 @@
       jumpPressed: k.jumpPressed || t.jumpPressed,
       downPressed: k.downPressed || t.downPressed,
       downHeld: k.downHeld || t.downHeld,
-      attackPressed: k.attackPressed || t.attackPressed,
-      ultPressed: k.ultPressed || t.ultPressed,
+   attackPressed: k.attackPressed || t.attackPressed,
+attackHeld: k.attackHeld || t.attackHeld,
+attackReleased: k.attackReleased || t.attackReleased,
+ultPressed: k.ultPressed || t.ultPressed,
       skillPressed: k.skillPressed ? k.skillPressed.map((v, i) => v || (t.skillPressed ? t.skillPressed[i] : false)) : [false, false, false, false],
     };
   }
@@ -118,7 +128,7 @@
     const kReset = keyboard.consumeReset();
     const tReset = touch ? touch.consumeReset() : false;
     const kPick = keyboard.consumePick();
-    const tPick = touch ? touch.consumePick() : null;
+ 
     const kMenu = keyboard.consumeMenu();
     const tMenu = touch ? touch.consumeMenu() : false;
     const kPause = keyboard.consumePause();
@@ -127,9 +137,12 @@
     const tAi = touch ? touch.consumeAi() : false;
     const nav = keyboard.consumeNav();
 
-    if (mode === "select") {
-      if (kPick !== null) select.pick(kPick.slot, kPick.index);
-      for (const action of nav) select.nav(action);
+if (mode === "select") {
+  if (kPick !== null) select.pick(kPick.slot, kPick.index);
+
+
+
+  for (const action of nav) select.nav(action);
       keyboard.clearPresses();
       if (touch) touch.poll();
       const choice = select.consumeStart();
@@ -157,7 +170,7 @@
       return;
     }
     if (kPick !== null) pickCharacter(kPick.slot, kPick.index);
-    if (tPick !== null) pickCharacter(tPick.slot, order.indexOf(tPick.id));
+ 
     if (kAi || tAi) {
       kindIndex = (kindIndex + 1) % kinds.length;
       makeBot();

@@ -303,6 +303,24 @@
     ctx.restore();
   }
 
+  // Draw through an offscreen canvas and composite it at `alpha` (Phantom Decoy cloak). Without a DOM it just draws normally.
+  let fadeCv = null;
+  function drawFaded(ctx, alpha, fn) {
+    if (typeof document === "undefined" || !ctx.canvas || !ctx.getTransform) { fn(ctx); return; }
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    if (!fadeCv || fadeCv.width !== w || fadeCv.height !== h) { fadeCv = document.createElement("canvas"); fadeCv.width = w; fadeCv.height = h; }
+    const c = fadeCv.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, w, h);
+    c.setTransform(ctx.getTransform());
+    fn(c);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(fadeCv, 0, 0);
+    ctx.restore();
+  }
+
   // ─── character body drawing ─────────────────────────────────────
   // Art lives in character_art.js (procedural IK rig). Dust / jump rings go through the shared particles.
   const artFx = { spawn: spawnParticle, trail: addTrail };
@@ -693,10 +711,17 @@
   // ─── panel (HUD) ───────────────────────────────────────────────
   const PANEL_W = 420;
 
-  function drawPanel(ctx, f, x, label, kills, rightAlign) {
+  // `tap` = true for the local touch player: the whole panel becomes the ultimate button.
+  // Returns the panel rectangle (canvas pixels) so the caller can hit-test taps against it.
+  function drawPanel(ctx, f, x, label, kills, rightAlign, tap) {
     const s = f.stats;
     const y = 18, bh = 20;
     const frac = Math.max(0, f.hp / s.maxHP);
+    const maxMana = MW.CONFIG.combat.maxMana;
+    const mf = Math.max(0, Math.min(1, f.mana / maxMana));
+    const ultReady = !!tap && mf >= 1;
+    const glowPulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.012);
+    const panelRect = { x: x - 12, y: y - 8, w: PANEL_W + 24, h: 82 };
 
     // glass backing
     ctx.fillStyle = "rgba(8,10,20,0.55)";
@@ -708,6 +733,19 @@
     roundRect(ctx, x - 12, y - 8, PANEL_W + 24, 82, 12);
     ctx.stroke();
     ctx.globalAlpha = 1;
+
+    // glowing "ultimate ready" border around the whole panel
+    if (ultReady) {
+      ctx.save();
+      ctx.shadowColor = "#ffd479";
+      ctx.shadowBlur = 14 + 14 * glowPulse;
+      ctx.strokeStyle = "#ffd479";
+      ctx.globalAlpha = 0.6 + 0.4 * glowPulse;
+      ctx.lineWidth = 4;
+      roundRect(ctx, x - 12, y - 8, PANEL_W + 24, 82, 12);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // name + kills
     ctx.textBaseline = "top";
@@ -738,10 +776,13 @@
       roundRect(ctx, fx + 3, by + 2, Math.max(0, fw - 6), 5, 3);
       ctx.fill();
     }
-    ctx.strokeStyle = "rgba(220,228,255,0.55)";
+    // HP bar outline: glows gold while the ultimate is ready
+    if (ultReady) { ctx.save(); ctx.shadowColor = "#ffd479"; ctx.shadowBlur = 10 + 10 * glowPulse; }
+    ctx.strokeStyle = ultReady ? "#ffd479" : "rgba(220,228,255,0.55)";
     ctx.lineWidth = 2;
     roundRect(ctx, x, by, PANEL_W, bh, 10);
     ctx.stroke();
+    if (ultReady) ctx.restore();
 
     ctx.font = "bold 13px monospace";
     ctx.textAlign = "center";
@@ -750,8 +791,6 @@
     ctx.textAlign = "left";
 
     // mana bar (ultimate meter): fills with every hit landed, pulses when full
-    const maxMana = MW.CONFIG.combat.maxMana;
-    const mf = Math.max(0, Math.min(1, f.mana / maxMana));
     const my = by + 25, mh = 10;
     ctx.fillStyle = "#141a2a";
     roundRect(ctx, x, my, PANEL_W, mh, 5);
@@ -776,9 +815,11 @@
       ctx.font = "bold 9px monospace";
       ctx.textAlign = "center";
       ctx.fillStyle = "#1a1200";
-      ctx.fillText("ULTIMATE READY", x + PANEL_W / 2, my + 1);
+      ctx.fillText(tap ? "TAP FOR ULTIMATE" : "ULTIMATE READY", x + PANEL_W / 2, my + 1);
       ctx.textAlign = "left";
     }
+
+    return panelRect; // tap area = the whole panel
   }
 
   // ─── themed arenas ──────────────────────────────────────────────
@@ -1619,6 +1660,8 @@
       this.arena = arena;
       this.p2Label = "P2 DUMMY";
       this.paused = false;
+      this.tapUlt = false;  // main.js sets this true on touch devices: P1 panel = ultimate button
+      this.ultRect = null;  // P1 panel rect in canvas pixels (set every frame while tapUlt is on)
       this.helpText =
         "A/D move   W jump   S drop   J attack   U I O L skills   Y ultimate   P pause   R restart   M menu";
       const b = arena.blastZone;
@@ -1714,6 +1757,7 @@
       if (alpha === undefined) alpha = 1;
       const ctx = this.ctx;
       const { width, height } = this.canvas;
+      this.ultRect = null; // set again below each frame; never leave a stale tap area behind
 
       // tick effects
       tickParticles();
@@ -1767,7 +1811,11 @@
         // check for hit bursts
         checkHitBurst(f);
 
+        // cloaked / vanished Assassin (Phantom Decoy, Onslaught): body and HP bar are hidden from the opponent
+        const cloaked = f.fade !== undefined && f.fade < 1;
+        if (f.fade !== undefined && f.fade < 0.02) { ctx.restore(); continue; }
         // HP bar above head (nicer rounded version)
+        if (cloaked) ctx.globalAlpha = 0;
         const bw = s.width + 24, bx = f.x + s.width / 2 - bw / 2, bY = f.y - 54;
         ctx.fillStyle = "#1a1e2a";
         roundRect(ctx, bx - 1, bY - 1, bw + 2, 9, 4);
@@ -1781,6 +1829,7 @@
         }
 
         drawMomentumPips(ctx, f, bY + 15);
+        ctx.globalAlpha = 1;
 
         if (f.invuln > 0 && Math.floor(sim.tick / 4) % 2 === 0) {
           ctx.restore();
@@ -1790,11 +1839,15 @@
         ctx.globalAlpha = f.state === S.KO ? 0.5 : 1;
         const isFlash = f.flash > 0;
 
-        if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(ctx, f);
-        if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawAura(ctx, f); // flame aura replaces the static glow
-        else drawMomentumAura(ctx, f);
-        // draw the full character body
-        drawCharacterBody(ctx, f, isFlash);
+        const paintBody = (c) => {
+          if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(c, f);
+          if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawAura(c, f); // flame aura replaces the static glow
+          else drawMomentumAura(c, f);
+          // draw the full character body
+          drawCharacterBody(c, f, isFlash);
+        };
+        if (cloaked) drawFaded(ctx, f.fade, paintBody); // cloaked Assassin: the art resets alpha itself, so fade the finished picture
+        else paintBody(ctx);
 
         // Iron Guard aura
         drawGuardAura(ctx, f);
@@ -1822,8 +1875,9 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawSkillFxScreen(ctx, width, height);
       ctx.textBaseline = "top";
-      drawPanel(ctx, sim.fighters[0], 40, "P1", sim.kills[0], false);
-      if (sim.fighters[1]) drawPanel(ctx, sim.fighters[1], width - 40 - PANEL_W, this.p2Label, sim.kills[1], true);
+      const p1Rect = drawPanel(ctx, sim.fighters[0], 40, "P1", sim.kills[0], false, this.tapUlt);
+      if (this.tapUlt) this.ultRect = p1Rect; // canvas-pixel coords; main.js hit-tests taps against this
+      if (sim.fighters[1]) drawPanel(ctx, sim.fighters[1], width - 40 - PANEL_W, this.p2Label, sim.kills[1], true, false);
 
       drawBanner(ctx, width, height); // "METEOR BREAKER" title
       if (sim.koTimer > 0) {

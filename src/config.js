@@ -6,6 +6,7 @@
 
   MW.CONFIG = {
     tickRate: 60, // fixed simulation rate (Hz)
+    rngSeed: 7331, // seeded randomness for the sim (Abyssal Transit destinations): same seed -> same match
     physics: {
       gravity: 0.55, // px / tick^2
     },

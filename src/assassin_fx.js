@@ -36,6 +36,10 @@
   const guides = []; // dash distance preview while charging (rebuilt every frame)
   const chains = []; // chained scythe lines (rebuilt every frame)
   const marks = []; // Death Mark indicators over the target (rebuilt every frame)
+  const clones = []; // Phantom Decoy illusion + Death Sentence illusions drawn as faint copies of the Assassin (rebuilt every frame)
+  const binds = []; // Death Sentence chains from each illusion to the victim (rebuilt every frame)
+  const stars = []; // Death Sentence shuriken in flight (rebuilt every frame)
+  const cloneArt = {}; // per-clone animation state (key -> art state), so each illusion animates on its own
   let frame = 0;
 
   function add(p) {
@@ -79,12 +83,17 @@
     guides.length = 0;
     chains.length = 0;
     marks.length = 0;
+    clones.length = 0;
+    binds.length = 0;
+    stars.length = 0;
+    for (const f of sim.fighters) bleedFx(f);
     for (const f of sim.fighters) {
       byId[f.id] = f;
       if (f.stats.id !== "assassin") continue;
       const v = Math.max(0, (frenzy[f.id] || 0) - TUNE.frenzyDecay);
       frenzy[f.id] = v;
       f._frenzy = v;
+      skillFx(f);
       if (f.state === MW.STATE.KO) { frenzy[f.id] = 0; continue; }
       const speed = Math.abs(f.x - f.px);
 
@@ -146,15 +155,111 @@
       }
       const lunging = f.state === MW.STATE.ATTACK_STARTUP || f.state === MW.STATE.ATTACK_ACTIVE;
       // silhouette frays into dark crimson smoke while he is fast or frenzied
-      if ((speed > TUNE.ghostSpeed || v > 0.5) && Math.random() < TUNE.smokeChance * (0.5 + v)) {
+      const cloaked = f.fade !== undefined && f.fade < 0.5; // hidden from the opponent: no smoke / ghost trail to give him away
+      if (!cloaked && (speed > TUNE.ghostSpeed || v > 0.5) && Math.random() < TUNE.smokeChance * (0.5 + v)) {
         const dd = f.facing < 0 ? -1 : 1;
         add({ kind: "smoke", x: f.x + f.stats.width / 2 - dd * 4, y: f.y + f.stats.height * rnd(0.35, 0.95), vx: -dd * rnd(0.2, 1.2), vy: rnd(-0.7, -0.1), life: 24 + (Math.random() * 12 | 0), size: rnd(5, 9), drag: 0.96, g: -0.01 });
       }
-      if ((speed > TUNE.ghostSpeed || (lunging && speed > 1.5)) && frame % 2 === 0) {
+      if (!cloaked && (speed > TUNE.ghostSpeed || (lunging && speed > 1.5)) && frame % 2 === 0) {
         ghosts.push({ x: f.x, y: f.y, w: f.stats.width, h: f.stats.height, d: f.facing < 0 ? -1 : 1, life: TUNE.ghostLife + Math.round(5 * v) });
         if (ghosts.length > 24) ghosts.shift();
       }
     }
+  }
+
+  // ─── skills 2-4 + ultimate: visuals only, read from fighter fields ───
+  const SENT_ALPHA = 0.8;
+  function smoke(x, y, n) {
+    add({ kind: "flare", x, y, life: 8, size: 46, drag: 1 });
+    for (let i = 0; i < n; i++) add({ kind: "smoke", x: x + rnd(-10, 10), y: y + rnd(-22, 22), vx: rnd(-1.8, 1.8), vy: rnd(-1.6, 0.4), life: 26 + (Math.random() * 10 | 0), size: rnd(8, 14), drag: 0.95 });
+  }
+  function slashBurst(x, y, dir, big) {
+    slashes.push({ x: x - dir * 10, y, dir, range: big ? 100 : 62, up: Math.random() < 0.5, age: 0, life: big ? 15 : 9 });
+    if (slashes.length > 12) slashes.shift();
+    add({ kind: "flare", x, y, life: 8, size: big ? 60 : 30, drag: 1 });
+    const n = big ? 16 : 6;
+    for (let i = 0; i < n; i++) add({ kind: "spark", x, y, vx: dir * rnd(1, 9), vy: rnd(-5, 2), life: 12 + (Math.random() * 8 | 0), size: rnd(1.6, 2.8), g: 0.2, drag: 0.93 });
+  }
+
+  // Rupture: red drips off the bleeding fighter, more while he moves; a small gash flash on every damage tick.
+  function bleedFx(f) {
+    if (!f.bleed) return;
+    const moved = Math.abs(f.x - f.px);
+    const cx = f.x + f.stats.width / 2;
+    if (frame % 5 === 0 || moved > 3) add({ kind: "drop", x: cx + rnd(-8, 8), y: f.y + rnd(f.stats.height * 0.25, f.stats.height * 0.8), vx: rnd(-0.6, 0.6) - Math.sign(f.x - f.px) * 0.5, vy: rnd(-1, 0.4), life: 20 + (Math.random() * 12 | 0), size: rnd(1.8, 3.2), g: 0.28, drag: 0.97 });
+    if (f.bleedPulse === 5) add({ kind: "gash", x: cx, y: f.y + f.stats.height * 0.45, ang: rnd(-0.8, 0.8), len: 22, life: 10, drag: 1 });
+  }
+
+  function skillFx(f) {
+    const s = f.stats, W = s.width, H = s.height;
+    while (f.poofs && f.poofs.length) { const p = f.poofs.shift(); smoke(p.x, p.y, 6); }
+    if (f.slashFx) { const q = f.slashFx; f.slashFx = null; slashBurst(q.x, q.y, q.dir, q.big); }
+    // Phantom Decoy: the illusion is a full copy of the Assassin that runs on its own
+    if (f.decoy) {
+      const d = f.decoy;
+      clones.push({ f, key: f.id + ":decoy", x: d.x, y: d.y, vx: d.vx, vy: d.vy, facing: d.facing, state: d.state, grounded: d.grounded, alpha: d.left < 18 ? d.left / 18 : 1 });
+    }
+    // Death Sentence: four illusions fade in around the victim, chain him, throw shuriken, then vanish
+    const S = f.sentence;
+    if (S) {
+      const v = S.target, C = S.cfg;
+      const vcx = v.x + v.stats.width / 2, vfeet = v.y + v.stats.height, vcy = v.y + v.stats.height * 0.45;
+      const fadeIn = clamp(S.t / 10, 0, 1), fadeOut = S.done ? clamp(S.fade / (C.fadeTicks || 12), 0, 1) : 1;
+      S.ills.forEach((il, i) => {
+        const ix = vcx + il.dx - W / 2, iy = vfeet - H + il.dy;
+        const thrown = S.t >= il.throwAt, since = S.t - il.throwAt;
+        let state = MW.STATE.ATTACK_STARTUP, hit = { pose: il.pose, startup: C.bindTicks, active: 8, recovery: 10 }, stateTimer = Math.max(1, C.bindTicks - S.t);
+        if (thrown) { state = since < 8 ? MW.STATE.ATTACK_ACTIVE : MW.STATE.ATTACK_RECOVERY; stateTimer = since < 8 ? Math.max(1, 8 - since) : Math.max(1, 10 - (since - 8)); }
+        clones.push({ f, key: f.id + ":ill" + i, x: ix, y: iy, vx: 0, vy: 0, facing: il.dx <= 0 ? 1 : -1, state, grounded: true, hit, stateTimer, alpha: SENT_ALPHA * fadeIn * fadeOut, tint: true });
+        const hx = ix + W / 2, hy = iy + H * 0.42;
+        binds.push({ x0: hx, y0: hy, x1: vcx, y1: vcy, a: fadeIn * fadeOut, t: S.t });
+        if (thrown && !il.done && since <= C.flight) { // shuriken in flight: from the illusion to the victim
+          const u = clamp(since / Math.max(1, C.flight), 0, 1);
+          stars.push({ x: hx + (vcx - hx) * u, y: hy + (vcy - hy) * u, rot: frame * 0.6, a: 1 });
+        }
+        if (il.done && S.t - il.hitAt === 0) slashBurst(vcx, vcy, il.dx <= 0 ? 1 : -1, false);
+      });
+    }
+  }
+
+  function drawClone(ctx, c) {
+    if (!MW.CharacterArt || c.alpha <= 0.01) return;
+    const p = Object.create(c.f); // inherits stats / palette / frenzy; every field the art reads is overridden below
+    p.x = c.x; p.y = c.y; p.px = c.x; p.py = c.y; p.vx = c.vx; p.vy = c.vy;
+    p.facing = c.facing; p.state = c.state; p.grounded = c.grounded;
+    p.hit = c.hit || null; p.stateTimer = c.stateTimer || 0; p.flash = 0; p.chargeReleased = true;
+    p._art = cloneArt[c.key] || null; // null: the art creates its own state on the clone
+    ctx.save();
+    ctx.globalAlpha = c.alpha;
+    MW.CharacterArt.draw(ctx, p, false, null);
+    ctx.restore();
+    cloneArt[c.key] = p._art;
+  }
+
+  function drawBind(ctx, b) {
+    const dx = b.x1 - b.x0, dy = b.y1 - b.y0, len = Math.hypot(dx, dy);
+    if (len < 4) return;
+    const n = Math.max(2, Math.floor(len / 9)), reach = clamp(b.t / 10, 0, 1);
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.globalAlpha = b.a;
+    for (let i = 0; i < n * reach; i++) {
+      const u0 = i / n, u1 = (i + 0.62) / n;
+      ctx.strokeStyle = i % 2 ? "#8a8f9a" : "#3a3d46"; ctx.lineWidth = 3.2;
+      ctx.beginPath(); ctx.moveTo(b.x0 + dx * u0, b.y0 + dy * u0); ctx.lineTo(b.x0 + dx * u1, b.y0 + dy * u1); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawStar(ctx, s) {
+    ctx.save();
+    ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+    ctx.fillStyle = "#c9ced8"; ctx.strokeStyle = DARK; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const r = i % 2 ? 4 : 11, a = (i / 8) * TAU; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, TAU); ctx.fill();
+    ctx.restore();
   }
 
   function tick() {
@@ -315,7 +420,10 @@
   }
 
   function draw(ctx) {
+    for (const c of clones) drawClone(ctx, c);
+    for (const b of binds) drawBind(ctx, b);
     for (const c of chains) drawChain(ctx, c);
+    for (const s of stars) drawStar(ctx, s);
     for (const m of marks) drawMark(ctx, m);
     for (const s of slashes) drawSlash(ctx, s);
     if (!parts.length) return;
@@ -373,7 +481,7 @@
   // Red aura and rising embers around a frenzied Assassin. Drawn BEHIND the body, inside the fighter's transform.
   function drawAura(ctx, f) {
     const v = Math.max(f._frenzy || 0, f._chargeLv || 0);
-    if (v < 0.03 || f.state === MW.STATE.KO) return;
+    if (v < 0.03 || f.state === MW.STATE.KO || (f.fade !== undefined && f.fade < 0.5)) return;
     const s = f.stats;
     const cx = f.x + s.width / 2, cy = f.y + s.height * 0.5;
     const r = s.height * (0.55 + 0.25 * v);

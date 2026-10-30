@@ -21,12 +21,12 @@
 
     /* joystick: small, glassy */
     .mw-stick { position: absolute; left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-      width: 90px; height: 90px; border-radius: 50%; pointer-events: auto;
+      width: 124px; height: 124px; border-radius: 50%; pointer-events: auto;
       background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 100%);
       border: 2px solid rgba(255,255,255,0.28);
       box-shadow: inset 0 0 18px rgba(127,216,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
       backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-    .mw-knob { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+    .mw-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
       border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), rgba(160,200,255,0.5));
       border: 2px solid rgba(255,255,255,0.75); box-shadow: 0 2px 10px rgba(0,0,0,0.45), 0 0 12px rgba(127,216,255,0.45); }
 
@@ -66,12 +66,35 @@
     .mw-skill.empty.active { background: rgba(255,255,255,0.18); }
 
     /* top-centre control pill: pause / restart / menu / fullscreen */
-    .mw-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px));
-      display: flex; gap: 8px; padding: 5px 8px; border-radius: 999px; pointer-events: none;
-      background: rgba(10,12,26,0.5); border: 1px solid rgba(255,255,255,0.18);
-      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-    .mw-bar .mw-btn { position: relative; width: 38px; height: 38px; box-shadow: none; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.35); }
-    .mw-bar .mw-btn.active { background: rgba(127,216,255,0.45); }
+.mw-bar {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    display: flex;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    pointer-events: none;
+    background: rgba(10,12,26,0.5);
+    border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.mw-bar .mw-btn {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    pointer-events: auto; /* Allow button touches */
+    box-shadow: none;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.35);
+}
+
+.mw-bar .mw-btn.active {
+    background: rgba(127,216,255,0.45);
+}
 
     .mw-hint { display: none; position: absolute; left: 0; right: 0; top: 56%; text-align: center; color: #8b94ab;
       font: 14px monospace; pointer-events: none; }
@@ -105,6 +128,8 @@
       this.attackQueued = false;
       this.nx = 0; // joystick, -1..1
       this.ny = 0;
+      this.attackHeld = false;
+this.attackReleased = false;
       this.jumpQueued = false;
       this.resetQueued = false;
       this.menuQueued = false;
@@ -128,9 +153,7 @@
       this.jumpBtn = iconBtn("mw-btn mw-jump", "jump", "Jump");
       this.attackBtn = iconBtn("mw-btn mw-attack", "attack", "Attack");
       this.ultQueued = false;
-      this.ultBtn = el("mw-btn mw-ult", "ULT");
-      this.ultBtn.setAttribute("role", "button");
-      this.ultBtn.setAttribute("aria-label", "Ultimate");
+   
       this.skillQueued = [false, false, false, false];
       this.skillBtns = [0, 1, 2, 3].map((i) => {
         const b = el("mw-btn mw-skill empty");
@@ -148,8 +171,8 @@
       this.bar = el("mw-bar");
       this.bar.append(this.pauseBtn, this.refreshBtn, this.resetBtn, this.menuBtn);
 
-      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.bar);
-      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.ultBtn, this.pauseBtn, this.refreshBtn, this.resetBtn, this.menuBtn];
+      root.append(hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.bar);
+      this.gameEls = [hint, this.stick, this.jumpBtn, this.attackBtn, ...this.skillBtns, this.pauseBtn, this.refreshBtn, this.resetBtn, this.menuBtn];
       this.layoutButtons();
       this.setSkills(null);
 
@@ -175,23 +198,66 @@
       }
       parent.appendChild(root);
 
-      this.bindStick();
-      this.bindButton(this.jumpBtn, () => (this.jumpQueued = true));
-      this.bindButton(this.attackBtn, () => (this.attackQueued = true));
-      this.skillBtns.forEach((b, i) => this.bindButton(b, () => (this.skillQueued[i] = true)));
-      this.bindButton(this.ultBtn, () => (this.ultQueued = true));
-      this.bindButton(this.pauseBtn, () => (this.pauseQueued = true));
+       this.bindStick();
+
+      // Jump
+      this.bindButton(this.jumpBtn, () => {
+        this.jumpQueued = true;
+      });
+
+      // Attack: supports tapping and holding
+      this.attackBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+
+        this.attackBtn.setPointerCapture(e.pointerId);
+        this.attackBtn.classList.add("active");
+
+        this.attackQueued = true;
+        this.attackHeld = true;
+      });
+
+      const releaseAttack = (e) => {
+        if (!this.attackHeld) return;
+
+        this.attackHeld = false;
+        this.attackReleased = true;
+        this.attackBtn.classList.remove("active");
+      };
+
+      this.attackBtn.addEventListener("pointerup", releaseAttack);
+      this.attackBtn.addEventListener("pointercancel", releaseAttack);
+      this.attackBtn.addEventListener("lostpointercapture", releaseAttack);
+
+      // Skills
+      this.skillBtns.forEach((b, i) => {
+        this.bindButton(b, () => {
+          this.skillQueued[i] = true;
+        });
+      });
+
+      // Pause
+      this.bindButton(this.pauseBtn, () => {
+        this.pauseQueued = true;
+      });
+
+      // Hard refresh
       this.bindButton(this.refreshBtn, () => {
-        // Hard refresh - reload the page completely
         window.location.reload(true);
       });
-      this.bindButton(this.resetBtn, () => (this.resetQueued = true));
-      this.bindButton(this.menuBtn, () => (this.menuQueued = true));
-    }
 
-    // Right-hand cluster. Everything is placed by its centre, measured from the bottom-right corner:
-    // big attack in the corner, jump to its left, 4 skill slots fanned on an arc around the attack button.
-    // Tweak the numbers below to re-layout.
+      // Restart
+      this.bindButton(this.resetBtn, () => {
+        this.resetQueued = true;
+      });
+
+      // Menu
+        this.bindButton(this.menuBtn, () => {
+        this.menuQueued = true;
+      });
+
+    } // <-- ADD THIS. Closes constructor.
+
+    // Right-hand cluster. Everything is placed by its centre.
     layoutButtons() {
       const LAYOUT = {
         attack: { x: 46, y: 46 }, // centre of the attack button
@@ -220,7 +286,10 @@
       this._ultOn = on;
       this.ultBtn.classList.toggle("ready", on);
     }
-
+    // The P1 health panel acts as the ultimate button (main.js calls this when it is tapped while ready).
+    fireUlt() {
+      this.ultQueued = true;
+    }
     // Cooldown overlay on each skill button. cds[i] = ticks left, max[i] = full cooldown ticks (main.js, every frame).
     setSkillCooldowns(cds, max) {
       this.skillBtns.forEach((b, i) => {
@@ -278,6 +347,11 @@
       return r;
     }
 
+    consumeReset() {
+  const r = this.resetQueued;
+  this.resetQueued = false;
+  return r;
+}
     // The character / AI picker was removed from the on-screen controls; these stay as no-ops
     // so main.js and older callers keep working.
     setAiLabel() {}
@@ -345,35 +419,35 @@
     }
 
     // Called once per simulation tick; consumes edge-triggered presses.
-    poll() {
-      const downHeld = this.ny > 0.55;
-      const intent = {
-        left: this.nx < -0.3,
-        right: this.nx > 0.3,
-        jumpPressed: this.jumpQueued,
-        downPressed: downHeld && !this.prevDown,
-        downHeld: downHeld,
-        attackPressed: this.attackQueued,
-        ultPressed: this.ultQueued,
-        skillPressed: this.skillQueued.slice(),
-      };
-      this.prevDown = downHeld;
-      this.jumpQueued = false;
-      this.attackQueued = false;
-      this.skillQueued.fill(false);
-      this.ultQueued = false;
-      return intent;
-    }
+   poll() {
+  const downHeld = this.ny > 0.55;
 
-    consumeReset() {
-      const r = this.resetQueued;
-      this.resetQueued = false;
-      return r;
-    }
+  const intent = {
+    left: this.nx < -0.3,
+    right: this.nx > 0.3,
 
-    consumePick() {
-      return null;
-    }
+    jumpPressed: this.jumpQueued,
+    downPressed: downHeld && !this.prevDown,
+    downHeld: downHeld,
+
+    attackPressed: this.attackQueued,
+    attackHeld: this.attackHeld,
+    attackReleased: this.attackReleased,
+
+    ultPressed: this.ultQueued,
+    skillPressed: this.skillQueued.slice(),
+  };
+
+  this.prevDown = downHeld;
+
+  this.jumpQueued = false;
+  this.attackQueued = false;
+  this.attackReleased = false;
+  this.skillQueued.fill(false);
+  this.ultQueued = false;
+
+  return intent;
+}
   }
 
   MW.TouchInput = TouchInput;

@@ -61,6 +61,11 @@
       this.castFx = null; // visual event for a skill that just started
       this.advanceStopped = false;
       this.lastHit = null; // readout of the last hit taken (see takeHit)
+      this.zones = []; // Void Mage: spike fields / grasp pools / pulls this fighter owns (the Sim steps them, void fx draws them)
+      this.overload = false; // Void Mage passive: next basic attack is the empowered gravity orb
+      this.overloadHits = 0; // successful hits counted towards Void Overload
+      this.overloadIdle = 0;
+      this.rand = null; // seeded random function, set by Sim.step (Abyssal Transit destination)
       this.respawn(arena);
       this.invuln = 0; // no blink on the very first spawn
     }
@@ -90,11 +95,34 @@
       this.lockState = null; // Meteor Fist lock-on: null = not decided yet, true / false once the swing is committed
       this.scythe = null; // Assassin Chained Scythe in progress: { target, phase: "pull" | "bomb", t, cfg, mul }
       this.blastFx = null; // visual one-shot (bomb explosion), read by assassin_fx.js
+      // Assassin skills 2-4 + ultimate (see the "ASSASSIN SKILLS" block below). All visual-only fields are read and cleared by assassin_fx.js.
+      this.cloak = null; // Phantom Decoy invisibility: { left, alpha, revealOnHit }
+      this.vanished = false; // true on ticks the Assassin is hidden mid-Onslaught
+      this.fade = 1; // render opacity of the body (0 hidden .. 1 normal); set at the end of step()
+      this.decoy = null; // Phantom Decoy illusion: independent moving clone (render-only entity)
+      this.onslaught = null; // Phantom Onslaught in progress: { target, i, ph, t, beats, cfg, mul }
+      this.sentence = null; // Death Sentence in progress: { target, t, ills, cfg, mul, done }
+      this.bleed = null; // Rupture on THIS fighter (as the victim): { by, cfg, left, t, still, total, mul }
+      this.bleedPulse = 0; // visual: ticks since the last bleed damage (fx)
+      this.poofs = []; // visual one-shots: smoke puffs { x, y } (capped, so headless runs never grow it)
+      this.slashFx = null; // visual one-shot: { x, y, dir, big } extra slash arcs for Onslaught / Death Sentence
+      this.foe = this.foe || null; // the opponent (set by Sim.step); only used by the Decoy illusion to chase
       this.mark = { target: null, stacks: 0, idle: 0, marked: false, left: 0 }; // Assassin passive: Death Mark on the enemy
       this.chainIndex = 0;
       this.comboQueued = false;
       this.hitTargets = new Set(); // fighter ids already hit by the current swing
       this.pendingProjectile = null; // attack data to fire this tick (Sim turns it into a Projectile)
+      // Void Mage state (everything transient: cleared on every respawn)
+      this.root = null; // restrained by Void bound Wraiths: { left } (refreshed every tick by the caster)
+      this.slow = null; // inside Abyssal Grasp: { left, mul, noJump }
+      this.ctl = null; // forced velocity from another fighter's skill: { vx, vy, left }
+      this.wraiths = null; // Void bound Wraiths in progress (caster side)
+      this.transit = null; // Abyssal Transit in progress
+      this.gravSlam = null; // Void Overload orb: lift + slam of the victim (caster side)
+      this.execution = null; // Void Execution ultimate in progress (caster side)
+      this.untargetable = false; // true while dissolved into the void: nothing can hit this fighter
+      this.pendingZone = null; // zone skill to create this tick (the Sim turns it into f.zones entries)
+      this.fxOut = []; // visual one-shots for the Sim to forward (capped, drained every tick)
       this.swingFx = false; // set on the first active tick of a melee swing (visual events only)
       this.flash = 0;
       this.armorHit = 0;
@@ -139,6 +167,10 @@
       this.guardEmpowered = false;
       this.guardEmpowerLeft = 0;
       this.counterTarget = null;
+      this.zones = [];
+      this.overload = false;
+      this.overloadHits = 0;
+      this.overloadIdle = 0;
       this.respawn(arena);
     }
 
@@ -149,9 +181,11 @@
     }
 
     startAttack(index) {
+      this.breakCloak();
       const a = this.stats.attack;
       this.chainIndex = index;
       this.hit = a.chain && a.chain[index] ? Object.assign({}, a, a.chain[index]) : a;
+      if (this.overload && this.overloadData()) this.hit = this.orbHit(); // Void Overload: the next attack input is the gravity orb
       if (this.guardEmpowered && index === 0) {
         // Iron Guard bonus: the next basic punch hits harder (numbers come from the guard's "empower" data)
         const E = this.guardEmpowerCfg || { damage: 2, knockback: 1.5, stun: 12 };
@@ -191,6 +225,13 @@
       if (this.armorHit > 0) this.armorHit--;
       switch (this.state) {
         case STATE.ATTACK_STARTUP:
+          if (this.hit && this.hit.chargeHold && !this.chargeReleased && this.overload && this.overloadData()) {
+            // Void Overload became ready while charging: the empowered orb replaces the Singularity right away
+            this.hit = this.orbHit();
+            this.stateTimer = this.hit.startup;
+            this.chargeReleased = true;
+            this.chargeTicks = 0;
+          }
           if (this.hit && this.hit.chargeHold && !this.chargeReleased) {
             // Charged punch: the swing waits while the button is held; letting go too early cancels it.
             if (this.attackHeld) {
@@ -221,8 +262,16 @@
           if (--this.stateTimer <= 0) {
             this.state = STATE.ATTACK_ACTIVE;
             this.stateTimer = this.hit.active || 1;
-            if (this.hit.type === "projectile") this.pendingProjectile = this.hit;
-            else if (this.hit.fxStyle) this.swingFx = true;
+            if (this.hit.decoy) this.beginDecoy();
+            if (this.hit.transit) this.beginTransit();
+            if (this.hit.wraiths) this.beginWraiths();
+            if (this.hit.spikes) this.pendingZone = { type: "spikes", cfg: this.hit.spikes };
+            else if (this.hit.grasp) this.pendingZone = { type: "grasp", cfg: this.hit.grasp };
+            if (this.hit.execution) this.beginExecution();
+            if (this.hit.type === "projectile") {
+              this.pendingProjectile = this.hit;
+              if (this.hit.overloadOrb) this.consumeOverload(); // spent when fired, even if it misses
+            } else if (this.hit.fxStyle) this.swingFx = true;
           }
           break;
         case STATE.ATTACK_ACTIVE:
@@ -322,8 +371,486 @@
       }
     }
 
+    // ═════════════════════ ASSASSIN SKILLS 2-4 + ULTIMATE ═════════════════════
+    // Everything here is driven by config blocks on the attack data in characters.js (decoy / rupture / onslaught / sentence).
+    // The initiating swing is an ordinary melee hit that the Sim resolves; takeHit() then calls beginOnslaught / beginSentence /
+    // startBleed, exactly like the Chained Scythe. Follow-up damage is applied by direct takeHit() calls (noMark, no hit events).
+
+    breakCloak() {
+      this.cloak = null;
+    }
+
+    // Visual smoke puff (capped, so a headless run without fx never grows the list).
+    poof(x, y) {
+      if (this.poofs.length >= 6) this.poofs.shift();
+      this.poofs.push({ x: x, y: y });
+    }
+
+    // One follow-up hit applied directly to the victim (like the scythe bomb). Returns false if the victim can't be hit any more.
+    strikeHit(v, spec, dir) {
+      if (v.state === STATE.KO || v.invuln > 0 || v.untargetable) return false;
+      v.takeHit(this, spec, dir);
+      this.onHitLanded(spec);
+      return true;
+    }
+
+    // Hold the victim in place (undodgeable while the sequence runs).
+    holdVictim(v) {
+      if (v.state === STATE.KO || v.hp <= 0) return; // never revive a victim the last hit killed
+      v.state = STATE.HITSTUN;
+      v.stateTimer = Math.max(v.stateTimer, 3);
+      v.vx = 0;
+      v.vy = 0;
+    }
+
+    // ── Skill 2: Phantom Decoy. At the end of the cast an illusion stays where he stood and moves on its own (it runs at the
+    // enemy, hops now and then, never walks off a platform); the real Assassin is cloaked. Attacking (or being hit) ends the cloak.
+    beginDecoy() {
+      const C = this.hit.decoy, s = this.stats;
+      this.poof(this.x + s.width / 2, this.y + s.height * 0.5);
+      this.decoy = { x: this.x, y: this.y, px: this.x, py: this.y, vx: 0, vy: 0, facing: this.facing, dir: this.facing, grounded: this.grounded, standingOn: this.standingOn, state: STATE.IDLE, left: C.duration, t: 0, cfg: C };
+      this.cloak = { left: C.cloak, alpha: C.cloakAlpha === undefined ? 0.1 : C.cloakAlpha, revealOnHit: C.revealOnHit !== false };
+    }
+
+    decoyStep(arena) {
+      const d = this.decoy, C = d.cfg, s = this.stats, P = MW.CONFIG.physics;
+      d.px = d.x;
+      d.py = d.y;
+      if (--d.left <= 0) { this.poof(d.x + s.width / 2, d.y + s.height * 0.5); this.decoy = null; return; }
+      d.t++;
+      let moving = true;
+      if (this.foe && this.foe.state !== STATE.KO && C.chase !== false) {
+        const gx = this.foe.x + this.foe.stats.width / 2 - (d.x + s.width / 2);
+        d.dir = gx >= 0 ? 1 : -1;
+        moving = Math.abs(gx) > (C.stopGap || 0);
+      }
+      d.vx = moving ? d.dir * C.speed : 0;
+      if (d.grounded && C.jumpEvery && d.t % C.jumpEvery === 0) { d.vy = -(C.jumpV || 11); d.grounded = false; d.standingOn = null; }
+      // never walk off the platform it stands on (turns around when the enemy is unknown)
+      if (d.grounded && d.standingOn && C.edgeSafe !== false && d.vx !== 0) {
+        const cx = d.x + s.width / 2 + d.vx, p = d.standingOn;
+        if (cx < p.x || cx > p.x + p.w) { d.vx = 0; if (!this.foe) d.dir = -d.dir; }
+      }
+      d.vy = Math.min(d.vy + P.gravity, s.maxFallSpeed);
+      const prevBottom = d.y + s.height;
+      d.x += d.vx;
+      d.y += d.vy;
+      d.grounded = false;
+      d.standingOn = null;
+      if (d.vy >= 0) {
+        let best = null;
+        for (const p of arena.platforms) {
+          if (d.x + s.width <= p.x || d.x >= p.x + p.w) continue;
+          if (prevBottom <= p.y + EPS && d.y + s.height >= p.y && (!best || p.y < best.y)) best = p;
+        }
+        if (best) { d.y = best.y - s.height; d.vy = 0; d.grounded = true; d.standingOn = best; }
+      }
+      if (d.vx !== 0) d.facing = d.vx > 0 ? 1 : -1;
+      else if (this.foe) d.facing = this.foe.x >= d.x ? 1 : -1;
+      d.state = d.grounded ? (Math.abs(d.vx) > 0.1 ? STATE.RUN : STATE.IDLE) : (d.vy < 0 ? STATE.RISING : STATE.FALLING);
+      const b = arena.blastZone;
+      if (d.x + s.width < b.left || d.x > b.right || d.y > b.bottom) { this.poof(d.x + s.width / 2, d.y); this.decoy = null; }
+    }
+
+    // ── Skill 3: Rupture. The slash starts a bleed on the victim (this fighter): a damage tick every dotEvery ticks, plus
+    // damage that scales with how fast the victim MOVES (full run speed = moveDamage per tick). Standing still: no movement
+    // damage and the ticks are cut to stillMul after stillAfter ticks. Hit-stagger movement does not count (countWhileStunned).
+    startBleed(attacker, hit) {
+      this.bleed = { by: attacker, cfg: hit.rupture, left: hit.rupture.duration, t: 0, still: 0, total: 0, mul: hit.markMul || 1 };
+    }
+
+    bleedStep() {
+      const B = this.bleed, C = B.cfg;
+      if (this.state === STATE.KO || this.hp <= 0 || B.by.state === STATE.KO || --B.left <= 0) { this.bleed = null; return; }
+      B.t++;
+      const moved = Math.abs(this.x - this.px);
+      let dmg = 0, tickHit = false;
+      if (B.t % C.dotEvery === 0) {
+        tickHit = true;
+        dmg += C.dotDamage * B.mul * (B.still >= (C.stillAfter || 0) && moved < (C.stillSpeed || 0.2) ? (C.stillMul === undefined ? 1 : C.stillMul) : 1);
+      }
+      if (moved < (C.stillSpeed || 0.2)) B.still++;
+      else {
+        B.still = 0;
+        if (this.state !== STATE.HITSTUN || C.countWhileStunned) dmg += C.moveDamage * B.mul * Math.min(1, moved / this.stats.runSpeed);
+      }
+      if (dmg <= 0) return;
+      const taken = C.ignoreArmor ? dmg : Combat.damageTaken(dmg, this.stats.armor);
+      this.hp = Math.max(0, this.hp - taken);
+      B.total += taken;
+      this.bleedPulse = 6;
+      if (tickHit && C.manaPerTick) B.by.addMana({ manaGain: C.manaPerTick });
+      this.lastHit = { by: B.by.stats.name + " (bleed)", combo: 0, raw: dmg, armor: C.ignoreArmor ? 0 : this.stats.armor, dmg: taken, knockback: 0, stun: 0, lost: 1 - this.hp / this.stats.maxHP, bleed: true };
+      if (this.hp <= 0) { // bled out: a normal KO (the Sim's checkKO counts it)
+        this.state = STATE.KO;
+        this.stateTimer = 0;
+        this.bleed = null;
+      }
+    }
+
+    // ── Skill 4: Phantom Onslaught. The (short, rooted) first slash must connect; then the Assassin vanishes and reappears
+    // around the victim from cfg.beats angles, striking each time, and ends with a heavy finisher that knocks the target away.
+    // Beat fields: dx / dy (offset from the victim's feet-level centre; dx<0 = left of them), vanish (ticks hidden before the
+    // strike), show (ticks visible after), damage, knockback, launchH / launchV, stun, pose, final (true = releases the victim).
+    beginOnslaught(victim, hit) {
+      this.onslaught = { id: hit.id, target: victim, i: 0, ph: "hide", t: 0, cfg: hit.onslaught, beats: hit.onslaught.beats, mul: hit.markMul || 1 };
+      this.poof(this.x + this.stats.width / 2, this.y + this.stats.height * 0.5);
+    }
+
+    onslaughtStep(arena) {
+      const S = this.onslaught, v = S.target, C = S.cfg, s = this.stats;
+      if (!this.hit || this.hit.id !== S.id || this.state === STATE.HITSTUN || this.state === STATE.KO || v.state === STATE.KO || v.invuln > 0 || v.untargetable) {
+        this.onslaught = null; // interrupted (or the target respawned): the sequence ends
+        return;
+      }
+      this.state = STATE.ATTACK_ACTIVE; // stay committed
+      this.stateTimer = 3;
+      this.vx = 0;
+      this.vy = 0;
+      const b = S.beats[S.i];
+      if (!(S.ph === "show" && b.final)) this.holdVictim(v);
+      S.t++;
+      if (S.ph === "hide") {
+        this.vanished = true;
+        if (S.t < b.vanish) return;
+        // reappear around the victim and strike
+        const vcx = v.x + v.stats.width / 2;
+        this.poof(this.x + s.width / 2, this.y + s.height * 0.5);
+        let ax = vcx + b.dx - s.width / 2;
+        if (v.standingOn) ax = Math.max(v.standingOn.x, Math.min(v.standingOn.x + v.standingOn.w - s.width, ax));
+        this.x = ax;
+        this.y = v.y + v.stats.height - s.height + (b.dy || 0);
+        this.px = this.x;
+        this.py = this.y;
+        this.facing = vcx + 0.5 >= ax + s.width / 2 ? 1 : -1;
+        this.vanished = false;
+        this.poof(this.x + s.width / 2, this.y + s.height * 0.5);
+        const spec = { id: "phantom_onslaught", isSkill: true, noMark: true, damage: b.damage * S.mul, knockback: b.knockback || 0, launchH: b.launchH === undefined ? 0 : b.launchH, launchV: b.launchV === undefined ? 0 : b.launchV, stun: b.stun === undefined ? C.stun : b.stun, manaGain: b.manaGain === undefined ? C.manaGain : b.manaGain, empowered: S.mul > 1 };
+        this.strikeHit(v, spec, this.facing);
+        this.slashFx = { x: v.x + v.stats.width / 2, y: v.y + v.stats.height * 0.45, dir: this.facing, big: !!b.final };
+        if (b.pose !== undefined) this.hit = Object.assign({}, this.hit, { pose: b.pose });
+        S.ph = "show";
+        S.t = 0;
+      } else if (S.t >= b.show) {
+        if (++S.i >= S.beats.length) { // finished: punishable recovery
+          this.onslaught = null;
+          this.state = STATE.ATTACK_RECOVERY;
+          this.stateTimer = C.endRecovery;
+          return;
+        }
+        S.ph = "hide";
+        S.t = 0;
+      }
+    }
+
+    // ── Ultimate: Death Sentence. The initiating hit (lockOn, long visible startup) must connect. Then cfg.illusions
+    // appear around the victim, chain them in place, and each throws shuriken (damage lands hitAt ticks after bindTicks,
+    // one illusion every throwGap). Then a finishing hit, the illusions vanish, and the Assassin recovers.
+    beginSentence(victim, hit) {
+      const C = hit.sentence;
+      this.sentence = {
+        id: hit.id, target: victim, t: 0, cfg: C, mul: hit.markMul || 1, done: false, fade: C.fadeTicks || 12,
+        ills: C.illusions.map((c, i) => ({ dx: c.dx, dy: c.dy || 0, pose: c.pose, throwAt: C.bindTicks + i * C.throwGap, hitAt: C.bindTicks + i * C.throwGap + C.flight, done: false })),
+      };
+    }
+
+    sentenceStep() {
+      const S = this.sentence, v = S.target, C = S.cfg;
+      if (S.done) { if (--S.fade <= 0) this.sentence = null; return; } // illusions fading out (visual only)
+      if (!this.hit || this.hit.id !== S.id || this.state === STATE.HITSTUN || this.state === STATE.KO || v.state === STATE.KO || v.invuln > 0) {
+        this.sentence = null;
+        return;
+      }
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.vx = 0;
+      this.holdVictim(v);
+      S.t++;
+      let last = 0;
+      for (const il of S.ills) {
+        last = Math.max(last, il.hitAt);
+        if (il.done || S.t < il.hitAt) continue;
+        il.done = true;
+        const spec = { id: "death_sentence", isSkill: true, noMark: true, damage: C.shurikenDamage * S.mul, knockback: 0, launchH: 0, launchV: 0, stun: C.shurikenStun, manaGain: 0, empowered: S.mul > 1 };
+        this.strikeHit(v, spec, il.dx <= 0 ? 1 : -1);
+        this.holdVictim(v);
+      }
+      if (S.t >= last + C.finishDelay) { // the finishing blow, then everything fades
+        const dir = v.x + v.stats.width / 2 >= this.x + this.stats.width / 2 ? 1 : -1, F = C.finish;
+        const spec = { id: "death_sentence", isSkill: true, noMark: true, damage: F.damage * S.mul, knockback: F.knockback, launchH: F.launchH, launchV: F.launchV, stun: F.stun, manaGain: 0, empowered: S.mul > 1 };
+        this.strikeHit(v, spec, dir);
+        this.slashFx = { x: v.x + v.stats.width / 2, y: v.y + v.stats.height * 0.45, dir: dir, big: true };
+        S.done = true;
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = C.endRecovery;
+      }
+    }
+
+    // ═════════════════════ VOID MAGE ═════════════════════
+    // Passive (Void Overload), four skills and the ultimate. Every number comes from characters.js (mage.passive / skills / ultimate / charge),
+    // so balance changes never touch this file. Caster-side controllers (wraiths, gravSlam, execution) steer the victim through
+    // victim.ctl / victim.root; ground effects live in this.zones and are stepped by the Sim (sim.js stepZones).
+
+    // True while this fighter cannot be hit at all (respawn invulnerability or dissolved into the void).
+    untouchable() {
+      return this.invuln > 0 || this.untargetable;
+    }
+
+    overloadData() {
+      const P = this.stats.passive;
+      return P && P.type === "voidoverload" ? P : null;
+    }
+
+    // The empowered gravity orb, as attack data (replaces the basic attack / Singularity while Void Overload is ready).
+    orbHit() {
+      return Object.assign({}, this.stats.attack, this.stats.passive.orb);
+    }
+
+    consumeOverload() {
+      this.overload = false;
+      this.overloadHits = 0;
+      this.overloadIdle = 0;
+      this.fxOut.push({ kind: "overload_fire" });
+    }
+
+    // Damage over time / zone damage: armor applies, but no stun and no launch.
+    dotHit(by, dmg, label) {
+      if (this.state === STATE.KO || this.untouchable()) return;
+      const taken = Combat.damageTaken(dmg, this.stats.armor);
+      this.hp = Math.max(0, this.hp - taken);
+      this.flash = Math.max(this.flash, 2);
+      this.lastHit = { by: by.stats.name + (label ? " (" + label + ")" : ""), combo: 0, raw: dmg, armor: this.stats.armor, dmg: taken, knockback: 0, stun: 0, lost: 1 - this.hp / this.stats.maxHP };
+      if (this.hp <= 0) {
+        this.state = STATE.KO;
+        this.stateTimer = 0;
+      }
+    }
+
+    fxPush(ev) {
+      if (this.fxOut.length < 12) this.fxOut.push(ev);
+    }
+
+    // ── Void Overload orb: the victim is enveloped, lifted, hangs for a moment, then is slammed into the ground.
+    beginGravSlam(victim, cfg) {
+      this.gravSlam = { target: victim, cfg: cfg, phase: "lift", p: 0, t: 0 };
+    }
+
+    gravSlamStep() {
+      const G = this.gravSlam, v = G.target, C = G.cfg;
+      if (v.state === STATE.KO || v.untouchable() || ++G.t > C.maxTicks) { this.gravSlam = null; v.ctl = null; return; }
+      this.holdVictim(v);
+      if (G.phase === "lift") {
+        v.ctl = { vx: 0, vy: -C.liftSpeed, left: 2 };
+        if (++G.p >= C.liftTicks) { G.phase = "hang"; G.p = 0; }
+      } else if (G.phase === "hang") {
+        v.ctl = { vx: 0, vy: 0, left: 2 };
+        if (++G.p >= C.hang) { G.phase = "slam"; G.p = 0; }
+      } else {
+        v.ctl = { vx: 0, vy: C.slamSpeed, left: 2 };
+        if (++G.p > 2 && v.grounded) {
+          const dir = v.x + v.stats.width / 2 >= this.x + this.stats.width / 2 ? 1 : -1;
+          v.ctl = null;
+          this.strikeHit(v, { id: "void_slam", isSkill: true, noMark: true, noOverload: true, empowered: true, damage: C.damage, knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun, manaGain: C.manaGain || 0 }, dir);
+          this.fxPush({ kind: "slam", x: v.x + v.stats.width / 2, y: v.y + v.stats.height, big: false });
+          this.gravSlam = null;
+        }
+      }
+    }
+
+    // ── Skill 1: Void bound Wraiths. Two wraiths chase the enemy (one for the legs, one hovering at the head).
+    // If BOTH catch it, it is restrained (no move / jump / attack) for cfg.restrain ticks. Pursuit ends after cfg.pursuit ticks.
+    beginWraiths() {
+      const C = this.hit.wraiths, s = this.stats;
+      const cx = this.x + s.width / 2 + this.facing * 26, cy = this.y + s.height * 0.4;
+      this.wraiths = {
+        cfg: C, phase: "chase", t: 0, fade: 0,
+        ws: [
+          { role: "legs", x: cx, y: cy + 10, vx: this.facing * 2, vy: 1, latched: false },
+          { role: "head", x: cx, y: cy - 10, vx: this.facing * 2, vy: -1, latched: false },
+        ],
+      };
+      this.fxPush({ kind: "wraith_summon", x: cx, y: cy });
+    }
+
+    wraithStep() {
+      const W = this.wraiths, C = W.cfg, v = this.foe;
+      if (this.state === STATE.KO || !v || v.state === STATE.KO) { this.wraiths = null; return; }
+      W.t++;
+      const vcx = v.x + v.stats.width / 2;
+      const anchor = (w) => (w.role === "legs" ? [vcx, v.y + v.stats.height - (C.legOffset || 8)] : [vcx, v.y - (C.headOffset || 14)]);
+      if (W.phase === "chase") {
+        if (W.t > C.pursuit) { W.phase = "fade"; W.t = 0; return; } // pursuit ran out without catching: they disappear
+        for (const w of W.ws) {
+          const a = anchor(w);
+          if (w.latched) { w.x = a[0]; w.y = a[1]; continue; }
+          const dx = a[0] - w.x, dy = a[1] - w.y, dist = Math.hypot(dx, dy) || 1;
+          if (!v.untouchable() && dist <= C.catchRadius) { w.latched = true; this.fxPush({ kind: "wraith_latch", x: a[0], y: a[1] }); continue; }
+          w.vx += ((dx / dist) * C.speed - w.vx) * C.turn;
+          w.vy += ((dy / dist) * C.speed - w.vy) * C.turn;
+          w.x += w.vx;
+          w.y += w.vy;
+        }
+        if (W.ws.every((w) => w.latched)) { W.phase = "bound"; W.t = 0; }
+      } else if (W.phase === "bound") {
+        for (const w of W.ws) { const a = anchor(w); w.x = a[0]; w.y = a[1]; }
+        if (W.t >= C.restrain || v.untouchable()) { this.wraiths = null; this.fxPush({ kind: "wraith_release", x: vcx, y: v.y + v.stats.height * 0.5 }); return; }
+        v.root = { left: 2 };
+      } else if (W.t >= (C.fadeTicks || 14)) {
+        this.wraiths = null;
+      }
+    }
+
+    // ── Skill 2: Abyssal Transit. The melt is the startup (still hittable); once fully dissolved he is untargetable for
+    // cfg.hide ticks, then reforms at a random platform (never outside the arena, never right next to the enemy when avoidable).
+    beginTransit() {
+      const C = this.hit.transit, s = this.stats;
+      const spot = this.pickTransitSpot(this.arenaRef, C);
+      this.transit = { cfg: C, phase: "void", t: 0, fade: 0, from: { x: this.x + s.width / 2, y: this.y + s.height }, dest: spot };
+      this.fxPush({ kind: "transit_out", x: this.x + s.width / 2, y: this.y + s.height });
+    }
+
+    pickTransitSpot(arena, C) {
+      const s = this.stats;
+      if (!arena) return null;
+      const b = arena.blastZone, R = this.rand || Math.random;
+      const foe = this.foe, fcx = foe ? foe.x + foe.stats.width / 2 : null;
+      const plats = arena.platforms.filter((p) => p.w >= s.width && p.y - s.height > b.top && p.y < b.bottom && p.x >= b.left && p.x + p.w <= b.right);
+      if (!plats.length) return null;
+      const total = plats.reduce((a, p) => a + p.w, 0);
+      let best = null, bestD = -1;
+      for (let i = 0; i < (C.tries || 12); i++) {
+        let r = R() * total, p = plats[plats.length - 1];
+        for (const q of plats) { if ((r -= q.w) <= 0) { p = q; break; } }
+        const m = Math.min(C.edgeMargin || 0, (p.w - s.width) / 2);
+        const x = p.x + m + R() * (p.w - s.width - 2 * m);
+        const d = fcx === null ? 1e9 : Math.abs(x + s.width / 2 - fcx) + Math.abs(p.y - (foe.y + foe.stats.height)) * 0.5;
+        if (d >= (C.minEnemyDist || 0)) return { x: x, p: p };
+        if (d > bestD) { best = { x: x, p: p }; bestD = d; }
+      }
+      return best;
+    }
+
+    transitStep() {
+      const T = this.transit, C = T.cfg, s = this.stats;
+      if (!this.hit || this.hit.id !== "abyssal_transit" || this.state === STATE.HITSTUN || this.state === STATE.KO) {
+        this.transit = null; // interrupted while reforming
+        this.untargetable = false;
+        return;
+      }
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.ctl = { vx: 0, vy: 0, left: 2 }; // hangs where it is
+      T.t++;
+      if (T.phase === "void") {
+        this.vanished = true;
+        T.fade = 0;
+        this.untargetable = true;
+        if (T.t >= C.hide) {
+          const d = T.dest;
+          if (d) {
+            this.x = d.x;
+            this.y = d.p.y - s.height;
+            this.px = this.x;
+            this.py = this.y;
+            this.grounded = true;
+            this.standingOn = d.p;
+            this.airJumpsLeft = s.maxAirJumps;
+          }
+          this.vx = 0;
+          this.vy = 0;
+          if (this.foe) this.facing = this.foe.x >= this.x ? 1 : -1;
+          T.phase = "reform";
+          T.t = 0;
+          this.fxPush({ kind: "transit_in", x: this.x + s.width / 2, y: this.y + s.height });
+        }
+      } else {
+        T.fade = Math.min(1, T.t / C.reform);
+        this.untargetable = T.t <= (C.reformSafe || 0);
+        if (T.t >= C.reform) {
+          this.transit = null;
+          this.untargetable = false;
+          this.state = STATE.ATTACK_RECOVERY;
+          this.stateTimer = this.hit.recovery;
+        }
+      }
+    }
+
+    // ── Ultimate: Void Execution. A visible startup, then a rift opens at the enemy's position. If the enemy is still inside the
+    // grab zone when the rift finishes opening it is seized, lifted, impaled by tentacles and slammed. Leaving the zone = a clean miss.
+    beginExecution() {
+      const C = this.hit.execution, s = this.stats, v = this.foe;
+      this.execution = null;
+      if (!v || v.state === STATE.KO || v.untouchable()) return;
+      const dx = v.x + v.stats.width / 2 - (this.x + s.width / 2), dy = v.y + v.stats.height / 2 - (this.y + s.height / 2);
+      if (Math.hypot(dx, dy) > C.range) return; // nobody in range: a pure miss with the full recovery
+      this.facing = dx >= 0 ? 1 : -1;
+      this.execution = { id: this.hit.id, cfg: C, target: v, phase: "open", t: 0, p: 0, imp: 0, rx: v.x + v.stats.width / 2, ry: v.y + v.stats.height };
+      this.fxPush({ kind: "rift_open", x: this.execution.rx, y: this.execution.ry });
+    }
+
+    executionStep() {
+      const X = this.execution, C = X.cfg, v = X.target;
+      const stop = (recovery) => {
+        this.execution = null;
+        if (v.ctl) v.ctl = null;
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = recovery;
+      };
+      if (!this.hit || this.hit.id !== X.id || this.state === STATE.HITSTUN || this.state === STATE.KO) { // the Mage was knocked out of it
+        this.execution = null;
+        if (v.ctl) v.ctl = null;
+        return;
+      }
+      if (v.state === STATE.KO || (X.phase !== "open" && X.phase !== "retreat" && v.invuln > 0)) { stop(C.endRecovery); return; }
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.vx = 0;
+      X.t++;
+      const vcx = v.x + v.stats.width / 2;
+      if (X.phase === "open") {
+        if (X.t >= C.openTicks) {
+          const grabbed = !v.untouchable() && Math.abs(vcx - X.rx) <= C.grabRX && Math.abs(v.y + v.stats.height - X.ry) <= C.grabRY;
+          X.phase = grabbed ? "lift" : "retreat";
+          X.p = 0;
+          this.fxPush({ kind: grabbed ? "grab" : "rift_miss", x: X.rx, y: X.ry });
+        }
+      } else if (X.phase === "retreat") {
+        if (++X.p >= C.sinkTicks) stop(C.missRecovery);
+      } else if (X.phase === "lift") {
+        this.holdVictim(v);
+        v.ctl = { vx: (X.rx - vcx) * 0.25, vy: -C.liftSpeed, left: 2 };
+        if (++X.p >= C.liftTicks) { X.phase = "impale"; X.p = 0; }
+      } else if (X.phase === "impale") {
+        this.holdVictim(v);
+        v.ctl = { vx: 0, vy: 0, left: 2 };
+        X.p++;
+        if (X.imp < C.impales && X.p % C.impaleGap === 0) {
+          X.imp++;
+          this.strikeHit(v, { id: "void_execution", isSkill: true, noMark: true, noOverload: true, damage: C.impaleDamage, knockback: 0, launchH: 0, launchV: 0, stun: C.impaleStun, manaGain: 0 }, this.facing);
+          this.holdVictim(v);
+          this.fxPush({ kind: "impale", x: vcx, y: v.y + v.stats.height * 0.5, n: X.imp });
+        }
+        if (X.imp >= C.impales && X.p >= C.impales * C.impaleGap + C.settle) { X.phase = "slam"; X.p = 0; }
+      } else if (X.phase === "slam") {
+        this.holdVictim(v);
+        v.ctl = { vx: 0, vy: C.slamSpeed, left: 2 };
+        if (++X.p > 2 && v.grounded) {
+          v.ctl = null;
+          const dir = vcx >= this.x + this.stats.width / 2 ? 1 : -1;
+          this.strikeHit(v, { id: "void_execution", isSkill: true, noMark: true, noOverload: true, empowered: true, damage: C.slamDamage, knockback: C.slamKnockback, launchH: C.slamLaunchH, launchV: C.slamLaunchV, stun: C.slamStun, manaGain: 0 }, dir);
+          this.fxPush({ kind: "slam", x: vcx, y: v.y + v.stats.height, big: true });
+          X.phase = "sink";
+          X.p = 0;
+        }
+      } else if (++X.p >= C.sinkTicks) { // sink
+        stop(C.endRecovery);
+      }
+    }
+
+
     // Momentum passive: a melee swing that landed nothing costs whiffLoss momentum.
     whiffCheck() {
+      if (this.hit && this.hit.utility) return; // a utility skill (Phantom Decoy) is not a swing
       const P = this.stats.passive;
       if (P && P.type === "deathmark" && !this.swingHit && this.hit && this.hit.type === "melee" && !this.mark.marked) this.mark.stacks = 0; // a miss breaks the chain
       if (P && P.type === "momentum" && P.whiffLoss && !this.swingHit && this.hit && this.hit.type === "melee" && this.momentum > 0) {
@@ -367,6 +894,7 @@
 
     // Does the melee shape touch this rectangle? Only the front half of the ellipse counts.
     hitsRect(r) {
+      if (this.hit && this.hit.utility) return false; // utility skills never hit anything
       // Lock-on (Meteor Fist): decided on the first active tick, i.e. when the punch is committed.
       // Locked = it cannot be dodged by moving or jumping; not locked = ordinary short reach (a miss).
       const L = this.hit && this.hit.lockOn;
@@ -394,6 +922,13 @@
       this.swingHit = true;
       this.addMana(hit);
       const P = this.stats.passive;
+      if (P && P.type === "voidoverload" && !(hit && hit.noOverload) && !this.overload) { // Void Overload: every Nth landed hit charges the next basic attack
+        this.overloadIdle = 0;
+        if (++this.overloadHits >= P.hits) {
+          this.overload = true;
+          this.fxOut.push({ kind: "overload_ready" });
+        }
+      }
       if (P && P.type === "momentum") {
         this.momentum = Math.min(P.max, this.momentum + (hit && hit.momentumGain !== undefined ? hit.momentumGain : 1));
         this.momentumIdle = 0;
@@ -447,6 +982,7 @@
     }
 
     startSkill(slot, hit) {
+      if (!hit.decoy) this.breakCloak(); // attacking ends the invisibility early (casting the decoy itself does not)
       this.chainIndex = 0;
       this.hit = hit;
       this.skillSlot = slot;
@@ -472,6 +1008,7 @@
       const s = this.stats;
       const C = MW.CONFIG.combat;
       const P = s.passive;
+      if (this.untargetable) return this.lastHit; // dissolved into the void: nothing lands
       if (attacker && attacker !== this && attacker.addMark) attacker.addMark(this, hit); // Death Mark stacks
       // Iron Guard is up while it winds up and while it is active.
       const guarding = !!(this.hit && this.hit.id === "iron_guard" &&
@@ -495,6 +1032,8 @@
       }
 
       this.hp = Math.max(0, this.hp - dmg);
+      if (this.cloak && this.cloak.revealOnHit) this.cloak = null; // getting hit reveals the cloaked Assassin
+      if (hit.rupture && this.hp > 0 && attacker && attacker !== this) this.startBleed(attacker, hit); // Rupture: bleeding starts (also on armored targets)
       const lost = 1 - this.hp / s.maxHP;
       const kb = Combat.knockback(hit.knockback, lost, s.weight);
       const stun = hit.stun !== undefined ? hit.stun : Combat.hitstun(kb); // hit.stun = fixed stagger
@@ -540,6 +1079,8 @@
         lost: lost,
       };
       if (hit.scythe && this.hp > 0 && attacker && attacker.beginScythe) attacker.beginScythe(this, hit); // chained: pull starts
+      if (hit.onslaught && this.hp > 0 && attacker && attacker.beginOnslaught) attacker.beginOnslaught(this, hit); // Phantom Onslaught starts
+      if (hit.sentence && this.hp > 0 && attacker && attacker.beginSentence) attacker.beginSentence(this, hit); // Death Sentence starts
       return this.lastHit;
     }
 
@@ -547,9 +1088,15 @@
       const s = this.stats;
       const P = MW.CONFIG.physics;
       const wasGrounded = this.grounded;
+      this.arenaRef = arena; // Abyssal Transit needs the layout to pick where to reappear
 
       this.px = this.x;
       this.py = this.y;
+      if (this.root) { // Void bound Wraiths: no movement, no jumping, no attacking
+        intent = MW.IDLE_INTENT;
+        this.jumpBuf = 0;
+        this.atkBuf = 0;
+      }
       // Direction held this tick. A new swing (including the next hit of a chain started
       // by buffered/spammed presses) turns to face it, so reversing the stick mid-spam works.
       this.heldDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
@@ -558,6 +1105,16 @@
       else { this.atkHeldTicks = 0; this.chargeLock = false; }
       this.advanceState();
       if (this.scythe) this.scytheStep();
+      this.vanished = false;
+      if (this.onslaught) this.onslaughtStep(arena);
+      if (this.sentence) this.sentenceStep(arena);
+      if (this.decoy) this.decoyStep(arena);
+      if (this.transit) this.transitStep(arena);
+      if (this.wraiths) this.wraithStep();
+      if (this.gravSlam) this.gravSlamStep();
+      if (this.execution) this.executionStep();
+      const PV = this.stats.passive; // Void Overload: the hit counter fades if no hit lands for idleReset ticks (0 = never)
+      if (PV && PV.type === "voidoverload" && !this.overload && this.overloadHits > 0 && PV.idleReset && ++this.overloadIdle >= PV.idleReset) this.overloadHits = 0;
       const DMK = this.stats.passive;
       if (DMK && DMK.type === "deathmark") { // stacks fade if the chain of hits stops; the mark runs out after its duration
         const m = this.mark;
@@ -569,6 +1126,7 @@
       const B = MW.CONFIG.inputBufferFrames;
       if (intent.jumpPressed) this.jumpBuf = B;
       if (intent.attackPressed) this.atkBuf = B;
+      if (this.slow && this.slow.noJump) this.jumpBuf = 0; // Abyssal Grasp: no jumping (air jumps included)
 
       // Skill slots (touch pad / U I O L). Only from locomotion states; nothing is assigned yet.
       if (intent.skillPressed && LOCOMOTION.has(this.state)) {
@@ -594,7 +1152,7 @@
 
       // Hold the attack button (after the tap / jab) to charge the heavy punch.
       const CH = s.charge;
-      if (CH && this.attackHeld && !this.chargeLock && this.atkHeldTicks >= CH.holdStart && LOCOMOTION.has(this.state)) {
+      if (CH && this.attackHeld && !this.chargeLock && !this.overload && this.atkHeldTicks >= CH.holdStart && LOCOMOTION.has(this.state)) {
         this.startCharge(CH);
       }
 
@@ -626,6 +1184,11 @@
       } else {
         this.vx = approach(this.vx, 0, wasGrounded ? s.groundFriction : s.airDrag);
       }
+      if (this.slow && this.state !== STATE.HITSTUN) { // Abyssal Grasp: heavily reduced speed
+        const cap = s.runSpeed * this.slow.mul;
+        this.vx = Math.max(-cap, Math.min(cap, this.vx));
+      }
+      if (this.root && this.state !== STATE.HITSTUN) this.vx = 0; // restrained: knockback still works, walking does not
       // Step-in while swinging (attack data: advance).
       if (this.state === STATE.ATTACK_STARTUP && this.hit.dashSpeed) {
         this.vx = this.facing * this.hit.dashSpeed; // skill dash (Fist Rush)
@@ -659,6 +1222,12 @@
         this.vy = s.fastFallSpeed;
       } else if (this.vy > s.maxFallSpeed) {
         this.vy = s.maxFallSpeed;
+      }
+
+      if (this.ctl) { // another fighter's skill is steering this one (pull, lift, slam, hold)
+        this.vx = this.ctl.vx;
+        this.vy = this.ctl.vy;
+        if (--this.ctl.left <= 0) this.ctl = null;
       }
 
       // --- integrate + platform collision (top surface, falling only) ---
@@ -703,6 +1272,15 @@
       ) {
         this.leaveArena(arena);
       }
+
+      if (this.bleed) this.bleedStep();
+      if (this.bleedPulse > 0) this.bleedPulse--;
+      if (this.cloak && --this.cloak.left <= 0) this.cloak = null;
+      this.fade = this.vanished ? 0 : this.cloak ? this.cloak.alpha : 1;
+      if (this.transit) this.fade = this.transit.fade; // Abyssal Transit: melting / reforming body opacity
+      if (this.root && --this.root.left <= 0) this.root = null;
+      if (this.slow && --this.slow.left <= 0) this.slow = null;
+      if (this.fxOut.length > 12) this.fxOut.length = 12;
 
       if (this.jumpBuf > 0) this.jumpBuf--;
       if (this.atkBuf > 0) this.atkBuf--;
