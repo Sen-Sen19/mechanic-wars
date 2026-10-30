@@ -20,13 +20,13 @@
     #mw-touch * { touch-action: none; -webkit-tap-highlight-color: transparent; }
 
     /* joystick: small, glassy */
-    .mw-stick { position: absolute; left: calc(22px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-      width: 240px; height: 240px; border-radius: 50%; pointer-events: auto;
+    .mw-stick { position: absolute; left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+      width: 90px; height: 90px; border-radius: 50%; pointer-events: auto;
       background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 100%);
       border: 2px solid rgba(255,255,255,0.28);
       box-shadow: inset 0 0 18px rgba(127,216,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
       backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-    .mw-knob { position: absolute; left: 50%; top: 50%; width: 110px; height: 110px; margin: -55px 0 0 -55px;
+    .mw-knob { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
       border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), rgba(160,200,255,0.5));
       border: 2px solid rgba(255,255,255,0.75); box-shadow: 0 2px 10px rgba(0,0,0,0.45), 0 0 12px rgba(127,216,255,0.45); }
 
@@ -37,22 +37,22 @@
       transition: transform 0.06s, background 0.06s; }
     .mw-btn svg { display: block; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
     .mw-btn.active { transform: scale(0.9); }
-    .mw-jump { width: 58px; height: 58px;
+    .mw-jump { width: 42px; height: 42px;
       background: rgba(74,163,255,0.35); border-color: rgba(120,190,255,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(74,163,255,0.4); }
     .mw-jump.active { background: rgba(74,163,255,0.75); }
-    .mw-attack { width: 80px; height: 80px;
+    .mw-attack { width: 56px; height: 56px;
       background: rgba(255,90,90,0.35); border-color: rgba(255,130,130,0.95); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 14px rgba(255,90,90,0.4); }
     .mw-attack.active { background: rgba(255,90,90,0.75); }
 
     /* skill slots: fan of 4 around the attack button */
-    .mw-skill { width: 46px; height: 46px; flex-direction: column; font: 700 11px/1 monospace; letter-spacing: 0.02em;
+    .mw-skill { width: 34px; height: 34px; flex-direction: column; font: 700 9px/1 monospace; letter-spacing: 0.02em;
       background: rgba(176,108,255,0.30); border-color: rgba(200,160,255,0.9); box-shadow: 0 3px 10px rgba(0,0,0,0.4), 0 0 10px rgba(176,108,255,0.35); }
-    .mw-skill .mw-slot-n { position: absolute; top: -3px; right: -3px; width: 15px; height: 15px; border-radius: 50%;
-      background: rgba(10,12,26,0.85); border: 1px solid rgba(255,255,255,0.5); font-size: 9px; line-height: 13px; text-align: center; }
+    .mw-skill .mw-slot-n { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%;
+      background: rgba(10,12,26,0.85); border: 1px solid rgba(255,255,255,0.5); font-size: 8px; line-height: 10px; text-align: center; }
     .mw-skill.empty { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.28); border-style: dashed; color: rgba(255,255,255,0.4);
       box-shadow: none; }
     .mw-skill.active { background: rgba(176,108,255,0.75); }
-    .mw-ult { width: 52px; height: 52px; font: 800 10px/1 monospace; letter-spacing: 0.04em;
+    .mw-ult { width: 38px; height: 38px; font: 800 8px/1 monospace; letter-spacing: 0.04em;
       background: rgba(255,212,121,0.10); border-color: rgba(255,212,121,0.35); color: rgba(255,255,255,0.45); box-shadow: none; }
     .mw-ult.ready { background: rgba(255,212,121,0.45); border-color: #ffd479; color: #fff;
       box-shadow: 0 0 18px rgba(255,212,121,0.8), 0 4px 12px rgba(0,0,0,0.4); animation: mwUltPulse 0.9s ease-in-out infinite; }
@@ -60,7 +60,7 @@
     @keyframes mwUltPulse { 50% { box-shadow: 0 0 28px rgba(255,212,121,1), 0 4px 12px rgba(0,0,0,0.4); } }
     .mw-skill { overflow: hidden; }
     .mw-skill .mw-cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
-    .mw-skill .mw-cdt { position: absolute; font: 800 14px/1 monospace; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+    .mw-skill .mw-cdt { position: absolute; font: 800 11px/1 monospace; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
     .mw-skill .mw-slot-n { z-index: 2; }
     .mw-skill.cooling { filter: saturate(0.4); }
     .mw-skill.empty.active { background: rgba(255,255,255,0.18); }
@@ -194,12 +194,12 @@
     // Tweak the numbers below to re-layout.
     layoutButtons() {
       const LAYOUT = {
-        attack: { x: 64, y: 64 }, // centre of the attack button
-        jump: { x: 160, y: 42 },
-        ult: { x: 232, y: 44 }, // ultimate: glows when the mana meter is full
-        arc: { radius: 112, angles: [22, 50, 78, 106] }, // degrees, 0 = straight left of attack, 90 = straight up
+        attack: { x: 46, y: 46 }, // centre of the attack button
+        jump: { x: 114, y: 30 },
+        ult: { x: 164, y: 32 }, // ultimate: glows when the mana meter is full
+        arc: { radius: 80, angles: [22, 50, 78, 106] }, // degrees, 0 = straight left of attack, 90 = straight up
       };
-      const size = { attack: 80, jump: 58, skill: 46 }; // keep in step with the CSS sizes
+      const size = { attack: 56, jump: 42, skill: 34 }; // keep in step with the CSS sizes
       const put = (elm, cx, cy, w) => {
         if (!elm) return; // Guard against undefined elements
         elm.style.right = "calc(" + (cx - w / 2) + "px + env(safe-area-inset-right, 0px))";
@@ -207,7 +207,7 @@
       };
       put(this.attackBtn, LAYOUT.attack.x, LAYOUT.attack.y, size.attack);
       put(this.jumpBtn, LAYOUT.jump.x, LAYOUT.jump.y, size.jump);
-      put(this.ultBtn, LAYOUT.ult.x, LAYOUT.ult.y, 52);
+      put(this.ultBtn, LAYOUT.ult.x, LAYOUT.ult.y, 38);
       this.skillBtns.forEach((b, i) => {
         const a = (LAYOUT.arc.angles[i] * Math.PI) / 180;
         put(b, LAYOUT.attack.x + LAYOUT.arc.radius * Math.cos(a), LAYOUT.attack.y + LAYOUT.arc.radius * Math.sin(a), size.skill);

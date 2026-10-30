@@ -15,7 +15,7 @@
   const TUNE = {
     maxParticles: 260,
     // hit-stop in sim ticks (60 = 1 s). Only the Brawler's own hits freeze the game.
-    hitStop: { jab: 0, hook: 2, upper: 4, power: 6, rush: 4, rising: 6, meteor: 10, slam: 2, ko: 14 },
+    hitStop: { jab: 0, hook: 2, upper: 4, power: 6, rush: 4, rising: 6, meteor: 14, slam: 2, charged: 6, hundred: 0, ko: 14 },
     jitter: 3.2, // px the victim trembles during hit-stop
     comboWindow: 80, // frames after the last landed hit that the counter stays up
     comboMin: 2, // counter appears from this many hits
@@ -40,11 +40,15 @@
   const beams = []; // vertical streaks (uppercut / rising)
   const words = []; // POW! BAM!
   const ghosts = []; // afterimages
+  const cracks = []; // ground cracks left by Fist Rush
+  const fistTrail = []; // fist afterimages during Hundred Fists
+  const giants = []; // spectral fist of Meteor Fist (rebuilt every frame)
   const combo = {}; // owner id -> { n, dmg, last, pop }
   const pos = {}; // fighter id -> { x, y } (for the combo text)
   const jit = {}; // victim id -> { n, max }
   const momPrev = {}; // fighter id -> last seen momentum
   let frame = 0;
+  let hundredN = 0; // punches landed by the barrage (throttles its effects)
   let freeze = 0;
   let koSeen = false;
 
@@ -102,6 +106,26 @@
     }
   }
 
+  // jagged crack in the floor (drawn behind the fighters)
+  function crack(x, y, dir) {
+    const lines = [];
+    const n = 3 + (Math.random() * 2 | 0);
+    for (let i = 0; i < n; i++) {
+      let px = x, py = y;
+      const pts = [[px, py]];
+      const ang = rnd(-0.35, 0.35) + (i % 2 ? Math.PI : 0) * 0 + (Math.random() < 0.5 ? 0 : Math.PI);
+      const segs = 3 + (Math.random() * 3 | 0);
+      for (let j = 0; j < segs; j++) {
+        px += Math.cos(ang) * rnd(8, 16) + rnd(-3, 3);
+        py += Math.abs(Math.sin(ang)) * rnd(-1, 4) + rnd(-1.5, 1.5);
+        pts.push([px, py]);
+      }
+      lines.push(pts);
+    }
+    cracks.push({ lines, life: 46, max: 46 });
+    if (cracks.length > 14) cracks.shift();
+  }
+
   // ─── events ───────────────────────────────────────────────────────
   function strike(ev) {
     const P = pal(ev.empowered);
@@ -150,6 +174,9 @@
       burstRays(x, y, 14, 90 * k, P, 12, dir, false);
       sparks(x, y, dir, 16, P, 12, 1.2);
       chunks(x, y + 10, 8, P);
+      // localized ground shockwave (bigger when empowered)
+      ring(x, y + 36, 8, 130 * k * (ev.empowered ? 1.4 : 1), 0.22, 18, P.gold, 4, 0, 0);
+      dust(x, y + 38, ev.empowered ? 10 : 6, dir, 20);
       word(ev.empowered ? "POW!!" : "POW!", x - dir * 4, y - 36, ev.empowered ? 40 : 32, P, dir);
     } else if (shape === "rush") { // Fist Rush
       flash(x, y, 40 * k, P, 10);
@@ -164,10 +191,42 @@
       burstRays(x, y, 12, 80 * k, P, 11, dir, false);
       sparks(x, y, dir, 12, P, 9, 1.3);
       word(ev.empowered ? "RISING!!" : "RISING!", x, y - 52, ev.empowered ? 36 : 28, P, dir);
+    } else if (shape.indexOf("bz_") === 0) { // one punch of the barrage: small and cheap, ~10 per second
+      hundredN++;
+      const yy = y + rnd(-6, 6);
+      if (shape === "bz_upper") { // rising punch: little vertical streak
+        flash(x, y, 26 * k + 12, P, 7);
+        beams.push({ x, y, h: 70, w: 14, P, life: 8, max: 8 });
+        sparks(x, y, dir * 0.4, 5, P, 8, 1.6);
+      } else if (shape === "bz_hook") { // wide swing: fan of lines along the arc
+        flash(x, yy, 24 * k + 12, P, 7);
+        burstRays(x, yy, 6, 54, P, 7, dir, true);
+        sparks(x, y, dir, 5, P, 9, 1);
+      } else if (shape === "bz_body") { // low punch: dust kicks up
+        flash(x, y + 6, 22 * k + 12, P, 6);
+        dust(x, y + 30, 2, dir, 10);
+        sparks(x, y + 6, dir, 4, P, 7, 0.9);
+      } else { // jab / cross
+        flash(x + rnd(-6, 6), yy, 20 * k + 12, P, 6);
+        sparks(x, y, dir, 4, P, 8, 1.1);
+      }
+      if (hundredN % 4 === 0) ring(x, y, 4, 38, 1.4, 8, P.mid, 2.5, dir, 4);
+      if (hundredN % 12 === 0) word("WHAM!", x, y - 40, 24, P, dir);
+    } else if (shape === "charged") { // charged punch
+      flash(x, y, 44 * k, P, 11);
+      ring(x, y, 6, 78 * k, 1.35, 14, P.mid, 5, dir, 8);
+      burstRays(x, y, 12, 80 * k, P, 11, dir, false);
+      sparks(x, y, dir, 14, P, 12, 1.2);
+      chunks(x, y + 10, 6, P);
+      word("CRUSH!", x - dir * 4, y - 36, 30, P, dir);
     } else if (shape === "meteor") {
       flash(x, y, 80, P, 16);
       burstRays(x, y, 18, 140, P, 14, dir, false);
       sparks(x, y, dir, 22, P, 14, 1.4);
+      ring(x, y + 30, 10, 260, 0.22, 26, P.gold, 6, 0, 0); // huge ground shockwave
+      ring(x, y, 10, 200, 1, 20, P.mid, 5, dir, 20);
+      chunks(x, y + 10, 14, P);
+      word("METEOR FIST!", x, y - 70, 40, HOT, dir);
     } else { // anything else (slam etc.): a small generic impact
       flash(x, y, 26 * k, P, 8);
       sparks(x, y, dir, 8, P, 8, 1);
@@ -192,6 +251,12 @@
       burstRays(ev.x, ev.y, 8, 70, P, 9, -ev.dir, true);
     } else if (ev.id === "rising_fist") {
       dust(ev.x, ev.fy, 6, 0, 18);
+    } else if (ev.id === "hundred_fists") {
+      dust(ev.x, ev.fy, 8, 0, 20);
+      ring(ev.x, ev.fy - 2, 6, 60, 0.25, 14, "#e8dcc0", 3, 0, 0);
+    } else if (ev.id === "meteor_fist") {
+      ring(ev.x, ev.fy - 2, 8, 110, 0.25, 22, HOT.gold, 4, 0, 0);
+      dust(ev.x, ev.fy, 10, 0, 24);
     }
   }
 
@@ -217,6 +282,7 @@
 
   function update(sim) {
     frame++;
+    giants.length = 0;
     if (sim.koTimer > 0) koSeen = true;
     else if (koSeen) { koSeen = false; for (const k in combo) delete combo[k]; } // new round: counters off
     for (const f of sim.fighters) {
@@ -254,6 +320,46 @@
         ghosts.push({ x: f.x, y: f.y, w: f.stats.width, h: f.stats.height, d: f.facing < 0 ? -1 : 1, life: TUNE.ghostLife, hot: !!(f.hit && f.hit.empowered) || meteor || f.momentumFull(), fist: f._art && f._art.fist ? [f._art.fist[0], f._art.fist[1]] : null });
         if (ghosts.length > TUNE.ghostMax) ghosts.shift();
       }
+
+      // Fist Rush: dust and cracks in the floor behind the dash
+      if (dashing && frame % 2 === 0) {
+        const fy = f.y + f.stats.height, bx = f.x + f.stats.width / 2 - f.facing * 14;
+        dust(bx, fy, 3, -f.facing, 10);
+        crack(bx, fy, f.facing);
+      }
+
+      // Hundred Fists: fist afterimages + a bit of dust
+      if (f.hit && f.hit.id === "hundred_fists" && f.state === S.ATTACK_ACTIVE) {
+        if (frame % 2 === 0) for (const p of fistPoints(f)) fistTrail.push({ x: p[0], y: p[1], life: 7, max: 7, hot: !!f.hit.empowered });
+        if (fistTrail.length > 60) fistTrail.splice(0, fistTrail.length - 60);
+        if (frame % 6 === 0) dust(f.x + f.stats.width / 2 + f.facing * 20, f.y + f.stats.height, 2, f.facing, 12);
+      }
+
+      // charge-up: Charged Punch (while the button is held) and the Meteor Fist wind-up
+      const chargeHold = !!(f.hit && f.hit.chargeHold && f.state === S.ATTACK_STARTUP && !f.chargeReleased);
+      const meteorCharge = !!(f.hit && f.hit.id === "meteor_fist" && f.state === S.ATTACK_STARTUP);
+      if (chargeHold || meteorCharge) {
+        const prog = chargeHold ? f.chargeTicks / f.hit.chargeTime : 1 - f.stateTimer / Math.max(1, f.hit.startup);
+        const pts = fistPoints(f);
+        if (pts.length && frame % 2 === 0) { // energy sucked into the gauntlet
+          const p = pts[0], a = rnd(0, TAU), r = rnd(28, 62) * (meteorCharge ? 1.5 : 1) * (1.15 - 0.5 * prog);
+          add({ kind: "spark", x: p[0] + Math.cos(a) * r, y: p[1] + Math.sin(a) * r, vx: -Math.cos(a) * r * 0.14, vy: -Math.sin(a) * r * 0.14, life: 8, size: rnd(1.6, 2.8), g: 0, drag: 1, col: prog >= 1 || meteorCharge ? HOT.gold : COOL.mid });
+        }
+        if (meteorCharge && frame % 10 === 0 && pts.length) ring(pts[0][0], pts[0][1], 40 + 30 * prog, 6, 1, 10, HOT.mid, 3, 0, 0);
+        if (chargeHold && f.chargeTicks >= f.hit.chargeTime) {
+          if (!f._chargeReady) { // ready: pop once, then keep glowing
+            f._chargeReady = true;
+            if (pts.length) { ring(pts[0][0], pts[0][1], 4, 54, 1, 14, HOT.gold, 4, 0, 0); flash(pts[0][0], pts[0][1], 40, HOT, 10); }
+          }
+          if (pts.length && frame % 3 === 0) add({ kind: "ember", x: pts[0][0] + rnd(-6, 6), y: pts[0][1] + rnd(-6, 6), vx: rnd(-0.5, 0.5), vy: rnd(-2.4, -0.8), life: 14, size: rnd(2, 3.4), g: -0.02, drag: 0.97, col: HOT.gold });
+        }
+      }
+      if (!chargeHold) f._chargeReady = false;
+
+      // Meteor Fist: the enormous spectral fist, drawn in draw()
+      if (f.hit && f.hit.id === "meteor_fist" && f.state === S.ATTACK_ACTIVE) {
+        giants.push({ x: f.facing > 0 ? f.x + f.stats.width : f.x, y: f.y + f.stats.height * 0.4, d: f.facing < 0 ? -1 : 1, prog: 1 - f.stateTimer / Math.max(1, f.hit.active) });
+      }
     }
   }
 
@@ -263,7 +369,7 @@
       p.x += p.vx; p.y += p.vy; p.vx *= p.drag; p.vy *= p.drag; p.vy += p.g; p.rot += p.vr;
       if (--p.life <= 0) parts.splice(i, 1);
     }
-    for (const arr of [stars, rings, rays, beams, words, ghosts]) {
+    for (const arr of [stars, rings, rays, beams, words, ghosts, cracks, fistTrail]) {
       for (let i = arr.length - 1; i >= 0; i--) if (--arr[i].life <= 0) arr.splice(i, 1);
     }
     for (const id in jit) if (--jit[id].n <= 0) delete jit[id];
@@ -300,8 +406,19 @@
 
   // blue afterimages behind the fighters: a simple boxer silhouette with a leading glove
   function drawBehind(ctx) {
-    if (!ghosts.length) return;
+    if (!ghosts.length && !cracks.length) return;
     ctx.save();
+    for (const c of cracks) { // cracks in the floor (Fist Rush)
+      const a = clamp(c.life / (c.max * 0.6), 0, 1);
+      for (const pass of [[5, "rgba(20,12,6," + (0.45 * a).toFixed(3) + ")"], [2, "rgba(255,226,170," + (0.55 * a).toFixed(3) + ")"]]) {
+        ctx.lineWidth = pass[0]; ctx.strokeStyle = pass[1]; ctx.globalAlpha = 1;
+        for (const pts of c.lines) {
+          ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.stroke();
+        }
+      }
+    }
     for (const gh of ghosts) {
       const a = clamp(gh.life / TUNE.ghostLife, 0, 1);
       const P = gh.hot ? HOT : COOL;
@@ -523,6 +640,36 @@
         ctx.fillStyle = p.col;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * a), 0, TAU); ctx.fill();
       }
+    }
+
+    // Hundred Fists afterimages
+    for (const t of fistTrail) {
+      const a = clamp(t.life / t.max, 0, 1);
+      ctx.globalAlpha = a * 0.55; ctx.fillStyle = t.hot ? HOT.mid : COOL.mid;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 11 * (0.6 + 0.4 * a), 0, TAU); ctx.fill();
+      ctx.globalAlpha = a * 0.5; ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, TAU); ctx.fill();
+    }
+
+    // Meteor Fist: enormous spectral gauntlet punching forward from his own fist
+    for (const G of giants) {
+      const k = clamp(G.prog, 0, 1), e = 1 - (1 - k) * (1 - k);
+      const len = 170 + 150 * e, hh = 76 + 30 * e;
+      ctx.save();
+      ctx.translate(G.x, G.y); ctx.scale(G.d, 1);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.9 - 0.35 * k;
+      const gr = ctx.createLinearGradient(0, 0, len, 0);
+      gr.addColorStop(0, "rgba(255,120,40,0)"); gr.addColorStop(0.45, "rgba(255,170,70,0.75)"); gr.addColorStop(1, "rgba(255,245,210,0.95)");
+      ctx.fillStyle = gr;
+      ctx.beginPath();
+      ctx.moveTo(0, -hh * 0.3); ctx.lineTo(len * 0.55, -hh * 0.5);
+      ctx.quadraticCurveTo(len * 1.04, -hh * 0.55, len * 1.06, 0);
+      ctx.quadraticCurveTo(len * 1.04, hh * 0.55, len * 0.55, hh * 0.5);
+      ctx.lineTo(0, hh * 0.3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.8)"; // knuckles
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(len * 0.9, (i - 1.5) * hh * 0.24, hh * 0.15, 0, TAU); ctx.fill(); }
+      ctx.restore();
     }
 
     // words

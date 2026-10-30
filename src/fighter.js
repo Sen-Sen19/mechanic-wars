@@ -81,6 +81,16 @@
       this.state = STATE.FALLING;
       this.stateTimer = 0; // ticks left in the current timed state (attack phase / hitstun)
       this.hit = null; // attack data of the swing in progress
+      this.attackHeld = false; // attack button held this tick (charged punch)
+      this.atkHeldTicks = 0;
+      this.chargeLock = false; // one charge per button press
+      this.chargeTicks = 0;
+      this.chargeReleased = true;
+      this.swingHit = false; // did the current swing land anything? (Momentum whiff loss)
+      this.lockState = null; // Meteor Fist lock-on: null = not decided yet, true / false once the swing is committed
+      this.scythe = null; // Assassin Chained Scythe in progress: { target, phase: "pull" | "bomb", t, cfg, mul }
+      this.blastFx = null; // visual one-shot (bomb explosion), read by assassin_fx.js
+      this.mark = { target: null, stacks: 0, idle: 0, marked: false, left: 0 }; // Assassin passive: Death Mark on the enemy
       this.chainIndex = 0;
       this.comboQueued = false;
       this.hitTargets = new Set(); // fighter ids already hit by the current swing
@@ -160,6 +170,7 @@
       this.stateTimer = this.hit.startup;
       this.comboQueued = false;
       this.hitTargets = new Set();
+      this.swingHit = false;
       if (this.heldDir) this.facing = this.heldDir;
     }
 
@@ -180,6 +191,33 @@
       if (this.armorHit > 0) this.armorHit--;
       switch (this.state) {
         case STATE.ATTACK_STARTUP:
+          if (this.hit && this.hit.chargeHold && !this.chargeReleased) {
+            // Charged punch: the swing waits while the button is held; letting go too early cancels it.
+            if (this.attackHeld) {
+              if (this.chargeTicks < this.hit.chargeTime) this.chargeTicks++;
+              break;
+            }
+            const cs = this.hit.chargeScale;
+            if (!cs && this.chargeTicks < this.hit.chargeTime) { // plain charge: must be full to fire
+              this.hit = null;
+              this.chargeTicks = 0;
+              this.state = STATE.FALLING;
+              break;
+            }
+            if (cs) {
+              // Scaled charge (dash slash): fires at ANY charge level; distance and damage grow with the charge.
+              const r = Math.max(0, Math.min(1, this.chargeTicks / this.hit.chargeTime));
+              const dist = cs.dist[0] + (cs.dist[1] - cs.dist[0]) * r;
+              const dmg = cs.damage ? cs.damage[0] + (cs.damage[1] - cs.damage[0]) * r : this.hit.damage;
+              this.hit = Object.assign({}, this.hit, {
+                advance: cs.speed, // px per tick, applied during startup + active
+                active: Math.max(1, Math.round(dist / cs.speed) - this.hit.startup + 1), // the dash IS the active window (+1: the last tick switches state before moving)
+                damage: dmg, chargeRatio: r, stopAtEnd: true,
+              });
+              this.stateTimer = this.hit.startup;
+            }
+            this.chargeReleased = true;
+          }
           if (--this.stateTimer <= 0) {
             this.state = STATE.ATTACK_ACTIVE;
             this.stateTimer = this.hit.active || 1;
@@ -188,9 +226,20 @@
           }
           break;
         case STATE.ATTACK_ACTIVE:
+          // barrage (Hundred Fists): every multiHit ticks the swing may hit the same target again
+          if (this.hit.multiHit && this.stateTimer % this.hit.multiHit === 0) {
+            this.hitTargets = new Set();
+            const base = this.hitBase;
+            if (base && base.sequence && base.sequence.length) { // each punch of the barrage has its own shape / angle
+              const step = base.sequence[this.barrageBeat++ % base.sequence.length];
+              this.hit = Object.assign({}, base, step, { knockback: base.knockback * (step.kb || 1) });
+            }
+          }
           if (--this.stateTimer <= 0) {
             this.state = STATE.ATTACK_RECOVERY;
             this.stateTimer = this.hit.recovery;
+            if (this.hit.stopAtEnd) this.vx = 0; // a dash ends where it ends (no sliding on)
+            this.whiffCheck();
           }
           break;
         case STATE.ATTACK_RECOVERY:
@@ -204,6 +253,90 @@
 
     rect() {
       return { x: this.x, y: this.y, w: this.stats.width, h: this.stats.height };
+    }
+
+    // ── Assassin passive: Death Mark. Called (from the victim's takeHit) for every hit this fighter lands.
+    // Consecutive hits stack on the target; at max stacks the target is MARKED and the next skill (markBonus) deals bonus damage.
+    addMark(victim, hit) {
+      const P = this.stats.passive;
+      if (!P || P.type !== "deathmark" || hit.noMark || hit.isCounter) return;
+      const m = this.mark;
+      if (m.target !== victim) { m.target = victim; m.stacks = 0; m.marked = false; m.left = 0; }
+      if (m.marked) return; // already marked: waiting for a skill
+      m.idle = 0;
+      if (++m.stacks >= P.max) { m.stacks = P.max; m.marked = true; m.left = P.duration; }
+    }
+
+    clearMark() {
+      this.mark = { target: null, stacks: 0, idle: 0, marked: false, left: 0 };
+    }
+
+    // ── Assassin skill 1: Chained Scythe. The hook itself is a long thin melee hit; when it lands the Fighter that
+    // was hit calls this (from takeHit). The target is dragged in, a bomb is attached, it explodes, and he jumps away.
+    beginScythe(victim, hit) {
+      this.scythe = { target: victim, phase: "pull", t: 0, cfg: hit.scythe, mul: hit.markMul || 1 };
+    }
+
+    scytheStep() {
+      const S = this.scythe;
+      const v = S.target, C = S.cfg;
+      if (!this.hit || this.hit.id !== "chained_scythe" || this.state === STATE.HITSTUN || this.state === STATE.KO || v.state === STATE.KO) {
+        this.scythe = null; // interrupted: the chain drops
+        return;
+      }
+      this.state = STATE.ATTACK_ACTIVE; // stay committed for the whole pull
+      this.stateTimer = 3;
+      const cx = this.x + this.stats.width / 2, vcx = v.x + v.stats.width / 2;
+      const dir = vcx >= cx ? 1 : -1;
+      this.facing = dir;
+      const gap = Math.abs(vcx - cx) - (this.stats.width + v.stats.width) / 2;
+      v.state = STATE.HITSTUN; // the target cannot act while chained
+      v.stateTimer = Math.max(v.stateTimer, 3);
+      S.t++;
+      if (S.phase === "pull") {
+        if (gap <= C.closeRange || S.t > C.maxTicks) {
+          if (gap > C.closeRange * 2) { this.scythe = null; this.state = STATE.ATTACK_RECOVERY; this.stateTimer = C.endRecovery; return; } // chain slipped
+          S.phase = "bomb"; S.t = 0; v.vx = 0;
+        } else {
+          v.vx = -dir * C.pullSpeed;
+          v.vy = v.grounded ? 0 : Math.max(-10, Math.min(10, (this.y - v.y) * 0.2));
+        }
+      }
+      if (S.phase === "bomb") {
+        v.vx = 0;
+        if (S.t >= C.bombDelay) {
+          const bomb = { id: "scythe_bomb", isSkill: true, noMark: true, damage: C.bombDamage * S.mul, knockback: C.bombKnockback, launchH: C.bombLaunchH, launchV: C.bombLaunchV, stun: C.bombStun, manaGain: C.bombMana || 0, empowered: S.mul > 1 };
+          v.takeHit(this, bomb, dir);
+          this.onHitLanded(bomb);
+          this.blastFx = { x: vcx, y: v.y + v.stats.height * 0.5 };
+          // jump away: the direction held on the stick, or straight back from the enemy
+          const j = this.heldDir || -dir;
+          this.vx = j * C.jumpVx;
+          this.vy = -C.jumpVy;
+          this.grounded = false;
+          this.standingOn = null;
+          this.scythe = null;
+          this.state = STATE.ATTACK_RECOVERY;
+          this.stateTimer = C.endRecovery;
+        }
+      }
+    }
+
+    // Momentum passive: a melee swing that landed nothing costs whiffLoss momentum.
+    whiffCheck() {
+      const P = this.stats.passive;
+      if (P && P.type === "deathmark" && !this.swingHit && this.hit && this.hit.type === "melee" && !this.mark.marked) this.mark.stacks = 0; // a miss breaks the chain
+      if (P && P.type === "momentum" && P.whiffLoss && !this.swingHit && this.hit && this.hit.type === "melee" && this.momentum > 0) {
+        this.momentum = Math.max(0, this.momentum - P.whiffLoss);
+      }
+    }
+
+    // Charged punch (stats.charge): wind up while the attack button is held.
+    startCharge(cfg) {
+      this.chargeLock = true; // one charge per press: release the button to charge again
+      this.startSkill(-2, Object.assign({}, cfg.attack, { chargeHold: true, chargeTime: cfg.time, chargeScale: cfg.scale || null }));
+      this.chargeTicks = 0;
+      this.chargeReleased = false;
     }
 
     // Melee hit shape: a half-ellipse in front of the fighter (no square corners).
@@ -234,6 +367,16 @@
 
     // Does the melee shape touch this rectangle? Only the front half of the ellipse counts.
     hitsRect(r) {
+      // Lock-on (Meteor Fist): decided on the first active tick, i.e. when the punch is committed.
+      // Locked = it cannot be dodged by moving or jumping; not locked = ordinary short reach (a miss).
+      const L = this.hit && this.hit.lockOn;
+      if (L && this.state === STATE.ATTACK_ACTIVE) {
+        const dx = r.x + r.w / 2 - (this.x + this.stats.width / 2);
+        if (this.lockState === null) {
+          this.lockState = Math.abs(dx) <= L.range && ((dx >= 0 ? 1 : -1) === this.facing || Math.abs(dx) < this.stats.width);
+        }
+        if (this.lockState) return Math.abs(dx) <= (L.follow || L.range);
+      }
       const e = this.meleeShape();
       // closest point of the rect to the ellipse centre, restricted to the front half
       const x0 = e.dir > 0 ? Math.max(r.x, e.cx) : r.x;
@@ -248,6 +391,7 @@
 
     // Called by the sim whenever this fighter's attack connects.
     onHitLanded(hit) {
+      this.swingHit = true;
       this.addMana(hit);
       const P = this.stats.passive;
       if (P && P.type === "momentum") {
@@ -291,7 +435,12 @@
         // empowered: spend all momentum for bonus damage on this one use
         this.momentum = 0;
         this.momentumIdle = 0;
-        hit = Object.assign({}, hit, { damage: hit.damage * (1 + P.bonus), empowered: true });
+        hit = Object.assign({}, hit, { damage: hit.damage * (1 + P.bonus), knockback: hit.knockback * (P.bonusKnockback || 1), empowered: true });
+      }
+      if (hit.markBonus && P && P.type === "deathmark" && this.mark.marked) {
+        // marked target: this skill deals bonus damage (the scythe bomb too), then the mark is spent
+        hit = Object.assign({}, hit, { damage: hit.damage * (1 + P.bonus), markMul: 1 + P.bonus, empowered: true });
+        this.clearMark();
       }
       this.startSkill(slot, hit);
       return true;
@@ -307,6 +456,12 @@
       this.stateTimer = hit.startup;
       this.comboQueued = false;
       this.hitTargets = new Set();
+      this.hitBase = hit; // unmodified data of this skill (the barrage swaps this.hit every beat)
+      this.barrageBeat = 0;
+      this.swingHit = false;
+      this.lockState = null;
+      this.chargeTicks = 0;
+      this.chargeReleased = true;
       this.atkBuf = 0;
       if (this.heldDir) this.facing = this.heldDir;
     }
@@ -317,6 +472,7 @@
       const s = this.stats;
       const C = MW.CONFIG.combat;
       const P = s.passive;
+      if (attacker && attacker !== this && attacker.addMark) attacker.addMark(this, hit); // Death Mark stacks
       // Iron Guard is up while it winds up and while it is active.
       const guarding = !!(this.hit && this.hit.id === "iron_guard" &&
         (this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE));
@@ -383,6 +539,7 @@
         stun: stun,
         lost: lost,
       };
+      if (hit.scythe && this.hp > 0 && attacker && attacker.beginScythe) attacker.beginScythe(this, hit); // chained: pull starts
       return this.lastHit;
     }
 
@@ -396,7 +553,17 @@
       // Direction held this tick. A new swing (including the next hit of a chain started
       // by buffered/spammed presses) turns to face it, so reversing the stick mid-spam works.
       this.heldDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
+      this.attackHeld = !!intent.attackHeld;
+      if (this.attackHeld) this.atkHeldTicks++;
+      else { this.atkHeldTicks = 0; this.chargeLock = false; }
       this.advanceState();
+      if (this.scythe) this.scytheStep();
+      const DMK = this.stats.passive;
+      if (DMK && DMK.type === "deathmark") { // stacks fade if the chain of hits stops; the mark runs out after its duration
+        const m = this.mark;
+        if (m.marked) { if (--m.left <= 0 || (m.target && m.target.state === STATE.KO)) this.clearMark(); }
+        else if (m.stacks > 0 && ++m.idle >= DMK.stackWindow) m.stacks = 0;
+      }
 
       // Early presses are remembered for a few ticks so they are not lost to a lockout.
       const B = MW.CONFIG.inputBufferFrames;
@@ -423,6 +590,12 @@
           this.comboQueued = true;
           this.atkBuf = 0;
         }
+      }
+
+      // Hold the attack button (after the tap / jab) to charge the heavy punch.
+      const CH = s.charge;
+      if (CH && this.attackHeld && !this.chargeLock && this.atkHeldTicks >= CH.holdStart && LOCOMOTION.has(this.state)) {
+        this.startCharge(CH);
       }
 
       // Only locomotion states accept full input. Attacks in the air still allow
@@ -456,7 +629,7 @@
       // Step-in while swinging (attack data: advance).
       if (this.state === STATE.ATTACK_STARTUP && this.hit.dashSpeed) {
         this.vx = this.facing * this.hit.dashSpeed; // skill dash (Fist Rush)
-      } else if ((this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE) && this.hit.advance) {
+      } else if ((this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE) && this.hit.advance && !(this.hit.chargeHold && !this.chargeReleased)) {
         // stopOnContact (Meteor Breaker): the Sim sets advanceStopped when the enemy is in reach,
         // so the charge never runs THROUGH the enemy and whiffs.
         this.vx = this.advanceStopped ? 0 : this.facing * this.hit.advance;

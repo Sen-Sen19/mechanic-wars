@@ -76,6 +76,7 @@
         downPressed: this.tapped(P1_KEYS.down),
         downHeld: this.held(P1_KEYS.down),
         attackPressed: this.tapped(P1_KEYS.attack),
+        attackHeld: this.held(P1_KEYS.attack), // hold = charged punch (Vanguard)
         ultPressed: this.tapped(P1_KEYS.ult),
         skillPressed: P1_KEYS.skills.map((k) => this.tapped(k)),
       };

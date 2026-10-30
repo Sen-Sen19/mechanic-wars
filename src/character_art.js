@@ -21,15 +21,15 @@
   const PAL = {
     fighter: { main: "#c98a3a", dark: "#5c3f1f", light: "#e8a85a", accent: "#d9611a", skin: "#c98d64", skinDark: "#8f5a3b", skinLight: "#e3ae84", hair: "#1d1714", pants: "#232226", pantsDark: "#141316", boot: "#2b221b", iron: "#5a5d64", ironDark: "#2f3136", bronze: "#8a6234", bronzeDark: "#53391c", bronzeLight: "#bd8f4c", leather: "#3b2a1e", energy: "#d9611a", energyHi: "#f0a64a", scar: "#ecc7a6" },
     mage: { main: "#0c0a14", dark: "#07050d", light: "#b44bff", accent: "#e6bcff", skin: "#171229", hair: "#0c0a14", pants: "#0c0a14", boot: "#0c0a14", glow: "#b44bff" },
-    assassin: { main: "#2a2d3a", dark: "#10121a", light: "#ff6b82", accent: "#ff2a45", skin: "#2b2230", hair: "#0f0f15", pants: "#181b26", boot: "#0c0d12", scarf: "#e4203f", scarfDark: "#8f1228", steel: "#e6ecf8", wrap: "#555c72", strap: "#5b2a2e" },
-    hitter: { main: "#ff7a3d", dark: "#b8431a", light: "#ffb48a", accent: "#ffd24a", skin: "#e9b98f", hair: "#3a2414", pants: "#2f3a5a", boot: "#5a3a22", shirt: "#efe3cc", hat: "#8a5428", hatDark: "#4e2e14", band: "#d6342f", metal: "#aeb4c2", wood: "#6a3a1a" },
-    tank: { main: "#7d8aa0", dark: "#454f62", light: "#c8d2e2", accent: "#f2b84b", skin: "#c9a98a", hair: "#303642", pants: "#3b4252", boot: "#2e3442", glow: "#ff7a2a", glowHi: "#ffd9a0" },
+    assassin: { main: "#0b0a0f", dark: "#050408", light: "#ff4a5e", accent: "#ff1e3c", skin: "#b08f88", skinDark: "#6e4f4c", hair: "#09080b", pants: "#0f0e14", boot: "#060509", scarf: "#a1132b", scarfDark: "#4f0818", steel: "#252a35", silver: "#aeb4c2", wrap: "#2a1519", strap: "#2e0d14" },
+    hitter: { main: "#0b0c11", dark: "#040508", light: "#6fc0ff", accent: "#3fa0ff", skin: "#c6a089", hair: "#14151b", pants: "#0b0c11", boot: "#0b0c11", metal: "#343c4b", bronze: "#c79a4e", glow: "#3fa0ff" },
+    tank: { main: "#363e4e", dark: "#0a0b0f", light: "#a9b2c2", accent: "#dcbf6e", skin: "#b08c74", hair: "#303642", pants: "#14161d", boot: "#363e4e", glow: "#7fb2dd", glowHi: "#f4dd9e" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
   const BUILD = {
     fighter: { leg: 0.40, tor: 0.31, hr: 0.125, sw: 0.92, hw: 0.56, lw: 0.25, aw: 0.245, arm: 0.34, stride: 0.45 }, // heavyweight: wide shoulders, thick limbs
     mage: { leg: 0.40, tor: 0.33, hr: 0.10, sw: 0.58, hw: 0.42, lw: 0.15, aw: 0.105, arm: 0.40, stride: 0.34 },
-    assassin: { leg: 0.43, tor: 0.27, hr: 0.105, sw: 0.66, hw: 0.46, lw: 0.21, aw: 0.17, arm: 0.34, stride: 0.55 },
+    assassin: { leg: 0.44, tor: 0.27, hr: 0.10, sw: 0.72, hw: 0.40, lw: 0.235, aw: 0.19, arm: 0.36, stride: 0.58 }, // Bloodlust: lean, broad-ish shoulders, narrow waist, strong legs, long limbs
     hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.19, arm: 0.32, stride: 0.42 },
     tank: { leg: 0.36, tor: 0.33, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
@@ -51,14 +51,24 @@
       { wind: kf([0.5, -0.46], [0.36, -0.4], -0.02, 0, 0.06), strike: kf([0.5, -0.46], [0.36, -0.4], -0.02, 0, 0.07) },
       // 7 = Meteor Breaker (ultimate): long, heavy wind-up, then a massive forward slam
       { wind: kf([-0.8, 0.2], [0.3, 0.7], -0.4, -10, 0.12), strike: kf([1.4, 0.0], [-0.2, 0.7], 0.7, 20, 0.15) },
+      // 8 = Hundred Fists (skill 4): planted stance, fists alternate (animated in the pose code below)
+      { wind: kf([1.0, 0.0], [0.3, 0.3], 0.3, 5, 0.05), strike: kf([1.18, 0.0], [0.3, 0.3], 0.3, 6, 0.05) },
+      // 9 = Charged Punch: fist drawn far back and held low while charging, then a heavy straight punch
+      { wind: kf([-0.7, 0.25], [0.3, 0.6], -0.38, -9, 0.1), strike: kf([1.3, 0.0], [-0.1, 0.65], 0.6, 17, 0.12) },
     ],
     assassin: [
-      { wind: kf([-0.3, -0.45], [0.1, 0.6], -0.2, -3, 0.04), strike: kf([1.05, 0.05], [0.1, 0.5], 0.4, 9, 0.05) },
-      { wind: kf([-0.3, 0.6], [0.1, 0.6], -0.2, -3, 0.06), strike: kf([1.05, 0.35], [0.1, 0.5], 0.42, 9, 0.07) },
+      { wind: kf([-0.3, -0.45], [0.1, 0.6], -0.2, -3, 0.07), strike: kf([1.08, 0.05], [0.1, 0.5], 0.46, 11, 0.09) },
+      { wind: kf([-0.3, 0.6], [0.1, 0.6], -0.2, -3, 0.09), strike: kf([1.08, 0.38], [0.1, 0.5], 0.48, 11, 0.11) },
+      // 2 = third hit of the combo: wide heavy finisher
+      { wind: kf([-0.4, -0.3], [0.1, 0.6], -0.28, -5, 0.09), strike: kf([1.1, 0.25], [0.2, 0.5], 0.52, 13, 0.11) },
+      // 3 = Charged Slash: blades pulled far back and low while charging, then one long lunging slash
+      { wind: kf([-0.65, 0.2], [-0.2, 0.5], -0.36, -8, 0.1), strike: kf([1.28, 0.1], [0.2, 0.5], 0.62, 16, 0.11) },
+      // 4 = Chained Scythe: arm cocked back, then thrown straight out and held while the chain drags the enemy in
+      { wind: kf([-0.5, -0.3], [0.1, 0.6], -0.25, -4, 0.06), strike: kf([1.2, -0.15], [0.1, 0.55], 0.45, 12, 0.07) },
     ],
     tank: [{ wind: kf([-0.3, 0.05], [0.0, 0.5], -0.32, -5, 0.03), strike: kf([1.0, 0.1], [0.1, 0.5], 0.46, 8, 0.07) }],
     mage: [{ wind: kf([0.15, -0.55], [0.2, 0.5], -0.16, -2, 0.02), strike: kf([0.95, -0.2], [0.2, 0.5], 0.2, 3, 0.02) }],
-    hitter: [{ wind: kf([0.75, -0.2], [0.0, 0.5], -0.05, -1, 0.02), strike: kf([1.0, -0.1], [0.1, 0.5], 0.1, -3, 0.02) }],
+    hitter: [{ wind: kf([0.95, 0.08], [0.5, 0.04], -0.05, -1, 0.02), strike: kf([0.92, -0.02], [0.46, -0.06], 0.08, -3, 0.02) }], // two-handed rifle: raised level, small kick
   };
 
   // ── small drawing helpers ──────────────────────────────────────────
@@ -208,13 +218,14 @@
       ff = airborne ? [Wd * 0.3, -H * 0.08] : [Wd * 0.28, 0]; bf = airborne ? [-Wd * 0.25, -H * 0.04] : [-Wd * 0.3, 0];
     } else if (attacking && f.hit) {
       const seq = ATK[id] || ATK.fighter;
-      let key = seq.length > 1 ? (id === "fighter" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
+      let key = seq.length > 1 ? (id === "fighter" || id === "assassin" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.5], [0.5, 0.42], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
-        t = ease(clamp(1 - f.stateTimer / Math.max(1, f.hit.startup), 0, 1)); a = guard; b = K.wind;
+        const wind0 = f.hit.chargeHold && !f.chargeReleased ? f.chargeTicks / Math.max(1, f.hit.chargeTime) : 1 - f.stateTimer / Math.max(1, f.hit.startup);
+        t = ease(clamp(wind0, 0, 1)); a = guard; b = K.wind;
       } else if (st === S.ATTACK_ACTIVE) {
         t = easeOut(clamp(0.55 + 0.45 * (1 - f.stateTimer / Math.max(1, f.hit.active || 1)), 0, 1)); a = K.wind; b = K.strike;
       } else {
@@ -223,6 +234,17 @@
       fh = [lerp(a.fh[0], b.fh[0], t), lerp(a.fh[1], b.fh[1], t)];
       bh = [lerp(a.bh[0], b.bh[0], t), lerp(a.bh[1], b.bh[1], t)];
       lean = lerp(a.lean, b.lean, t); lunge = lerp(a.lunge, b.lunge, t); crouch = lerp(a.crouch, b.crouch, t) * H;
+      if (f.hit.id === "hundred_fists" && st === S.ATTACK_ACTIVE) { // barrage: a different punch every beat
+        const beat = Math.max(1, f.hit.multiHit || 6), rem = f.stateTimer % beat;
+        const ext = easeOut(clamp(1 - ((beat - rem) % beat) / beat, 0, 1)); // peaks on the hit tick, then pulls back
+        const P0 = { jab: [1.2, 0.0], cross: [1.22, -0.02], hook: [0.95, 0.22], body: [1.1, 0.5], upper: [0.78, -0.75] }[f.hit.punch] || [1.2, 0.0];
+        const rest = [0.35, 0.25], lead = f.hit.hand === 0;
+        const px = lerp(rest[0], P0[0], ext), py = lerp(rest[1], P0[1], ext);
+        if (lead) { fh = [px, py]; bh = [0.3, 0.2]; } else { bh = [px, py]; fh = [0.35, 0.2]; }
+        const up = f.hit.punch === "upper", low = f.hit.punch === "body";
+        lean = (up ? -0.02 : low ? 0.34 : 0.28) * (0.5 + 0.5 * ext);
+        lunge = 4 * ext; crouch = H * (up ? 0.07 : low ? 0.09 : 0.04) * ext;
+      }
       if (st === S.ATTACK_ACTIVE && f.hit.id !== "iron_guard") { sx = 1.06; sy = 0.96; }
       if (airborne) { ff = [Wd * 0.25, -H * 0.1]; bf = [-Wd * 0.2, -H * 0.05]; }
       else { ff = [Wd * 0.3 + lunge * 0.6, 0]; bf = [-Wd * 0.28, 0]; }
@@ -232,12 +254,14 @@
       ff = rising ? [Wd * 0.34, -H * 0.2] : [Wd * 0.2, -H * 0.06];
       bf = rising ? [-Wd * 0.1, -H * 0.1] : [-Wd * 0.22, -H * 0.04];
       fh = rising ? [0.7, -0.5] : [0.55, -0.6]; bh = rising ? [-0.3, -0.4] : [-0.15, -0.65];
+      if (id === "tank") { fh = [0.55, 0.1]; bh = [0.2, 0.2]; } // shield stays up in the air
+      if (id === "hitter") { fh = [0.85, 0.12]; bh = [0.52, 0.06]; } // rifle held ready in the air
       if (id === "fighter") { fh = rising ? [0.72, -0.3] : [0.58, -0.05]; bh = rising ? [0.4, -0.2] : [0.3, 0.1]; } // fists stay up in a guard while jumping
       sy = 1 + 0.08 * A.jump + (rising ? 0.02 : 0.03); sx = 1 - 0.05 * A.jump;
     } else if (st === S.RUN && vxa > 0.4) {
       const sp = clamp(vxa / (s.runSpeed || 5), 0, 1.3);
       const ph = A.phase, stride = Wd * B.stride * (0.6 + 0.4 * sp);
-      lean = 0.14 + 0.1 * sp + (id === "assassin" ? 0.14 : 0);
+      lean = 0.14 + 0.1 * sp + (id === "assassin" ? 0.2 : 0);
       bob = Math.abs(Math.cos(ph)) * H * 0.03;
       const foot = (q) => {
         const u = ((q % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
@@ -249,12 +273,31 @@
       const sw1 = Math.sin(ph + Math.PI), sw2 = Math.sin(ph);
       fh = [sw1 * 0.72, 0.66 - 0.2 * Math.abs(sw1)]; bh = [sw2 * 0.72, 0.66 - 0.2 * Math.abs(sw2)];
       if (id === "mage") { fh = [0.25 + sw1 * 0.4, 0.66 - 0.2 * Math.abs(sw1)]; bh = [0.05 + sw2 * 0.4, 0.7 - 0.2 * Math.abs(sw2)]; } // long arms, small swing
+      if (id === "tank") { fh = [0.55 + sw1 * 0.02, 0.2]; bh = [0.25 + sw2 * 0.25, 0.5 - 0.1 * Math.abs(sw2)]; lean += 0.03; } // shield held steady, gauntlet arm swings
+      if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.42]; bh = [0.5, 0.36 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
       if (id === "fighter") { fh = [0.5 + sw1 * 0.26, 0.14 + 0.1 * (1 - Math.abs(sw1))]; bh = [0.3 + sw2 * 0.22, 0.24 + 0.1 * (1 - Math.abs(sw2))]; lean += 0.04; } // guard up, fists pump with each step
     } else {
       bob = idle * H * 0.008;
       crouch = H * 0.012 * (1 + idle);
       fh = [0.45 + idle * 0.03, 0.55 + idle * 0.05]; bh = [0.12, 0.7 - idle * 0.04];
       tilt = idle * 0.02;
+      if (id === "assassin") { // Bloodlust: low predatory crouch, blades hanging forward, restless weight shifts
+        const tw = Math.sin(now * 3.1), fl = Math.sin(now * 6.3 + 1);
+        bob = Math.abs(Math.sin(now * 3.6)) * H * 0.012;
+        crouch = H * 0.075 + H * 0.01 * idle; lean = 0.24 + 0.03 * tw; tilt = tw * 0.03 + fl * 0.012;
+        fh = [0.52 + 0.05 * tw, 0.46 + 0.05 * fl]; bh = [0.2 - 0.05 * tw, 0.58 + 0.04 * fl];
+        ff = [Wd * 0.25 + tw * 1.6, 0]; bf = [-Wd * 0.3 - tw * 1.2, 0];
+      }
+      if (id === "tank") { // grounded fortress stance: wide, heavy, shield raised in a natural guard, barely moves
+        fh = [0.55, 0.2 + 0.01 * idle]; bh = [0.25, 0.5 - 0.01 * idle];
+        bob = idle * H * 0.004; crouch = H * 0.025; lean = 0.03; tilt = 0;
+        ff = [Wd * 0.24, 0]; bf = [-Wd * 0.28, 0];
+      }
+      if (id === "hitter") { // calm low-ready: rifle across the body, muzzle slightly down, almost no sway
+        fh = [0.85, 0.5 + 0.015 * idle]; bh = [0.5, 0.42 + 0.015 * idle];
+        bob = idle * H * 0.005; crouch = H * 0.02; lean = 0.05; tilt = idle * 0.01;
+        ff = [Wd * 0.2, 0]; bf = [-Wd * 0.24, 0];
+      }
       if (id === "fighter") { // heavyweight stance: planted, gauntlets raised at chest height, slow breathing
         const pump = Math.sin(now * 2.6);
         fh = [0.66 + 0.02 * pump, 0.14 + 0.03 * idle]; bh = [0.36 - 0.02 * pump, 0.27 - 0.02 * idle];
@@ -267,7 +310,7 @@
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
     }
 
-    if (id === "fighter") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+    if (id === "fighter" || id === "hitter" || id === "tank") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
       if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
       else {
         A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
@@ -799,90 +842,185 @@
       return;
     }
 
-    // ───────────── ASSASSIN ─────────────
-    // Dark hooded killer: charcoal clothes, grey wraps, knife strap, long crimson scarf, red eyes.
-    // fr = bloodlust 0..1 (set by assassin_fx.js): brighter eyes and blades while it is high.
+    // ───────────── BLOODLUST (Wraith class, internal id "assassin") ─────────────
+    // Lean predatory hunter: obsidian combat suit, ONE big fang-pauldron (asymmetrical), dark steel
+    // bracers and shin guards, torn crimson sash, pale swept-back hair, two curved fang blades.
+    // Blood-red energy shows as vein lines on the armor, blade glow and eye glow (controlled, not a blob).
+    // fr = frenzy 0..1 (set by assassin_fx.js): brighter veins, eyes and blades while it is high.
     if (id === "assassin") {
       const fr = f._frenzy || 0;
       const vxa = Math.abs(k.vx);
       const glowOn = !k.isFlash;
       const mid = (p, q, u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
       const hotEye = stunned ? "#ffe3e3" : P.accent;
+      const vein = clamp(0.35 + 0.5 * fr + 0.12 * pulse + (strike ? 0.3 : 0), 0, 1);
+      const bladeGlow = clamp(0.2 + 0.65 * fr + (strike ? 0.5 : 0) + windU * 0.3, 0, 1);
+      const prowl = !attackingNow && !stunned && vxa < 0.4 ? Math.sin(now * 3.1) : 0; // restless idle tremor
 
-      // tattered coat tail (behind everything), streams back when running
-      const drift = -clamp(k.vx * d, -6, 8) * 1.2 + Math.sin(now * 5) * 1.5;
-      const cy0 = k.sh[1] + 2, cy1 = k.hip[1] + k.legL * 0.42;
-      const coat = [
-        [k.sh[0] - 3, cy0], [k.sh[0] + k.sw * 0.22, cy0], [k.hip[0] + k.hw * 0.3 + drift * 0.4, cy1 - 2],
-        [k.hip[0] + drift * 0.7 + 6, cy1 + 5], [k.hip[0] - k.hw * 0.2 + drift, cy1 - 1],
-        [k.hip[0] - k.hw * 0.55 + drift, cy1 + 8], [k.hip[0] - k.hw * 0.78 + drift, cy1 - 3], [k.sh[0] - 3 - k.sw * 0.12, cy0 + 4],
-      ];
-      poly(ctx, MP(coat)); fillOut(ctx, col(P.dark), 2);
+      // fang / claw spike: base centre (x,y), direction angle, length, base width
+      const spike = (x, y, ang, len, w, fill) => {
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        poly(ctx, [[x - sa * w / 2, y + ca * w / 2], [x + sa * w / 2, y - ca * w / 2], [x + ca * len, y + sa * len]]);
+        fillOut(ctx, col(fill), 1.2);
+      };
+      // blood-energy vein line over armor
+      const veinLine = (pts, w) => {
+        if (!glowOn) return;
+        ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.shadowColor = P.accent; ctx.shadowBlur = 3 + 7 * vein;
+        ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.35 + 0.6 * vein; ctx.lineWidth = w || 1.2;
+        ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke(); ctx.restore();
+      };
+      // curved fang blade: hilt (hx,hy), unit direction (ux,uy), length L, curl amount, width, curl side sgn (+1 / -1)
+      const fang = (hx, hy, ux, uy, L, curl, wid, sgn) => {
+        const cx0 = d * sgn * uy, cy0 = -d * sgn * ux; // direction the blade curls towards
+        const N = 14, back = [], edge = [], nr = [];
+        for (let i = 0; i <= N; i++) {
+          const t = i / N;
+          const sx = hx + ux * L * t + cx0 * curl * L * t * t, sy = hy + uy * L * t + cy0 * curl * L * t * t;
+          const tx = ux * L + 2 * cx0 * curl * L * t, ty = uy * L + 2 * cy0 * curl * L * t;
+          const tl = Math.hypot(tx, ty) || 1;
+          let nx = -ty / tl, ny = tx / tl;
+          if (nx * cx0 + ny * cy0 < 0) { nx = -nx; ny = -ny; }
+          const w = wid * Math.pow(1 - t, 0.62) * Math.min(1, t / 0.07 + 0.35);
+          back.push([sx - nx * w * 0.72, sy - ny * w * 0.72]);
+          edge.push([sx + nx * w * 0.28, sy + ny * w * 0.28]);
+          nr.push([nx, ny]);
+        }
+        ctx.save();
+        ctx.lineJoin = "round"; ctx.lineCap = "round";
+        // organic barb on the spine, like a second fang
+        const bi = 4, bx = back[bi][0], by = back[bi][1];
+        spike(bx, by, Math.atan2(-nr[bi][1] - uy * 0.7, -nr[bi][0] - ux * 0.7), L * 0.2, wid * 0.55, P.steel);
+        ctx.beginPath(); ctx.moveTo(back[0][0], back[0][1]);
+        for (let i = 1; i <= N; i++) ctx.lineTo(back[i][0], back[i][1]);
+        for (let i = N; i >= 0; i--) ctx.lineTo(edge[i][0], edge[i][1]);
+        ctx.closePath(); fillOut(ctx, col(P.steel), 1.8);
+        // muted silver spine highlight
+        ctx.beginPath(); ctx.moveTo(back[1][0], back[1][1]);
+        for (let i = 2; i < N - 1; i++) ctx.lineTo(back[i][0], back[i][1]);
+        ctx.strokeStyle = col(P.silver); ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
+        // crimson cutting edge, glowing harder with frenzy / strikes
+        ctx.shadowColor = P.accent; ctx.shadowBlur = glowOn ? 4 + 14 * bladeGlow : 0;
+        ctx.beginPath(); ctx.moveTo(edge[1][0], edge[1][1]);
+        for (let i = 2; i <= N; i++) ctx.lineTo(edge[i][0], edge[i][1]);
+        ctx.strokeStyle = col(bladeGlow > 0.75 ? "#ffd0d8" : P.accent); ctx.lineWidth = 1.2 + 1.2 * bladeGlow; ctx.stroke();
+        ctx.restore();
+        return edge[N];
+      };
 
-      // back arm: dark sleeve, grey wrap on the forearm, gloved hand, reverse-grip dagger
-      limb(ctx, armBw, k.aw, col(P.main));
-      limb(ctx, [mid(armBw[1], armBw[2], 0.1), armBw[2]], k.aw * 1.08, col(P.wrap));
+      // torn crimson sash + a shorter shredded tail, streaming behind (drawn first)
+      const sa1 = ribbon(A, "bsashA", hipW[0] - d * k.hw * 0.3, hipW[1] - 4, 9, 6.5, -d * 2.2 - k.vx * d * 0.22, 0.45 + Math.sin(now * 8) * 0.3);
+      drawRibbon(ctx, sa1, 7, col(P.scarf));
+      const sa2 = ribbon(A, "bsashB", shW[0] - d * k.sw * 0.28, shW[1] + 5, 5, 5, -d * 1.9 - k.vx * d * 0.2, 0.6 + Math.sin(now * 6 + 2) * 0.3);
+      drawRibbon(ctx, sa2, 4.5, col(P.scarfDark));
+      const sa3 = ribbon(A, "bsashC", hipW[0] - d * k.hw * 0.1, hipW[1] - 3, 4, 4.5, -d * 1.5 - k.vx * d * 0.16, 0.9 + Math.sin(now * 10) * 0.3);
+      drawRibbon(ctx, sa3, 3.5, col(P.scarfDark));
+      // crimson smoke: the silhouette frays into it while he is fast or frenzied
+      if (glowOn && (vxa > 3.5 || fr > 0.45)) {
+        ctx.save(); ctx.globalAlpha = clamp(0.1 + 0.2 * fr + vxa * 0.012, 0, 0.34);
+        for (const [key, oy, w0] of [["smkA", 0.1, 8], ["smkB", 0.5, 6]]) {
+          const sm = ribbon(A, key, hipW[0] - d * k.hw * 0.2, hipW[1] + k.legL * oy, 6, 7, -d * 2.4 - k.vx * d * 0.3, -0.25 + Math.sin(now * 5 + oy * 9) * 0.3);
+          drawRibbon(ctx, sm, w0, "#5e0a1c");
+        }
+        ctx.restore();
+      }
+
+      // back arm: bare toned arm, dark steel bracer with claw spike, glove, reverse-grip fang blade
+      limb(ctx, armBw, k.aw, col(P.skin));
+      limb(ctx, [mid(armBw[1], armBw[2], 0.3), mid(armBw[1], armBw[2], 0.85)], k.aw * 1.3, col(P.steel));
+      {
+        const e = armBw[1], h = armBw[2], bp = mid(e, h, 0.2);
+        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) - 0.35 * d, k.aw * 2.2, k.aw * 0.9, P.steel);
+        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
+      }
       const bhd = armBw[2];
-      hand(k, bhd, k.aw * 0.8, P.hair);
-      ctx.beginPath(); ctx.moveTo(bhd[0], bhd[1]); ctx.lineTo(bhd[0] - d * 3, bhd[1] + 13); ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = col(P.steel); ctx.lineWidth = 2.4; ctx.stroke();
+      hand(k, bhd, k.aw * 0.8, P.main);
+      {
+        const ax = bhd[0] - armBw[1][0], ay = bhd[1] - armBw[1][1], al = Math.hypot(ax, ay) || 1;
+        const rx = -ax / al, ry = (-ay + al * 0.6) / al, rl = Math.hypot(rx, ry) || 1; // reverse grip: trails behind the fist
+        fang(bhd[0], bhd[1], rx / rl, ry / rl, k.H * 0.24, 0.3, 4.6, -1);
+      }
 
-      // legs with grey shin wraps
-      legsAndFeet(k, P.pants, P.boot, k.lw * 1.4);
-      for (const leg of [k.legB, k.legF]) {
+      // legs: black trousers, dark steel shin guards with a fang at the knee, one armored thigh plate
+      legsAndFeet(k, P.pants, P.boot, k.lw * 1.5);
+      for (const [leg, front] of [[k.legB, false], [k.legF, true]]) {
         const lp = MP(leg);
-        limb(ctx, [mid(lp[1], lp[2], 0.3), mid(lp[1], lp[2], 0.8)], k.lw * 1.0, col(P.wrap));
+        limb(ctx, [mid(lp[1], lp[2], 0.2), mid(lp[1], lp[2], 0.8)], k.lw * 0.98, col(P.steel));
+        spike(lp[1][0] + d, lp[1][1] - 1, Math.atan2(-0.5, d), k.lw * (front ? 1.15 : 0.85), k.lw * 0.75, P.steel);
+        if (front) {
+          limb(ctx, [mid(lp[0], lp[1], 0.12), mid(lp[0], lp[1], 0.7)], k.lw * 1.12, col(P.dark));
+          veinLine([mid(lp[0], lp[1], 0.18), mid(lp[0], lp[1], 0.7)], 1);
+        }
       }
 
-      // torso + diagonal knife strap with three throwing knives
-      torsoShape(k, k.sw * 0.8, k.hw * 0.9, 0, 0, P.main, P.dark, 5);
-      const sA = [shW[0] - k.sw * 0.36, shW[1] + 2], sB = [hipW[0] + k.hw * 0.4, hipW[1] - 3];
-      ctx.beginPath(); ctx.moveTo(sA[0], sA[1]); ctx.lineTo(sB[0], sB[1]); ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 7.5; ctx.stroke(); ctx.strokeStyle = col(P.strap); ctx.lineWidth = 4.5; ctx.stroke();
-      for (const u of [0.3, 0.52, 0.74]) {
-        const kx = sA[0] + (sB[0] - sA[0]) * u, ky = sA[1] + (sB[1] - sA[1]) * u;
-        poly(ctx, [[kx - 2.2, ky - 5], [kx + 2.2, ky - 5], [kx, ky + 3.5]]); fillOut(ctx, col(P.steel), 1.2);
+      // torso: fitted obsidian suit with defined pecs / abs, narrow waist
+      circle(ctx, hcw[0], hcw[1] + hr * 1.05, hr * 0.7, col(P.dark), 1.6); // high collar / neck
+      torsoShape(k, k.sw * 0.76, k.hw * 0.9, 0, 0, P.main, P.dark, 5);
+      if (glowOn) {
+        const cT = (u) => [shW[0] + (hipW[0] - shW[0]) * u, shW[1] + (hipW[1] - shW[1]) * u];
+        ctx.save(); ctx.strokeStyle = "rgba(160,170,195,0.2)"; ctx.lineWidth = 1; ctx.lineCap = "round";
+        for (const u of [0.46, 0.64, 0.82]) { const c = cT(u); ctx.beginPath(); ctx.moveTo(c[0] - k.hw * 0.18, c[1]); ctx.lineTo(c[0] + k.hw * 0.18, c[1]); ctx.stroke(); }
+        let c0 = cT(0.26), c1 = cT(0.92);
+        ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(c1[0], c1[1]); ctx.stroke();
+        c0 = cT(0.18); ctx.beginPath(); ctx.moveTo(c0[0] - k.sw * 0.2, c0[1]); ctx.quadraticCurveTo(c0[0], c0[1] + 4, c0[0] + k.sw * 0.2, c0[1]); ctx.stroke();
+        ctx.restore();
       }
+      // chest harness: diagonal strap with a crimson vein, steel buckle
+      const sA = [shW[0] - d * k.sw * 0.3, shW[1] + 2], sB = [hipW[0] + d * k.hw * 0.36, hipW[1] - 3];
+      ctx.beginPath(); ctx.moveTo(sA[0], sA[1]); ctx.lineTo(sB[0], sB[1]); ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = col(P.strap); ctx.lineWidth = 4.2; ctx.stroke();
+      veinLine([sA, sB], 1.1);
+      {
+        const bk = mid(sA, sB, 0.55);
+        poly(ctx, [[bk[0], bk[1] - 3.4], [bk[0] + 3, bk[1]], [bk[0], bk[1] + 3.4], [bk[0] - 3, bk[1]]]); fillOut(ctx, col(P.steel), 1.2);
+      }
+      // belt + torn crimson front sash
+      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.5, hipW[1] - 6, k.hw, 6); fillOut(ctx, col(P.dark), 1.6);
+      const sf0 = ribbon(A, "fsash", hipW[0] + d * k.hw * 0.3, hipW[1] - 2, 4, 3.6, -d * 0.4 - k.vx * d * 0.1, 0.9);
+      drawRibbon(ctx, sf0, 3.2, col(P.scarf));
 
-      // crimson sash with a hanging tail
-      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.46, hipW[1] - 6, k.hw * 0.92, 5); fillOut(ctx, col(P.scarf), 1.4);
-      const sash = ribbon(A, "sash", hipW[0] - d * k.hw * 0.4, hipW[1] - 3, 5, 5.5, -d * 1.4 - k.vx * d * 0.15, 0.7);
-      drawRibbon(ctx, sash, 4, col(P.scarfDark));
-
-      // long scarf (the signature) + a second short tail + neck wrap
-      const sc2 = ribbon(A, "scarf2", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.95, 7, hr * 1.0, -d * 2.0 - k.vx * d * 0.2, 0.55 + Math.sin(now * 7 + 1) * 0.3);
-      drawRibbon(ctx, sc2, 5, col(P.scarfDark));
-      const sc = ribbon(A, "scarf", hcw[0] - d * hr * 0.1, hcw[1] + hr * 0.85, 10, hr * 1.15, -d * 2.4 - k.vx * d * 0.2, 0.3 + Math.sin(now * 9) * 0.3);
-      drawRibbon(ctx, sc, 8, col(P.scarf));
-      ctx.beginPath(); ctx.ellipse(hcw[0], hcw[1] + hr * 0.95, hr * 1.05, hr * 0.42, 0, 0, 7); fillOut(ctx, col(P.scarf), 2);
-
-      // hood: round cowl + a sharp peak swept backwards
-      circle(ctx, hcw[0], hcw[1], hr * 1.08, col(P.main), 2.4);
+      // head: pale face, swept-back spiked hair, slanted burning eyes
+      const hcx = hcw[0] + (prowl > 0.85 ? d * 0.8 : 0);
+      circle(ctx, hcx, hcw[1], hr * 1.0, col(P.skin), 2.4);
       ctx.beginPath();
-      ctx.moveTo(hcw[0] - d * hr * 0.2, hcw[1] - hr * 1.0);
-      ctx.quadraticCurveTo(hcw[0] - d * hr * 1.2, hcw[1] - hr * 1.5, hcw[0] - d * hr * 2.2, hcw[1] - hr * 1.2 + Math.sin(now * 6) * 1.2);
-      ctx.quadraticCurveTo(hcw[0] - d * hr * 1.5, hcw[1] - hr * 0.1, hcw[0] - d * hr * 1.0, hcw[1] + hr * 0.5);
-      ctx.closePath(); fillOut(ctx, col(P.dark), 2);
-      // dark face opening + cloth mask over the lower face
-      ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.32, hcw[1] + hr * 0.02, hr * 0.74, hr * 0.5, 0, 0, 7); fillOut(ctx, col("#07070b"), 1.6);
-      ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.32, hcw[1] + hr * 0.42, hr * 0.72, hr * 0.3, 0, 0, 7); fillOut(ctx, col("#181a24"), 1.4);
-      // angry red eyes (slanted slits), brighter with frenzy
+      ctx.moveTo(hcx + d * hr * 0.78, hcw[1] - hr * 0.5);
+      ctx.quadraticCurveTo(hcx + d * hr * 0.2, hcw[1] - hr * 1.3, hcx - d * hr * 0.9, hcw[1] - hr * 1.0);
+      ctx.lineTo(hcx - d * hr * 2.4, hcw[1] - hr * 0.95 + Math.sin(now * 6) * 1.2);
+      ctx.lineTo(hcx - d * hr * 1.4, hcw[1] - hr * 0.5);
+      ctx.lineTo(hcx - d * hr * 2.1, hcw[1] - hr * 0.05 + Math.sin(now * 7 + 1) * 1.2);
+      ctx.lineTo(hcx - d * hr * 1.05, hcw[1] + hr * 0.12);
+      ctx.lineTo(hcx - d * hr * 0.75, hcw[1] + hr * 0.6);
+      ctx.quadraticCurveTo(hcx - d * hr * 0.1, hcw[1] - hr * 0.05, hcx + d * hr * 0.78, hcw[1] - hr * 0.5);
+      ctx.closePath(); fillOut(ctx, col(P.hair), 2);
+      // heavy brow + crimson war-line under the eye + tight snarl
+      ctx.save(); ctx.lineCap = "round";
+      ctx.strokeStyle = col(P.dark); ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(hcx + d * hr * 0.05, hcw[1] - hr * 0.42); ctx.lineTo(hcx + d * hr * 0.98, hcw[1] - hr * 0.16); ctx.stroke();
+      ctx.strokeStyle = col(P.scarf); ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(hcx + d * hr * 0.3, hcw[1] + hr * 0.22); ctx.lineTo(hcx + d * hr * 0.9, hcw[1] + hr * 0.12); ctx.stroke();
+      ctx.strokeStyle = col(P.dark); ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(hcx + d * hr * 0.35, hcw[1] + hr * 0.55); ctx.lineTo(hcx + d * hr * 0.85, hcw[1] + hr * 0.5); ctx.stroke();
+      ctx.restore();
       ctx.save();
       ctx.shadowColor = P.accent; ctx.shadowBlur = glowOn ? 8 + 16 * fr : 0;
       ctx.fillStyle = col(hotEye);
-      for (const ox of [0.1, 0.62]) {
+      for (const ox of [0.14, 0.6]) {
         ctx.beginPath();
-        ctx.moveTo(hcw[0] + d * hr * ox - 2, hcw[1] - hr * 0.22);
-        ctx.lineTo(hcw[0] + d * hr * (ox + 0.4) + 2, hcw[1] - hr * 0.02);
-        ctx.lineTo(hcw[0] + d * hr * (ox + 0.28), hcw[1] + hr * 0.14);
+        ctx.moveTo(hcx + d * hr * ox - 1.5, hcw[1] - hr * 0.3);
+        ctx.lineTo(hcx + d * hr * (ox + 0.4) + 1.5, hcw[1] - hr * 0.08);
+        ctx.lineTo(hcx + d * hr * (ox + 0.26), hcw[1] + hr * 0.08);
         ctx.closePath(); ctx.fill();
       }
       if (fr > 0.45 && glowOn) { // white-hot cores at high frenzy
         ctx.fillStyle = "#fff"; ctx.globalAlpha = (fr - 0.45) * 1.4;
-        for (const ox of [0.2, 0.7]) { ctx.beginPath(); ctx.arc(hcw[0] + d * hr * ox + d * 2, hcw[1] - hr * 0.03, 1.6, 0, 7); ctx.fill(); }
+        for (const ox of [0.24, 0.68]) { ctx.beginPath(); ctx.arc(hcx + d * hr * ox + d * 2, hcw[1] - hr * 0.1, 1.5, 0, 7); ctx.fill(); }
       }
       ctx.restore();
       // eye trails: thin red streaks behind the eyes while dashing, attacking or frenzied
       if (vxa > 3.5 || fr > 0.3 || attackingNow) {
-        const et = ribbon(A, "eyetr", hcw[0] + d * hr * 0.8, hcw[1] - hr * 0.05, 5, 3.2, -d * 1.3 - k.vx * d * 0.25, 0.04);
+        const et = ribbon(A, "eyetr", hcx + d * hr * 0.8, hcw[1] - hr * 0.12, 5, 3.2, -d * 1.3 - k.vx * d * 0.25, 0.04);
         ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = col(P.accent); ctx.globalCompositeOperation = "lighter";
         for (let i = 1; i < et.length; i++) {
           const u = 1 - i / et.length;
@@ -892,28 +1030,48 @@
         ctx.restore();
       }
 
-      // front arm: sleeve + wrap + glove + blade with a red glowing edge
-      limb(ctx, armFw, k.aw, col(P.main));
-      limb(ctx, [mid(armFw[1], armFw[2], 0.1), armFw[2]], k.aw * 1.08, col(P.wrap));
+      // front arm: bare arm -> big asymmetrical fang pauldron -> steel bracer -> glove -> fang blade
+      limb(ctx, armFw, k.aw, col(P.skin));
+      {
+        const sf = M(k.shF), r = k.sw * 0.21;
+        // lower plate, then the main plate
+        poly(ctx, [[sf[0] - d * r * 0.9, sf[1] - r * 0.1], [sf[0] + d * r * 1.1, sf[1] - r * 0.2], [sf[0] + d * r * 1.2, sf[1] + r * 1.15], [sf[0] - d * r * 0.2, sf[1] + r * 1.4], [sf[0] - d * r * 0.8, sf[1] + r * 0.8]]);
+        fillOut(ctx, col(P.dark), 1.8);
+        poly(ctx, [[sf[0] - d * r * 1.1, sf[1] - r * 0.75], [sf[0] + d * r * 0.6, sf[1] - r * 1.0], [sf[0] + d * r * 1.25, sf[1] + r * 0.35], [sf[0] - d * r * 0.1, sf[1] + r * 0.6], [sf[0] - d * r * 0.95, sf[1] + r * 0.2]]);
+        fillOut(ctx, col(P.main), 1.8);
+        // two upswept fangs make the silhouette
+        spike(sf[0] - d * r * 0.7, sf[1] - r * 0.75, Math.atan2(-1, -d * 0.9), r * 1.5, r * 0.8, P.steel);
+        spike(sf[0] + d * r * 0.15, sf[1] - r * 0.95, Math.atan2(-1, d * 0.25), r * 1.0, r * 0.7, P.steel);
+        veinLine([[sf[0] - d * r * 0.8, sf[1] - r * 0.1], [sf[0] + d * r * 0.1, sf[1] + r * 0.05], [sf[0] + d * r * 0.95, sf[1] + r * 0.45]], 1.1);
+      }
+      {
+        const e = armFw[1], h = armFw[2], bp = mid(e, h, 0.2);
+        limb(ctx, [mid(e, h, 0.3), mid(e, h, 0.85)], k.aw * 1.3, col(P.steel));
+        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) + 0.35 * d, k.aw * 2.4, k.aw * 0.9, P.steel);
+        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
+      }
       const fhd = armFw[2];
-      hand(k, fhd, k.aw * 0.8, P.hair);
-      const ax = fhd[0] - armFw[1][0], ay = fhd[1] - armFw[1][1], al = Math.hypot(ax, ay) || 1;
-      const bl = k.H * 0.27, ux = ax / al, uy = ay / al;
-      const tx = fhd[0] + ux * bl, ty = fhd[1] + uy * bl;
-      ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(fhd[0], fhd[1]); ctx.lineTo(tx, ty); ctx.strokeStyle = OUT; ctx.lineWidth = 6.5; ctx.stroke();
-      ctx.strokeStyle = col(P.steel); ctx.lineWidth = 3.2; ctx.stroke();
-      ctx.save();
-      ctx.shadowColor = P.accent; ctx.shadowBlur = glowOn ? 6 + 12 * fr + (strike ? 8 : 0) : 0;
-      ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 6, fhd[1] + uy * 6); ctx.lineTo(tx, ty);
-      ctx.strokeStyle = col(strike ? "#ffd0d8" : P.accent); ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.restore();
-      // crossguard
-      ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 3 - uy * 4, fhd[1] + uy * 3 + ux * 4); ctx.lineTo(fhd[0] + ux * 3 + uy * 4, fhd[1] + uy * 3 - ux * 4); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      hand(k, fhd, k.aw * 0.8, P.main);
+      {
+        const ax = fhd[0] - armFw[1][0], ay = fhd[1] - armFw[1][1], al = Math.hypot(ax, ay) || 1;
+        const tr = prowl * 0.05; // blade tip trembles while he waits
+        const ca = Math.cos(tr), sa = Math.sin(tr);
+        const ux = (ax / al) * ca - (ay / al) * sa, uy = (ax / al) * sa + (ay / al) * ca;
+        const tip = fang(fhd[0], fhd[1], ux, uy, k.H * 0.31, 0.34, 5.4, 1);
+        // small guard bar on the fist
+        ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 2 - uy * 3.5, fhd[1] + uy * 2 + ux * 3.5); ctx.lineTo(fhd[0] + ux * 2 + uy * 3.5, fhd[1] + uy * 2 - ux * 3.5);
+        ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke(); ctx.strokeStyle = col(P.silver); ctx.lineWidth = 1.4; ctx.stroke();
+      }
       return;
     }
 
-    // ───────────── GUNNER (id "hitter") ─────────────
+    // ───────────── ARTILLERIST (id "hitter") ─────────────
+    // Drawn in artillerist_art.js (arcane rifle specialist). The old cowboy Gunner below is only a fallback
+    // that runs if that file is not loaded.
+    if (id === "hitter" && MW.Artillerist) {
+      MW.Artillerist.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned });
+      return;
+    }
     if (id === "hitter") {
       const strikeNow = st === S.ATTACK_ACTIVE, recov = st === S.ATTACK_RECOVERY;
       limb(ctx, armBw, k.aw, col(P.shirt));
@@ -999,7 +1157,14 @@
       return;
     }
 
-    // ───────────── BULWARK ─────────────
+    // ───────────── BULWARK (id "tank") ─────────────
+    // Drawn in bulwark_art.js. The old knight below is only a fallback if that file is not loaded.
+    if (id === "tank" && MW.Bulwark) {
+      const armorOn = !!(f.hit && f.hit.superArmor && (st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE));
+      MW.Bulwark.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned, armorOn, spark: f.armorHit > 0 });
+      return;
+    }
+    // ───────────── BULWARK (old fallback) ─────────────
     // Horned great-helm, gold-trimmed plate, tower shield. The shield glows while super armor is on.
     {
       const armorOn = !!(f.hit && f.hit.superArmor && (st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE));
