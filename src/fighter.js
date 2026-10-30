@@ -51,6 +51,10 @@
       this.hp = stats.maxHP;
       this.mana = 0; // fills by landing hits; full = ultimate ready
       this.momentum = 0; // passive (Fighter): consecutive landed hits
+      this.gunnerStacks = 0; // Artillerist: Bullet Evolution (0..10)
+      this.gunnerBomb = null; // Artillerist remote explosive
+      this.gunnerHop = null;
+      this.gunnerBurst = null; // Artillerist Five-Shot Barrage in progress: { hit, left, timer, batch } (the Sim fires it)
       this.momentumIdle = 0; // ticks since the last landed hit
       this.cooldowns = [0, 0, 0, 0]; // skill cooldowns (ticks left)
       this.guardEmpowered = false; // after blocking with Iron Guard: next basic punch is stronger
@@ -86,6 +90,7 @@
       this.state = STATE.FALLING;
       this.stateTimer = 0; // ticks left in the current timed state (attack phase / hitstun)
       this.hit = null; // attack data of the swing in progress
+      if (this.stats.id === "hitter") { this.gunnerBomb = null; this.gunnerHop = null; this.gunnerBurst = null; }
       this.attackHeld = false; // attack button held this tick (charged punch)
       this.atkHeldTicks = 0;
       this.chargeLock = false; // one charge per button press
@@ -162,12 +167,18 @@
       this.hp = this.stats.maxHP;
       this.mana = 0;
       this.momentum = 0;
+      this.gunnerStacks = 0;
+      this.gunnerBomb = null;
+      this.gunnerHop = null;
       this.momentumIdle = 0;
       this.cooldowns = [0, 0, 0, 0];
       this.guardEmpowered = false;
       this.guardEmpowerLeft = 0;
       this.counterTarget = null;
       this.zones = [];
+      this.gunnerStacks = 0;
+      this.gunnerBomb = null;
+      this.gunnerHop = null;
       this.overload = false;
       this.overloadHits = 0;
       this.overloadIdle = 0;
@@ -184,7 +195,8 @@
       this.breakCloak();
       const a = this.stats.attack;
       this.chainIndex = index;
-      this.hit = a.chain && a.chain[index] ? Object.assign({}, a, a.chain[index]) : a;
+      this.hit = a.chain && a.chain[index] ? Object.assign({}, a, a.chain[index]) : Object.assign({}, a);
+      if (this.stats.id === "hitter" && this.hit.gunnerBasic) this.hit.damage *= 1 + this.gunnerStacks * this.stats.passive.damagePerStack;
       if (this.overload && this.overloadData()) this.hit = this.orbHit(); // Void Overload: the next attack input is the gravity orb
       if (this.guardEmpowered && index === 0) {
         // Iron Guard bonus: the next basic punch hits harder (numbers come from the guard's "empower" data)
@@ -861,7 +873,13 @@
     // Charged punch (stats.charge): wind up while the attack button is held.
     startCharge(cfg) {
       this.chargeLock = true; // one charge per press: release the button to charge again
-      this.startSkill(-2, Object.assign({}, cfg.attack, { chargeHold: true, chargeTime: cfg.time, chargeScale: cfg.scale || null }));
+      const attack = Object.assign({}, cfg.attack, { chargeHold: true, chargeTime: cfg.time, chargeScale: cfg.scale || null });
+      if (this.stats.id === "hitter" && attack.gunnerBarrage) {
+        attack.damage *= 1 + this.gunnerStacks * this.stats.passive.damagePerStack;
+        const pj = attack.projectile; // stay rooted in the active state until the last bullet has left
+        attack.active = Math.max(1, (pj.shots - 1) * pj.gap + 1);
+      }
+      this.startSkill(-2, attack);
       this.chargeTicks = 0;
       this.chargeReleased = false;
     }
@@ -922,6 +940,7 @@
       this.swingHit = true;
       this.addMana(hit);
       const P = this.stats.passive;
+      if (this.stats.id === "hitter" && hit && hit.gunnerBasic) this.gunnerStacks = Math.min(P.max, this.gunnerStacks + 1);
       if (P && P.type === "voidoverload" && !(hit && hit.noOverload) && !this.overload) { // Void Overload: every Nth landed hit charges the next basic attack
         this.overloadIdle = 0;
         if (++this.overloadHits >= P.hits) {
@@ -954,7 +973,15 @@
     useUltimate() {
       if (!this.manaReady() || !this.stats.ultimate) return false;
       this.mana = 0;
-      this.startSkill(-1, this.stats.ultimate.attack);
+      let ult = Object.assign({}, this.stats.ultimate.attack);
+      if (this.stats.id === "hitter") {
+        const PG = this.stats.passive;
+        ult.damage *= 1 + this.gunnerStacks * PG.damagePerStack;
+        ult.knockback *= 1 + this.gunnerStacks * (PG.ultKnockbackPerStack || 0);
+        ult.black = this.gunnerStacks >= PG.max; // max stacks: the enormous black-energy detonation
+        if (ult.black) ult.radius *= PG.ultBlackRadiusMul || 1;
+      }
+      this.startSkill(-1, ult);
       return true;
     }
 
@@ -962,9 +989,29 @@
     // Melee skills (def.attack) run through the normal startup -> active -> recovery states.
     useSkill(slot) {
       const def = this.stats.skills && this.stats.skills[slot];
+      if (this.stats.id === "hitter") {
+        if (slot === 0 && this.gunnerBomb) { this.gunnerBomb.detonate = true; return true; }
+        if (slot === 0 && def && this.cooldowns[slot] <= 0) {
+          if (!this.grounded || !this.standingOn) return false; // the bomb is planted ON a platform: no planting in mid-air
+          this.gunnerBomb = { x: this.x + this.stats.width / 2, y: this.y + this.stats.height, t: 0, cfg: def.attack };
+          this.fxOut.push({ kind: "gunner_bomb_plant", x: this.gunnerBomb.x, y: this.gunnerBomb.y });
+          return true;
+        }
+        if (slot === 1 && def && this.cooldowns[slot] <= 0) {
+          const C = def.attack, dir = this.heldDir || -this.facing;
+          if (this.heldDir) this.facing = dir; // a backward hop keeps him facing the enemy
+          this.vx = dir * (C.distance / C.duration);
+          this.vy = -C.vertical;
+          this.gunnerHop = { left: C.duration, vx: this.vx };
+          this.cooldowns[slot] = def.cooldown || 0;
+          this.fxOut.push({ kind: "gunner_hop", x: this.x + this.stats.width / 2, y: this.y + this.stats.height });
+          return true;
+        }
+      }
       if (!def || !def.attack || this.cooldowns[slot] > 0) return false;
       this.cooldowns[slot] = def.cooldown || 0;
-      let hit = def.attack;
+      let hit = Object.assign({}, def.attack);
+      if (this.stats.id === "hitter" && hit.type === "projectile") hit.damage *= 1 + this.gunnerStacks * this.stats.passive.damagePerStack;
       const P = this.stats.passive;
       if (hit.momentumBonus && P && P.type === "momentum" && this.momentum >= P.max) {
         // empowered: spend all momentum for bonus damage on this one use
@@ -1032,6 +1079,7 @@
       }
 
       this.hp = Math.max(0, this.hp - dmg);
+      if (this.stats.id === "hitter") this.gunnerHop = null; // a hit interrupts the mobility burst
       if (this.cloak && this.cloak.revealOnHit) this.cloak = null; // getting hit reveals the cloaked Assassin
       if (hit.rupture && this.hp > 0 && attacker && attacker !== this) this.startBleed(attacker, hit); // Rupture: bleeding starts (also on armored targets)
       const lost = 1 - this.hp / s.maxHP;
@@ -1178,11 +1226,16 @@
 
       // --- horizontal movement ---
       const move = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
-      if (move !== 0) {
+      if (this.stats.id === "hitter" && this.hit && this.hit.gunnerAim && this.state === STATE.ATTACK_STARTUP) this.vx = 0;
+      else if (move !== 0) {
         if (canAct) this.facing = move;
         this.vx = approach(this.vx, move * s.runSpeed, wasGrounded ? s.groundAccel : s.airAccel);
       } else {
         this.vx = approach(this.vx, 0, wasGrounded ? s.groundFriction : s.airDrag);
+      }
+      if (this.gunnerHop && this.gunnerHop.left > 0) {
+        this.vx = this.gunnerHop.vx;
+        if (--this.gunnerHop.left <= 0) this.gunnerHop = null;
       }
       if (this.slow && this.state !== STATE.HITSTUN) { // Abyssal Grasp: heavily reduced speed
         const cap = s.runSpeed * this.slow.mul;
@@ -1222,6 +1275,10 @@
         this.vy = s.fastFallSpeed;
       } else if (this.vy > s.maxFallSpeed) {
         this.vy = s.maxFallSpeed;
+      }
+      if (this.stats.id === "hitter" && this.hit && this.hit.gunnerAim && this.state === STATE.ATTACK_STARTUP) {
+        this.vx = 0;
+        this.vy = 0;
       }
 
       if (this.ctl) { // another fighter's skill is steering this one (pull, lift, slam, hold)

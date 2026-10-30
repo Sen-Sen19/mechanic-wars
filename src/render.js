@@ -148,6 +148,33 @@
   }
   function addShake(n) { shakeMag = Math.max(shakeMag, n); }
   function addFlash(a, col) { flashA = Math.max(flashA, a); flashCol = col || "#ffffff"; }
+  MW.fxShake = addShake; // other effect files (brawler_fx.js) can shake / flash the screen too
+  MW.fxFlash = addFlash;
+
+  // Artillerist effects: Self-Destruct fireball (or the black max-stack version) and the Perfect Aim beam trail
+  const blasts = [];    // {x,y,R,life,max,black,bolts}
+  const aimTrails = []; // {x0,x1,y,life,max}
+  const aimStart = {};  // owner id -> where the Perfect Aim bullet left the muzzle
+  function addSelfDestruct(ev) {
+    const R = ev.radius || 245, black = !!ev.black;
+    const bolts = [];
+    if (black) for (let i = 0; i < 10; i++) {
+      let a = (i / 10) * Math.PI * 2 + Math.random() * 0.5, r = 0.1;
+      const pts = [[Math.cos(a) * 0.1, Math.sin(a) * 0.1]];
+      for (let j = 0; j < 7; j++) { a += (Math.random() - 0.5) * 0.7; r += 0.13; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+      bolts.push(pts);
+    }
+    blasts.push({ x: ev.x, y: ev.y, R: R, life: 60, max: 60, black: black, bolts: bolts });
+    addRing(ev.x, ev.y, 10, R * 1.15, 34, black ? "#b86cff" : "#ff7a32", 9, 1);
+    addRing(ev.x, ev.y, 8, R * 0.8, 28, black ? "#6a2cff" : "#ffd479", 6, 1);
+    addRing(ev.x, ev.y, 6, R * 1.7, 16, "#ffffff", 3, 1);
+    for (let i = 0; i < 44; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 9;
+      spawnParticle(ev.x, ev.y, Math.cos(a) * sp, Math.sin(a) * sp - 1.5, black ? (i % 2 ? "#21162e" : "#b86cff") : (i % 3 === 0 ? "#4a4048" : i % 3 === 1 ? "#ff9a32" : "#fff0c2"), 30 + (Math.random() * 24 | 0), 3 + Math.random() * 4);
+    }
+    addShake(black ? 44 : 34);
+    addFlash(black ? 0.7 : 0.85, black ? "#1a0a2e" : "#fff4d0");
+  }
   function addFloat(ev, big) {
     if (!ev.dmg || ev.dmg < 1) return;
     if (floats.length > 12) floats.shift();
@@ -157,6 +184,26 @@
   const STRIKE_SHAKE = { hook: 1.5, upper: 4, power: 7, rush: 4, rising: 0, meteor: 0, slam: 2 }; // rising / meteor shake in their own impact code
   function onSkillEvent(ev) {
     if (!ev) return;
+    if (ev.aim) { // Perfect Aim shot: muzzle blast when it leaves, a beam trail + starburst when it lands
+      if (ev.type === "fire") {
+        aimStart[ev.ownerId] = { x: ev.x, y: ev.y };
+        addRing(ev.x, ev.y, 6, 90, 14, "#fff0b0", 5, 1);
+        addRing(ev.x, ev.y, 4, 150, 20, "#ffb52e", 3, 1.8);
+        spawnBurst(ev.x, ev.y, "#ffd66b", 16, 8);
+        addShake(10); addFlash(0.3, "#fff0b0");
+      } else if (ev.type === "hit" || ev.type === "fizzle") {
+        const st = aimStart[ev.ownerId];
+        if (st) aimTrails.push({ x0: st.x, x1: ev.x, y: ev.y, life: 24, max: 24 });
+        if (ev.type === "hit") {
+          addRing(ev.x, ev.y, 6, 170, 18, "#ffffff", 6, 1);
+          addRing(ev.x, ev.y, 4, 110, 14, "#ffb52e", 4, 1);
+          spawnBurst(ev.x, ev.y, "#ffffff", 14, 9);
+          spawnBurst(ev.x, ev.y, "#ffd66b", 20, 7);
+          addShake(20); addFlash(0.45, "#fff7d0");
+        }
+      }
+      return;
+    }
     if (ev.type === "strike") {
       if (!ev.blocked) {
         addShake((STRIKE_SHAKE[ev.shape] || 0) + (ev.empowered ? 2 : 0));
@@ -171,8 +218,8 @@
       } else if (ev.id === "iron_guard") {
         addRing(ev.x, ev.y, 14, 84, 18, "#ffd700", 4, 1);
         addShake(2);
-      } else if (ev.id === "meteor_breaker") {
-        banner = { text: "METEOR BREAKER", life: 80, maxLife: 80 };
+      } else if (ev.id === "meteor_breaker" || ev.id === "meteor_fist") {
+        banner = { text: ev.id === "meteor_fist" ? "METEOR FIST" : "METEOR BREAKER", life: 80, maxLife: 80 };
         darkLife = DARK_MAX;
         addRing(ev.x, ev.fy, 190, 20, 28, "#ff3a2a", 4, 0.3); // closes in on the Brawler: the tell
         addRing(ev.x, ev.fy, 120, 10, 28, "#ffb066", 3, 0.3);
@@ -193,6 +240,10 @@
         spawnBurst(ev.x, ev.y, "#ffffff", 8, 5);
         addShake(8); addFlash(0.14, "#fff2c0"); addFloat(ev, false);
       } else if (ev.fx === "meteor") {
+        addRing(ev.x, ev.fy, 10, 620, 44, "#ff3a2a", 10, 0.26); // the big punch lands: a far bigger shockwave and shake
+        addRing(ev.x, ev.fy, 10, 460, 38, "#ffd479", 7, 0.26);
+        addRing(ev.x, ev.y, 10, 340, 28, "#ffffff", 7, 1);
+        addShake(40); addFlash(0.9, "#ffffff");
         addRing(ev.x, ev.fy, 10, 300, 36, "#ff3a2a", 8, 0.3);
         addRing(ev.x, ev.fy, 10, 230, 30, "#ff9a3c", 6, 0.3);
         addRing(ev.x, ev.fy, 10, 160, 24, "#ffffff", 4, 0.3);
@@ -212,6 +263,19 @@
         spawnBurst(ev.x, ev.y, "#ffe27a", 14, 6);
         spawnBurst(ev.x, ev.y, "#ffffff", 6, 4);
         addShake(ev.empowered ? 6 : 8); addFloat(ev, false);
+      } else if (ev.fx === "self_destruct") {
+        addSelfDestruct(ev);
+      } else if (ev.fx === "explosion") {
+        const radius = ev.radius || 110;
+        const dark = !!ev.black; // max-stack Self-Destruct: black energy with a violet edge
+        addRing(ev.x, ev.y, 8, radius, 28, dark ? "#b86cff" : "#ff7a32", 7, 1);
+        addRing(ev.x, ev.y, 5, radius * 0.68, 20, dark ? "#21162e" : "#ffd479", dark ? 8 : 4, 1);
+        addRing(ev.x, ev.y, 2, radius * 0.38, 14, dark ? "#6a2cff" : "#ffffff", 3, 1);
+        spawnBurst(ev.x, ev.y, dark ? "#21162e" : "#ff8b32", dark ? 44 : 30, 8);
+        spawnBurst(ev.x, ev.y, dark ? "#b86cff" : "#fff0c2", 14, 5);
+        addShake(radius > 200 ? 22 : 9);
+        addFlash(radius > 200 ? 0.32 : 0.12, "#ffe0b0");
+        addFloat(ev, radius > 200);
       }
     }
   }
@@ -221,7 +285,7 @@
     flashA *= 0.82; if (flashA < 0.01) flashA = 0;
     if (darkLife > 0) darkLife--;
     if (banner && --banner.life <= 0) banner = null;
-    for (const arr of [rings, pillars, cracks, floats]) {
+    for (const arr of [rings, pillars, cracks, floats, blasts, aimTrails]) {
       for (let i = arr.length - 1; i >= 0; i--) if (--arr[i].life <= 0) arr.splice(i, 1);
     }
   }
@@ -262,6 +326,46 @@
         ctx.closePath(); ctx.fill();
       }
       ctx.globalAlpha = 1;
+    }
+    for (const t of aimTrails) { // Perfect Aim: the beam it left behind, with pressure rings along the path
+      const a = t.life / t.max, xa = Math.min(t.x0, t.x1), xb = Math.max(t.x0, t.x1);
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+      ctx.globalAlpha = a * 0.6; ctx.strokeStyle = "#ffb52e"; ctx.lineWidth = 16 * a; ctx.shadowColor = "#ffb52e"; ctx.shadowBlur = 20;
+      ctx.beginPath(); ctx.moveTo(xa, t.y); ctx.lineTo(xb, t.y); ctx.stroke();
+      ctx.globalAlpha = a; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4 * a; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.moveTo(xa, t.y); ctx.lineTo(xb, t.y); ctx.stroke();
+      for (let x = xa + 40; x < xb; x += 110) {
+        ctx.globalAlpha = a * 0.5; ctx.strokeStyle = "#fff0b0"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, t.y, 4 + (1 - a) * 14, 16 + (1 - a) * 50, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    for (const b of blasts) { // Self-Destruct: fireball with streaks, or a black-violet core with lightning at max stacks
+      const k = 1 - b.life / b.max, e = 1 - Math.pow(1 - Math.min(1, k * 1.7), 3);
+      const R = b.R * (0.2 + 0.8 * e), a = Math.pow(1 - k, 0.8);
+      ctx.save();
+      if (b.black) {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = safeRadialGrad(ctx, b.x, b.y, 4, b.x, b.y, R, [[0, "rgba(8,3,16,0.98)"], [0.6, "rgba(40,14,80,0.85)"], [0.88, "rgba(150,80,255,0.75)"], [1, "rgba(184,108,255,0)"]]);
+        ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = "#d9b8ff"; ctx.lineWidth = 2.5; ctx.shadowColor = "#b86cff"; ctx.shadowBlur = 14;
+        for (const pts of b.bolts) {
+          ctx.beginPath();
+          pts.forEach((p, i) => { const px = b.x + p[0] * R * 1.15, py = b.y + p[1] * R * 1.15; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+          ctx.stroke();
+        }
+      } else {
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a;
+        ctx.fillStyle = safeRadialGrad(ctx, b.x, b.y, 4, b.x, b.y, R, [[0, "rgba(255,244,194,1)"], [0.35, "rgba(255,154,50,0.85)"], [0.75, "rgba(255,75,30,0.35)"], [1, "rgba(255,75,30,0)"]]);
+        ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
+        if (k < 0.35) { ctx.globalAlpha = (0.35 - k) / 0.35; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(b.x, b.y, R * 0.55, 0, Math.PI * 2); ctx.fill(); }
+        ctx.globalAlpha = a * 0.8; ctx.strokeStyle = "#ffd479"; ctx.lineWidth = 3; ctx.lineCap = "round";
+        for (let i = 0; i < 20; i++) {
+          const ang = (i / 20) * Math.PI * 2 + 0.3, len = R * (0.62 + 0.38 * (((i * 7919) % 13) / 13));
+          ctx.beginPath(); ctx.moveTo(b.x + Math.cos(ang) * R * 0.3, b.y + Math.sin(ang) * R * 0.3); ctx.lineTo(b.x + Math.cos(ang) * len, b.y + Math.sin(ang) * len); ctx.stroke();
+        }
+      }
+      ctx.restore();
     }
     for (const r of rings) {
       const k = 1 - r.life / r.maxLife;
@@ -350,6 +454,20 @@
   // Pips under the floating HP bar: one per momentum point; they blaze when full.
   function drawMomentumPips(ctx, f, y) {
     const P = f.stats.passive;
+    if (P && P.type === "bulletevolution") {
+      const r = 3.1, gap = 7.5, x0 = f.x + f.stats.width / 2 - ((P.max - 1) * gap) / 2;
+      const colors = P.tierColors || ["#e8eef8", "#ffe04a", "#ff8b24", "#f02d45", "#21162e"];
+      const stage = MW.gunnerTier(f.gunnerStacks, P);
+      for (let i = 0; i < P.max; i++) {
+        const on = i < f.gunnerStacks;
+        ctx.beginPath(); ctx.arc(x0 + i * gap, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = on ? colors[stage] : "rgba(20,24,40,0.75)";
+        if (on) { ctx.shadowColor = colors[stage]; ctx.shadowBlur = stage === 4 ? 12 : 6; }
+        ctx.fill(); ctx.shadowBlur = 0;
+        ctx.strokeStyle = on ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.2)"; ctx.lineWidth = 0.8; ctx.stroke();
+      }
+      return;
+    }
     if (!P || P.type !== "momentum") return;
     const r = 4.2, gap = 11.5;
     const x0 = f.x + f.stats.width / 2 - ((P.max - 1) * gap) / 2;
@@ -379,7 +497,11 @@
     const cx = f.x + s.width / 2;
     const cy = f.y + s.height * 0.45;
 
-    if (f.state === S.ATTACK_STARTUP && f.hit.dashSpeed) {
+    if (f.state === S.ATTACK_STARTUP && f.hit.gunnerAim) {
+      drawGunnerAimCharge(ctx, f);
+    } else if (f.state === S.ATTACK_STARTUP && f.hit.selfDestruct) {
+      drawGunnerSelfDestruct(ctx, f);
+    } else if (f.state === S.ATTACK_STARTUP && f.hit.dashSpeed) {
       // Fist Rush dash: speed streaks trail behind and dust kicks up
       const col = f.hit.empowered ? "#ff6a2a" : MOM_HOT;
       ctx.save();
@@ -427,6 +549,88 @@
       ctx.shadowBlur = 0;
     } else if (f.state === S.ATTACK_ACTIVE) {
       if (f.hit.type === "melee") drawMeleeShape(ctx, f);
+    }
+  }
+
+  // Artillerist Perfect Aim charge: laser sight locked onto the enemy, a closing reticle with a progress arc
+  // (gold -> red, blinking when nearly ready), and a rifle that gathers light.
+  function drawGunnerAimCharge(ctx, f) {
+    const s = f.stats, dir = f.facing, cx = f.x + s.width / 2, cy = f.y + s.height * 0.4;
+    const prog = Math.max(0, Math.min(1, 1 - f.stateTimer / Math.max(1, f.hit.startup)));
+    const foe = f.foe && f.foe.state !== MW.STATE.KO ? f.foe : null;
+    const tx = foe ? foe.x + foe.stats.width / 2 : cx + dir * 520, ty = foe ? foe.y + foe.stats.height / 2 : cy;
+    const mx = cx + dir * 20, my = cy, TAU2 = Math.PI * 2;
+    const col = prog > 0.82 ? "#ff3a3a" : "#ffd66b";
+    const blink = prog > 0.92 ? (Math.floor(Date.now() / 60) % 2 ? 1 : 0.35) : 1;
+    ctx.save(); ctx.lineCap = "round"; ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = rgba(col, (0.18 + 0.6 * prog) * blink); ctx.lineWidth = 1 + prog * 3; ctx.shadowColor = col; ctx.shadowBlur = 8 + prog * 18;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); // laser sight
+    const ang = Math.atan2(ty - my, tx - mx);
+    ctx.strokeStyle = rgba(col, 0.12 * blink); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(ang) * 400, ty + Math.sin(ang) * 400); ctx.stroke();
+    const rad = 62 - 34 * prog, rot = Date.now() * 0.004 * (1 + prog * 2);
+    ctx.shadowBlur = 12; ctx.lineWidth = 2.5; ctx.strokeStyle = rgba(col, 0.9 * blink);
+    ctx.beginPath(); ctx.arc(tx, ty, rad, 0, TAU2); ctx.stroke(); // reticle ring
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(tx, ty, rad + 9, -Math.PI / 2, -Math.PI / 2 + TAU2 * prog); ctx.stroke(); // lock progress
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) { // four spinning brackets
+      const a = rot + i * Math.PI / 2;
+      ctx.beginPath(); ctx.moveTo(tx + Math.cos(a) * (rad - 10), ty + Math.sin(a) * (rad - 10)); ctx.lineTo(tx + Math.cos(a) * (rad + 16), ty + Math.sin(a) * (rad + 16)); ctx.stroke();
+    }
+    ctx.fillStyle = rgba(col, 0.95 * blink); ctx.beginPath(); ctx.arc(tx, ty, 2.5 + prog * 2, 0, TAU2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = safeRadialGrad(ctx, mx, my, 1, mx, my, 10 + 26 * prog, [[0, "rgba(255,255,255,0.95)"], [0.4, rgba(col, 0.7)], [1, rgba(col, 0)]]);
+    ctx.fillRect(mx - 40, my - 40, 80, 80); // muzzle glow
+    if (prog > 0.5) { // lens flare cross
+      const L = 14 + 100 * (prog - 0.5);
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(mx - L, my); ctx.lineTo(mx + L, my); ctx.moveTo(mx, my - L * 0.6); ctx.lineTo(mx, my + L * 0.6); ctx.stroke();
+    }
+    ctx.restore();
+    if (Math.random() < 0.3 + 0.6 * prog) { // light gathers into the muzzle
+      const a = Math.random() * TAU2, d = 30 + Math.random() * 40;
+      spawnParticle(mx + Math.cos(a) * d, my + Math.sin(a) * d, -Math.cos(a) * 2.6, -Math.sin(a) * 2.6, col, 11, 2.2);
+    }
+  }
+
+  // Self-Destruct charge: a dashed blast-radius warning ring, a filling ring, a growing core with cracks of light,
+  // energy pulled into the body, then a white-hot flicker. At max stacks everything turns black and violet.
+  function drawGunnerSelfDestruct(ctx, f) {
+    const s = f.stats, cx = f.x + s.width / 2, cy = f.y + s.height / 2, TAU2 = Math.PI * 2;
+    const prog = Math.max(0, Math.min(1, 1 - f.stateTimer / Math.max(1, f.hit.startup)));
+    const black = !!f.hit.black, R = f.hit.radius;
+    const hot = black ? "#b86cff" : "#ff9a32", core = black ? "#21162e" : "#fff4c2", edge = black ? "#6a2cff" : "#ff4b22";
+    const pulse = 0.75 + 0.25 * Math.sin(Date.now() * (0.02 + 0.04 * prog));
+    ctx.save();
+    ctx.lineWidth = 2; ctx.setLineDash([16, 10]); ctx.lineDashOffset = -Date.now() * 0.03;
+    ctx.strokeStyle = rgba(hot, 0.25 + 0.4 * prog);
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU2); ctx.stroke(); // where the blast will reach
+    ctx.setLineDash([]);
+    ctx.lineWidth = 3 + 4 * prog; ctx.strokeStyle = rgba(hot, 0.5 + 0.4 * prog); ctx.shadowColor = hot; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(cx, cy, R * prog, 0, TAU2); ctx.stroke(); // fills up as the charge grows
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = black ? "source-over" : "lighter";
+    ctx.globalAlpha = 0.35 + 0.55 * prog;
+    ctx.fillStyle = safeRadialGrad(ctx, cx, cy, 4, cx, cy, s.height * (0.6 + 1.1 * prog) * pulse, [[0, rgba(core, 1)], [0.4, rgba(hot, 0.8)], [1, rgba(edge, 0)]]);
+    ctx.fillRect(cx - s.height * 2, cy - s.height * 2, s.height * 4, s.height * 4);
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.4 + 0.5 * prog;
+    ctx.strokeStyle = black ? "#d9b8ff" : "#fff0c2"; ctx.lineWidth = 1.5 + prog * 2; ctx.shadowColor = hot; ctx.shadowBlur = 10;
+    for (let i = 0; i < 9; i++) { // cracks of light spreading from the body
+      const a = (i / 9) * TAU2 + Date.now() * 0.0004, len = (24 + 60 * prog) * (0.6 + Math.random() * 0.5);
+      let x = cx, y = cy;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let j = 0; j < 4; j++) { const aa = a + (Math.random() - 0.5) * 0.7; x += Math.cos(aa) * len / 4; y += Math.sin(aa) * len / 4; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    if (prog > 0.8) { // the last moments: the whole body flickers white-hot
+      ctx.shadowBlur = 0; ctx.globalAlpha = ((prog - 0.8) / 0.2) * (0.4 + 0.4 * Math.random()); ctx.fillStyle = "#ffffff";
+      ctx.fillRect(f.x, f.y, s.width, s.height);
+    }
+    ctx.restore();
+    if (Math.random() < 0.5 + 0.5 * prog) { // energy rushes into the body
+      const a = Math.random() * TAU2, d = 60 + Math.random() * 70, sp = 3 + prog * 3;
+      spawnParticle(cx + Math.cos(a) * d, cy + Math.sin(a) * d, -Math.cos(a) * sp, -Math.sin(a) * sp, hot, 12, 2.5);
     }
   }
 
@@ -616,16 +820,44 @@
 
   // ─── projectile drawing ─────────────────────────────────────────
   // Gunner bullet: bright head with a thin fading tracer streak.
+  // Perfect Aim shot: a long white-hot beam with a gold glow and pressure rings trailing behind the head.
+  function drawAimShot(ctx, p) {
+    const L = 340, x0 = p.x - p.dir * L;
+    const col = p.tier > 0 ? p.evolutionColor : "#fff0b0", glow = p.tier === 4 ? "#b86cff" : "#ffb52e";
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+    for (const [w, c, aa] of [[22, glow, 0.55], [9, p.tier === 4 ? "#d9b8ff" : col, 0.9], [3.5, "#ffffff", 1]]) {
+      ctx.strokeStyle = safeLinearGrad(ctx, x0, 0, p.x, 0, [[0, rgba(c, 0)], [1, rgba(c, aa)]]); ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(x0, p.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    ctx.shadowColor = glow; ctx.shadowBlur = 30; ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, 26, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 4; i++) {
+      ctx.strokeStyle = rgba("#ffffff", 0.55 - i * 0.13); ctx.lineWidth = 3 - i * 0.5;
+      ctx.beginPath(); ctx.ellipse(p.x - p.dir * (34 + i * 46), p.y, 7 + i * 2, 26 + i * 8, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+    if (Math.random() < 0.8) spawnParticle(p.x - p.dir * 30, p.y + (Math.random() - 0.5) * 20, -p.dir * 1.2, (Math.random() - 0.5) * 1.5, glow, 10, 2.4);
+  }
+
   function drawBullet(ctx, p) {
-    const L = 40, x0 = p.x - p.dir * L;
+    if (p.hit && p.hit.gunnerAim) { drawAimShot(ctx, p); return; }
+    const L = p.angle ? 22 : 40, ang = p.angle || 0;
+    const ux = p.dir * Math.cos(ang), uy = Math.sin(ang);
+    const x0 = p.x - ux * L, y0 = p.y - uy * L;
     ctx.lineCap = "round";
-    ctx.strokeStyle = safeLinearGrad(ctx, x0, 0, p.x, 0, [[0, rgba("#ffb02e", 0)], [1, "#ffe9a0"]]);
+    const col = p.evolutionColor || "#ffb02e";
+    const black = p.tier === 4; // top tier = glowing black bullet
+    ctx.strokeStyle = safeLinearGrad(ctx, x0, y0, p.x, p.y, [[0, rgba(black ? "#b86cff" : col, 0)], [1, black ? "#b86cff" : col]]);
     ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(x0, p.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    ctx.shadowColor = "#ffb02e";
-    ctx.shadowBlur = 14;
-    ctx.fillStyle = "#fffbe6";
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, 7, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.shadowColor = black ? "#b86cff" : col;
+    ctx.shadowBlur = black ? 24 : 14;
+    ctx.fillStyle = black ? "#21162e" : col;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.atan2(uy, ux));
+    ctx.beginPath(); ctx.ellipse(0, 0, 7, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+    if (black) { ctx.lineWidth = 1.6; ctx.strokeStyle = "#b86cff"; ctx.stroke(); }
+    ctx.restore();
     ctx.shadowBlur = 0;
     if (Math.random() < 0.5) spawnParticle(p.x - p.dir * 10, p.y + (Math.random() - 0.5) * 3, -p.dir * 0.4, (Math.random() - 0.5) * 0.6, "#ffcf5a", 8, 1.6);
   }
@@ -1854,6 +2086,12 @@
 
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
+        if (s.id === "hitter" && f.gunnerBomb) {
+          const b = f.gunnerBomb, pulse = 0.75 + 0.25 * Math.sin(sim.tick * 0.18);
+          ctx.save(); ctx.shadowColor = "#ff7b24"; ctx.shadowBlur = 12 * pulse;
+          ctx.fillStyle = "#ff8b24"; ctx.beginPath(); ctx.arc(b.x, b.y - 5, 8 * pulse, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#fff0c2"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+        }
         if (s.id === "mage" && MW.MageFx) MW.MageFx.drawFighter(ctx, f);
         if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawFighter(ctx, f);
         ctx.restore();

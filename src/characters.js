@@ -436,20 +436,61 @@
       runSpeed: 5.8,
       jumpStrength: 13.0,
       airJumpStrength: 11.6,
+      // PASSIVE - Bullet Evolution. Each normal bullet hit adds a stack; a missed bullet removes one.
+      // The five visual tiers are derived from stacks in render.js. All values remain tunable here.
+      // tiers = stack counts where the bullet look changes (yellow, orange, red, black); tierColors has one more colour (the plain bullet first).
+      // ultKnockbackPerStack = Self-Destruct knockback gain per stack; ultBlackRadiusMul = blast size at max stacks (the black detonation).
+      passive: {
+        type: "bulletevolution", max: 10, damagePerStack: 0.08, missLoss: 1, barrageMissLoss: 2,
+        tiers: [3, 5, 7, 10], tierColors: ["#e8eef8", "#ffe04a", "#ff8b24", "#f02d45", "#21162e"],
+        ultKnockbackPerStack: 0.06, ultBlackRadiusMul: 1.3,
+      },
       attack: {
-        type: "projectile",
-        damage: 5.6,
-        startup: 5,
-        recovery: 28,
-        knockback: 3.8,
+        type: "projectile", gunnerBasic: true,
+        damage: 5.6, startup: 5, recovery: 28, knockback: 3.8,
         projectile: { speed: 13, range: 420, size: 10, style: "bullet" },
       },
+      // Hold normal attack to charge a five-round burst. The burst resolves each bullet independently.
+      charge: {
+        holdStart: 14, time: 42,
+        // A rapid sequence: `shots` bullets, one every `gap` ticks, while he stands and fires (active is computed from shots + gap).
+        // stun keeps the target staggered between shots. Knockback of every hit adds up, capped by maxLaunch (px per tick).
+        attack: { id: "five_shot_barrage", type: "projectile", gunnerBarrage: true, isSkill: true,
+          damage: 2.8, startup: 2, active: 1, recovery: 34, knockback: 2.2, launchH: 1, launchV: 0.1, stun: 12, manaGain: 2, maxLaunch: 14,
+          projectile: { speed: 15, range: 440, size: 7, style: "bullet", shots: 5, gap: 4 } },
+      },
+      skills: [
+        // Plant at your feet; press Skill 1 again to remotely detonate. One device at a time.
+        { id: "remote_detonation", name: "Bomb", icon: "BMB", cooldown: 300,
+          attack: { id: "remote_detonation", gunnerBomb: true, damage: 22, radius: 112, stun: 28, knockback: 8, launchH: 0.8, launchV: 0.9, duration: 360,
+            manaGain: 10, explodeOnExpire: false, // false = an undetonated bomb just disarms when its time runs out; true = it blows up
+          } },
+        // Directional hop is a mobility action and deals no damage.
+        { id: "combat_hop", name: "Hop", icon: "HOP", cooldown: 240,
+          attack: { id: "combat_hop", gunnerHop: true, distance: 118, vertical: 5.8, duration: 10 } },
+        // Seven pellets in a cone: angleStep = radians between neighbours. Close up they all hit; far away the outer ones fly past.
+        // The knockback of every pellet that hits adds up (capped by maxLaunch).
+        { id: "point_blank_blast", name: "Blast", icon: "SG", cooldown: 360,
+          attack: { id: "point_blank_blast", type: "projectile", gunnerShotgun: true, isSkill: true,
+            damage: 4.2, startup: 8, active: 1, recovery: 42, knockback: 1.6, launchH: 1.2, launchV: 0.4, stun: 10, manaGain: 1.5, maxLaunch: 16,
+            projectile: { speed: 12, range: 170, size: 8, style: "bullet", pellets: 7, angleStep: 0.16 } } },
+        // Two-second stationary charge; interruption cancels it. The fired shot is extremely fast.
+        { id: "perfect_aim", name: "Aim", icon: "AIM", cooldown: 900,
+          attack: { id: "perfect_aim", type: "projectile", isSkill: true, gunnerAim: true,
+            damage: 42, startup: 120, active: 1, recovery: 54, knockback: 14, stun: 30, piercing: true,
+            projectile: { speed: 58, range: 1400, size: 36, style: "bullet" } } },
+      ],
+      // Self-Destruct is a radial blast around the Gunner. He survives but has a long recovery.
+      ultimate: { id: "self_destruct", name: "Self-Destruct", icon: "ULT",
+        attack: { id: "self_destruct", type: "melee", isSkill: true, selfDestruct: true,
+          damage: 54, radius: 245, startup: 72, active: 1, recovery: 78,
+          knockback: 18, launchH: 1.3, launchV: 1.1, stun: 42, manaGain: 0 } },
     }),
 
     // BULWARK (internal id stays "tank"): immovable shield-bearer.
     // One slow shield bash with SUPER ARMOR while winding up and swinging: hits still hurt him,
     // but cannot interrupt or launch him (lethal hits still KO). A miss is very punishable.
-    tank: define({
+        tank: define({
       id: "tank",
       name: "Bulwark",
       color: "#a9b2c2", // weathered silver: select card, chips, HUD

@@ -66,35 +66,12 @@
     .mw-skill.empty.active { background: rgba(255,255,255,0.18); }
 
     /* top-centre control pill: pause / restart / menu / fullscreen */
-.mw-bar {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    top: calc(8px + env(safe-area-inset-top, 0px));
-    display: flex;
-    gap: 8px;
-    padding: 5px 8px;
-    border-radius: 999px;
-    pointer-events: none;
-    background: rgba(10,12,26,0.5);
-    border: 1px solid rgba(255,255,255,0.18);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-}
-
-.mw-bar .mw-btn {
-    position: relative;
-    width: 38px;
-    height: 38px;
-    pointer-events: auto; /* Allow button touches */
-    box-shadow: none;
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.35);
-}
-
-.mw-bar .mw-btn.active {
-    background: rgba(127,216,255,0.45);
-}
+    .mw-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top, 0px));
+      display: flex; gap: 8px; padding: 5px 8px; border-radius: 999px; pointer-events: none;
+      background: rgba(10,12,26,0.5); border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .mw-bar .mw-btn { position: relative; width: 38px; height: 38px; box-shadow: none; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.35); }
+    .mw-bar .mw-btn.active { background: rgba(127,216,255,0.45); }
 
     .mw-hint { display: none; position: absolute; left: 0; right: 0; top: 56%; text-align: center; color: #8b94ab;
       font: 14px monospace; pointer-events: none; }

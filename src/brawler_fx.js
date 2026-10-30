@@ -24,6 +24,8 @@
     ghostMax: 20,
     dashGhostSpeed: 6.5, // px per tick: running faster than this also leaves ghosts
     words: true,
+    // Meteor Fist (the big punch): size of the spectral fist at the start / end of the swing (px), wind streaks, ground shockwave
+    meteor: { len: [240, 560], hh: [110, 210], streaks: 16 },
   };
 
   // two palettes: normal punches are blue/white/gold, empowered ones (full momentum / guard bonus) are hot
@@ -219,15 +221,19 @@
       sparks(x, y, dir, 14, P, 12, 1.2);
       chunks(x, y + 10, 6, P);
       word("CRUSH!", x - dir * 4, y - 36, 30, P, dir);
-    } else if (shape === "meteor") {
-      flash(x, y, 80, P, 16);
-      burstRays(x, y, 18, 140, P, 14, dir, false);
-      sparks(x, y, dir, 22, P, 14, 1.4);
-      ring(x, y + 30, 10, 260, 0.22, 26, P.gold, 6, 0, 0); // huge ground shockwave
-      ring(x, y, 10, 200, 1, 20, P.mid, 5, dir, 20);
-      chunks(x, y + 10, 14, P);
-      word("METEOR FIST!", x, y - 70, 40, HOT, dir);
-    } else { // anything else (slam etc.): a small generic impact
+    } else if (shape === "meteor") { // the big punch lands: everything, much bigger
+      flash(x, y, 220, HOT, 22);
+      flash(x, y, 120, COOL, 14);
+      burstRays(x, y, 30, 380, HOT, 20, dir, false);
+      sparks(x, y, dir, 44, HOT, 22, 1.6);
+      ring(x, y + 30, 10, 560, 0.2, 34, HOT.gold, 9, 0, 0); // huge ground shockwave
+      ring(x, y + 30, 10, 400, 0.2, 28, HOT.mid, 6, 0, 0);
+      ring(x, y, 10, 360, 1, 24, HOT.mid, 7, dir, 20);
+      ring(x, y, 10, 200, 1, 16, HOT.core, 5, dir, 10);
+      chunks(x, y + 10, 26, HOT);
+      dust(x, y + 40, 14, dir, 60);
+      word("METEOR FIST!", x, y - 90, 64, HOT, dir);
+        } else { // anything else (slam etc.): a small generic impact
       flash(x, y, 26 * k, P, 8);
       sparks(x, y, dir, 8, P, 8, 1);
     }
@@ -255,8 +261,9 @@
       dust(ev.x, ev.fy, 8, 0, 20);
       ring(ev.x, ev.fy - 2, 6, 60, 0.25, 14, "#e8dcc0", 3, 0, 0);
     } else if (ev.id === "meteor_fist") {
-      ring(ev.x, ev.fy - 2, 8, 110, 0.25, 22, HOT.gold, 4, 0, 0);
-      dust(ev.x, ev.fy, 10, 0, 24);
+      ring(ev.x, ev.fy - 2, 8, 180, 0.25, 26, HOT.gold, 6, 0, 0);
+      ring(ev.x, ev.fy - 2, 8, 120, 0.25, 20, HOT.mid, 4, 0, 0);
+      dust(ev.x, ev.fy, 18, 0, 40);
     }
   }
 
@@ -358,8 +365,26 @@
 
       // Meteor Fist: the enormous spectral fist, drawn in draw()
       if (f.hit && f.hit.id === "meteor_fist" && f.state === S.ATTACK_ACTIVE) {
-        giants.push({ x: f.facing > 0 ? f.x + f.stats.width : f.x, y: f.y + f.stats.height * 0.4, d: f.facing < 0 ? -1 : 1, prog: 1 - f.stateTimer / Math.max(1, f.hit.active) });
-      }
+        const d = f.facing < 0 ? -1 : 1, fx0 = f.facing > 0 ? f.x + f.stats.width : f.x, my = f.y + f.stats.height * 0.4, fy = f.y + f.stats.height;
+        const prog = 1 - f.stateTimer / Math.max(1, f.hit.active);
+        giants.push({ x: fx0, y: my, d: d, prog: prog });
+        if (!f._meteorFired) { // the moment the punch is thrown: a pressure blast, floor shockwave, cracks and a screen shake
+          f._meteorFired = true;
+          flash(fx0, my, 170, HOT, 14);
+          ring(fx0, my, 10, 340, 1.1, 18, HOT.gold, 9, d, 0);
+          ring(fx0, fy - 2, 10, 460, 0.2, 26, HOT.mid, 7, 0, 0);
+          burstRays(fx0, my, 24, 280, HOT, 14, d, true);
+          sparks(fx0, my, d, 30, HOT, 20, 0.6);
+          for (let i = 1; i <= 3; i++) crack(fx0 + d * i * 70, fy, d);
+          if (MW.fxShake) MW.fxShake(20);
+          if (MW.fxFlash) MW.fxFlash(0.5, "#fff3d0");
+        }
+        if (frame % 2 === 0) { // a wall of dust and sparks races forward along the floor
+          const L = TUNE.meteor.len[0] + (TUNE.meteor.len[1] - TUNE.meteor.len[0]) * prog;
+          dust(fx0 + d * L * rnd(0.15, 1), fy, 3, d, 10);
+          sparks(fx0 + d * L * rnd(0.3, 1), my + rnd(-60, 60), d, 2, HOT, 14, 0.2);
+        }
+      } else f._meteorFired = false;
     }
   }
 
@@ -651,99 +676,55 @@
       ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, TAU); ctx.fill();
     }
 
-    // Meteor Fist: enormous spectral gauntlet punching forward from his own fist
-   
-    // Meteor Fist: COLOSSAL SPECTRAL ARM
+    // Meteor Fist: a colossal spectral fist (wind cone, speed streaks, giant gauntlet, pressure arcs)
     for (const G of giants) {
-      const k = clamp(G.prog, 0, 1);
-      const e = 1 - (1 - k) * (1 - k);
-
-      const len = 1800 + 1200 * e;
-      const hh = 900 + 600 * e;
-      const armH = hh * 0.72;
-
+      const M = TUNE.meteor;
+      const k = clamp(G.prog, 0, 1), e = 1 - (1 - k) * (1 - k);
+      const len = M.len[0] + (M.len[1] - M.len[0]) * e, hh = M.hh[0] + (M.hh[1] - M.hh[0]) * e;
+      const fade = 1 - 0.4 * k;
       ctx.save();
-      ctx.translate(G.x, G.y);
-      ctx.scale(G.d, 1);
+      ctx.translate(G.x, G.y); ctx.scale(G.d, 1);
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.95 - 0.2 * k;
-
-      // Long, massive forearm
-      const armGrad = ctx.createLinearGradient(0, 0, len, 0);
-      armGrad.addColorStop(0, "rgba(255,90,20,0)");
-      armGrad.addColorStop(0.2, "rgba(255,100,30,0.65)");
-      armGrad.addColorStop(0.75, "rgba(255,150,50,0.9)");
-      armGrad.addColorStop(1, "rgba(255,230,180,0.95)");
-
-      ctx.fillStyle = armGrad;
-      ctx.beginPath();
-      ctx.moveTo(0, -armH * 0.28);
-      ctx.lineTo(len * 0.72, -armH * 0.35);
-      ctx.lineTo(len * 0.86, -hh * 0.34);
-      ctx.lineTo(len, -hh * 0.25);
-      ctx.lineTo(len * 1.08, 0);
-      ctx.lineTo(len, hh * 0.25);
-      ctx.lineTo(len * 0.86, hh * 0.34);
-      ctx.lineTo(len * 0.72, armH * 0.35);
-      ctx.lineTo(0, armH * 0.28);
-      ctx.closePath();
-      ctx.fill();
-
-      // Huge fist silhouette
-      const fx = len * 0.88;
-      const fy = 0;
-      const fistW = len * 0.34;
-      const fistH = hh * 0.85;
-
-      const fistGrad = ctx.createRadialGradient(
-        fx, fy, 10,
-        fx, fy, fistW
-      );
-      fistGrad.addColorStop(0, "#ffffff");
-      fistGrad.addColorStop(0.3, "#fff0c0");
-      fistGrad.addColorStop(0.65, "#ff9b42");
-      fistGrad.addColorStop(1, "#ff3825");
-
-      ctx.fillStyle = fistGrad;
-      ctx.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx.lineWidth = 18;
-      ctx.shadowColor = "#ff8a32";
-      ctx.shadowBlur = 65;
-
-      ctx.beginPath();
-      ctx.ellipse(fx, fy, fistW, fistH * 0.5, 0, 0, TAU);
-      ctx.fill();
-      ctx.stroke();
-
-      // Four enormous knuckles
-      ctx.shadowBlur = 35;
-      for (let i = 0; i < 4; i++) {
-        const ny = (i - 1.5) * fistH * 0.2;
-        ctx.fillStyle = "#fff4d8";
-        ctx.beginPath();
-        ctx.ellipse(
-          len * 1.05,
-          ny,
-          fistW * 0.28,
-          fistH * 0.115,
-          0,
-          0,
-          TAU
-        );
-        ctx.fill();
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      // 1) wind cone pushed ahead of the punch
+      let gr = ctx.createLinearGradient(0, 0, len * 1.7, 0);
+      gr.addColorStop(0, "rgba(255,190,110,0)"); gr.addColorStop(0.5, "rgba(255,200,130,0.24)"); gr.addColorStop(1, "rgba(255,240,210,0)");
+      ctx.globalAlpha = fade; ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.moveTo(0, -hh * 0.4); ctx.lineTo(len * 1.7, -hh * 2.2); ctx.lineTo(len * 1.7, hh * 2.2); ctx.lineTo(0, hh * 0.4); ctx.closePath(); ctx.fill();
+      // 2) speed streaks rushing past
+      ctx.strokeStyle = "rgba(255,245,220,0.85)";
+      for (let i = 0; i < M.streaks; i++) {
+        const r1 = ((i * 7919) % 97) / 97, r2 = ((i * 104729) % 89) / 89;
+        const yy = (r1 - 0.5) * hh * 3.6, sx = (((frame * 38 + i * 61) % 400) / 400) * len * 1.5, sl = 90 + r2 * 220;
+        ctx.globalAlpha = fade * (0.25 + 0.5 * r2); ctx.lineWidth = 1.5 + r2 * 3;
+        ctx.beginPath(); ctx.moveTo(sx, yy); ctx.lineTo(sx + sl, yy); ctx.stroke();
       }
-
-      // Bright energy outline
-      ctx.shadowBlur = 80;
-      ctx.strokeStyle = "rgba(255,240,200,0.8)";
-      ctx.lineWidth = 28;
+      // 3) the gauntlet: tapered palm, four big fingers, thumb, bright knuckles
+      const fg = ctx.createLinearGradient(0, 0, len * 1.04, 0);
+      fg.addColorStop(0, "rgba(255,110,30,0)"); fg.addColorStop(0.35, "rgba(255,150,60,0.85)"); fg.addColorStop(1, "rgba(255,250,225,1)");
+      ctx.globalAlpha = fade; ctx.fillStyle = fg; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 3;
+      ctx.shadowColor = "#ff7a2a"; ctx.shadowBlur = 30;
       ctx.beginPath();
-      ctx.ellipse(fx, fy, fistW * 1.08, fistH * 0.56, 0, -1.2, 1.2);
-      ctx.stroke();
-
+      ctx.moveTo(0, -hh * 0.3); ctx.lineTo(len * 0.52, -hh * 0.5); ctx.lineTo(len * 0.52, hh * 0.5); ctx.lineTo(0, hh * 0.3); ctx.closePath(); ctx.fill();
+      const fh = hh * 0.25;
+      for (let i = 0; i < 4; i++) {
+        const fy0 = (i - 2) * fh, fx0 = len * (0.46 + (i === 0 || i === 3 ? 0.02 : 0)), fw = len * (0.58 - (i === 0 || i === 3 ? 0.04 : 0));
+        const r = fh * 0.45;
+        ctx.beginPath();
+        ctx.moveTo(fx0, fy0 + r); ctx.arcTo(fx0, fy0, fx0 + r, fy0, r); ctx.lineTo(fx0 + fw - r, fy0); ctx.arcTo(fx0 + fw, fy0, fx0 + fw, fy0 + r, r);
+        ctx.lineTo(fx0 + fw, fy0 + fh - r); ctx.arcTo(fx0 + fw, fy0 + fh, fx0 + fw - r, fy0 + fh, r); ctx.lineTo(fx0 + r, fy0 + fh); ctx.arcTo(fx0, fy0 + fh, fx0, fy0 + fh - r, r); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.ellipse(len * 0.5, -hh * 0.62, len * 0.17, hh * 0.15, -0.25, 0, TAU); ctx.fill(); ctx.stroke(); // thumb
+      ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,0.9)"; // knuckle highlights
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(len * 1.0, (i - 1.5) * fh, fh * 0.28, 0, TAU); ctx.fill(); }
+      // 4) pressure arcs in front of the fist
+      for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = fade * (0.75 - i * 0.2); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 6 - i * 1.6;
+        ctx.beginPath(); ctx.ellipse(len * 1.04 + i * hh * 0.45 + k * 60, 0, hh * 0.35 * (1 + i * 0.5), hh * (1.1 + i * 0.5), 0, -Math.PI * 0.45, Math.PI * 0.45); ctx.stroke();
+      }
       ctx.restore();
     }
-
 
     // words
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";

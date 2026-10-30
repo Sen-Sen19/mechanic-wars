@@ -78,6 +78,7 @@
       }
       this.spawnProjectiles();
       this.spawnZones();
+      this.stepGunnerBombs();
       for (const f of this.fighters) { // visual one-shots queued by the Void Mage (always drained, so headless runs never grow them)
         for (const ev of f.fxOut) this.emitFx(Object.assign({ type: "void", style: "arcane", ownerId: f.id, x: f.x + f.stats.width / 2, y: f.y + f.stats.height * 0.45 }, ev));
         f.fxOut.length = 0;
@@ -87,6 +88,7 @@
         if (--this.koTimer === 0) this.newRound();
       } else {
         this.resolveHits();
+        this.resolveGunnerUltimates();
         this.stepProjectiles(true);
         this.stepZones();
         this.resolveCounters();
@@ -119,11 +121,110 @@
     spawnProjectiles() {
       for (const f of this.fighters) {
         if (f.pendingProjectile && f.state === MW.STATE.ATTACK_ACTIVE) {
-          const p = new MW.Projectile(f, f.pendingProjectile);
-          this.projectiles.push(p);
-          this.emit("fire", p);
+          const hit = f.pendingProjectile, cfg = hit.projectile || {}, count = Math.max(1, cfg.pellets || 1);
+          // Perfect Aim commits to the opponent's position at release, not at the start of its charge.
+          if (hit.gunnerAim && f.foe && f.foe.state !== MW.STATE.KO) {
+            f.facing = f.foe.x + f.foe.stats.width / 2 >= f.x + f.stats.width / 2 ? 1 : -1;
+          }
+          if (hit.gunnerBarrage) { // a rapid sequence: one bullet every cfg.gap ticks (stepGunnerBurst fires them)
+            f.gunnerBurst = { hit: hit, left: cfg.shots, timer: 0, batch: { type: "barrage", remaining: cfg.shots, hits: 0, owner: f } };
+            f.pendingProjectile = null;
+            continue;
+          }
+          const batch = count > 1 ? { type: "shotgun", remaining: count, hits: 0, owner: f, maxLaunch: hit.maxLaunch } : null;
+          for (let i = 0; i < count; i++) {
+            // shotgun: a cone (angle per pellet), so far-away targets are missed by the outer pellets
+            const angle = count === 1 ? 0 : (i - (count - 1) / 2) * (cfg.angleStep || 0);
+            const h = count === 1 ? hit : Object.assign({}, hit, { projectile: Object.assign({}, cfg, { angle: angle }) });
+            const p = new MW.Projectile(f, h);
+            if (hit.gunnerAim && f.foe && f.foe.state !== MW.STATE.KO) {
+              p.y = f.foe.y + f.foe.stats.height / 2;
+              p.py = p.y;
+            }
+            p.batch = batch;
+            this.projectiles.push(p);
+            this.emit("fire", p);
+          }
         }
         f.pendingProjectile = null;
+      }
+      for (const f of this.fighters) this.stepGunnerBurst(f);
+    }
+
+    // Five-Shot Barrage: fire the next bullet when its timer runs out. Being interrupted stops the burst;
+    // bullets that were never fired count as misses for the passive.
+    stepGunnerBurst(f) {
+      const b = f.gunnerBurst;
+      if (!b) return;
+      if (f.state !== MW.STATE.ATTACK_ACTIVE || !f.hit || !f.hit.gunnerBarrage) {
+        b.batch.remaining -= b.left;
+        b.left = 0;
+        f.gunnerBurst = null;
+        this.finishGunnerBatch(b.batch);
+        return;
+      }
+      if (b.timer > 0) { b.timer--; return; }
+      const p = new MW.Projectile(f, b.hit);
+      p.batch = b.batch;
+      this.projectiles.push(p);
+      this.emit("fire", p);
+      b.left--;
+      b.timer = b.hit.projectile.gap - 1;
+      if (b.left <= 0) f.gunnerBurst = null;
+    }
+
+    finishGunnerBatch(batch) {
+      if (!batch || batch.remaining > 0 || batch.done) return;
+      batch.done = true;
+      const owner = batch.owner;
+      if (batch.type === "barrage") {
+        if (batch.hits === 5) owner.gunnerStacks = Math.min(owner.stats.passive.max, owner.gunnerStacks + 1);
+        else if (batch.hits === 0) owner.gunnerStacks = Math.max(0, owner.gunnerStacks - owner.stats.passive.barrageMissLoss);
+      }
+    }
+
+    stepGunnerBombs() {
+      for (const f of this.fighters) {
+        const b = f.gunnerBomb;
+        if (!b) continue;
+        b.t++;
+        if (!b.detonate && b.t < b.cfg.duration) continue;
+        const C = b.cfg;
+        if (!b.detonate && !C.explodeOnExpire) { // time ran out: the bomb disarms, nothing happens
+          f.gunnerBomb = null;
+          f.cooldowns[0] = f.stats.skills[0].cooldown;
+          continue;
+        }
+        for (const target of this.fighters) {
+          if (target === f || target.state === MW.STATE.KO || target.untargetable) continue;
+          const dx = target.x + target.stats.width / 2 - b.x;
+          const dy = target.y + target.stats.height / 2 - b.y;
+          if (dx * dx + dy * dy > C.radius * C.radius) continue;
+          const dir = dx >= 0 ? 1 : -1;
+          target.takeHit(f, { id: "remote_detonation", isSkill: true, damage: C.damage, knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun }, dir);
+          f.onHitLanded({ manaGain: C.manaGain !== undefined ? C.manaGain : 10 });
+          this.emitFx({ type: "impact", fx: "explosion", x: target.x + target.stats.width / 2, y: target.y + target.stats.height / 2, radius: C.radius, ownerId: f.id });
+        }
+        this.emitFx({ type: "impact", fx: "explosion", x: b.x, y: b.y, radius: C.radius, ownerId: f.id });
+        f.gunnerBomb = null;
+        f.cooldowns[0] = f.stats.skills[0].cooldown;
+      }
+    }
+
+    resolveGunnerUltimates() {
+      for (const f of this.fighters) {
+        const h = f.hit;
+        if (!h || !h.selfDestruct || f.state !== MW.STATE.ATTACK_ACTIVE || h._resolved) continue;
+        h._resolved = true;
+        for (const target of this.fighters) {
+          if (target === f || target.state === MW.STATE.KO || target.invuln > 0 || target.untargetable) continue;
+          const dx = target.x + target.stats.width / 2 - (f.x + f.stats.width / 2);
+          const dy = target.y + target.stats.height / 2 - (f.y + f.stats.height / 2);
+          if (dx * dx + dy * dy > h.radius * h.radius) continue;
+          target.takeHit(f, h, dx >= 0 ? 1 : -1);
+          f.onHitLanded(h);
+        }
+        this.emitFx({ type: "impact", fx: "self_destruct", black: !!h.black, x: f.x + f.stats.width / 2, y: f.y + f.stats.height / 2, radius: h.radius, ownerId: f.id });
       }
     }
 
@@ -132,15 +233,32 @@
     stepProjectiles(canHit) {
       for (const p of this.projectiles) {
         const owner = this.fighters[p.ownerId];
+        if (p.hit && p.hit.gunnerAim && owner && owner.foe && owner.foe.state !== MW.STATE.KO) {
+          p.y = owner.foe.y + owner.foe.stats.height / 2;
+          p.py = p.y; // locked sightline follows the target until the piercing shot connects
+        }
         if (canHit && owner) {
           const box = p.box();
           for (const t of this.fighters) {
-            if (t.id === p.ownerId || t.state === MW.STATE.KO || t.invuln > 0 || t.untargetable) continue;
-            if (overlap(box, t.rect())) {
+            if (t.id === p.ownerId || p.hitTargets.has(t.id) || t.state === MW.STATE.KO || t.invuln > 0 || t.untargetable) continue;
+            const swept = { x: Math.min(p.px, p.x) - p.size / 2, y: p.y - p.size / 2, w: Math.abs(p.x - p.px) + p.size, h: p.size };
+            if (overlap(p.hit && p.hit.piercing ? swept : box, t.rect())) {
+              const before = p.batch && t.gunnerBatch === p.batch ? { vx: t.vx, vy: t.vy } : null;
               t.takeHit(owner, p.hit, p.dir);
-              owner.onHitLanded(p.hit);
+              if (p.batch && t.state === MW.STATE.HITSTUN) { // every bullet of a barrage / shotgun blast adds its knockback (capped)
+                t.gunnerBatch = p.batch;
+                if (before) {
+                  const cap = p.hit.maxLaunch || 14;
+                  t.vx = Math.max(-cap, Math.min(cap, before.vx + t.vx));
+                  t.vy = Math.max(-cap, Math.min(cap, before.vy + t.vy));
+                }
+              }
+              if (p.batch && p.batch.type === "barrage") owner.addMana(p.hit);
+              else owner.onHitLanded(p.hit);
+              if (p.batch) { p.batch.hits++; p.batch.remaining--; this.finishGunnerBatch(p.batch); }
+              p.hitTargets.add(t.id);
               this.projectileExtras(owner, t, p);
-              p.alive = false;
+              if (!p.hit.piercing) p.alive = false;
               this.emit("hit", p);
               break;
             }
@@ -148,7 +266,11 @@
         }
         if (p.alive) {
           p.step(this.arena);
-          if (!p.alive) this.emit("fizzle", p); // ran out of range / left the arena
+          if (!p.alive) {
+            this.emit("fizzle", p); // ran out of range / left the arena
+            if (p.batch && p.batch.remaining > 0) { p.batch.remaining--; this.finishGunnerBatch(p.batch); }
+            else if (owner && owner.stats.id === "hitter" && p.hit && p.hit.gunnerBasic) owner.gunnerStacks = Math.max(0, owner.gunnerStacks - owner.stats.passive.missLoss);
+          }
         }
       }
       this.projectiles = this.projectiles.filter((p) => p.alive);
@@ -326,7 +448,7 @@
       const st = p.hit && p.hit.projectile ? p.hit.projectile.style : undefined;
       // the cast circle opens 18px in front of the Mage, so the flash starts there
       const lead = type === "fire" ? p.dir * 18 : 0;
-      this.fx.push({ type: type, style: st, kind: p.hit && p.hit.projectile ? p.hit.projectile.kind : undefined, x: p.x + lead, y: p.y, dir: p.dir, ownerId: p.ownerId });
+      this.fx.push({ type: type, style: st, kind: p.hit && p.hit.projectile ? p.hit.projectile.kind : undefined, x: p.x + lead, y: p.y, dir: p.dir, ownerId: p.ownerId, aim: !!(p.hit && p.hit.gunnerAim) });
     }
 
     // Visual-only melee event (swing / hit), only for attacks that carry an fxStyle.
