@@ -58,6 +58,7 @@
     keyboard.clearPresses();
     select.active = false;
     renderer.randomTheme(); // new random arena for every match
+    if (MW.BrawlerFx) MW.BrawlerFx.reset();
     setPaused(false);
     mode = "arena";
   }
@@ -146,6 +147,7 @@
       sim.setArena(arena);
       renderer.setArena(arena);
       makeBot(); // same seed again, so a reset really repeats
+      if (MW.BrawlerFx) MW.BrawlerFx.reset();
       renderer.randomTheme();
       if (paused) setPaused(false);
     }
@@ -161,6 +163,9 @@
       makeBot();
     }
 
+    // hit-stop: a heavy Brawler hit freezes the game a few ticks. Inputs are not polled meanwhile,
+    // so presses made during the freeze are still there afterwards.
+    if (MW.BrawlerFx && MW.BrawlerFx.freezeStep()) return;
     sim.step([pollP1(), bot(sim, 1)]);
   }
 

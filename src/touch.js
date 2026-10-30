@@ -21,12 +21,12 @@
 
     /* joystick: small, glassy */
     .mw-stick { position: absolute; left: calc(22px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-      width: 104px; height: 104px; border-radius: 50%; pointer-events: auto;
+      width: 240px; height: 240px; border-radius: 50%; pointer-events: auto;
       background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 100%);
       border: 2px solid rgba(255,255,255,0.28);
       box-shadow: inset 0 0 18px rgba(127,216,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
       backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-    .mw-knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px;
+    .mw-knob { position: absolute; left: 50%; top: 50%; width: 110px; height: 110px; margin: -55px 0 0 -55px;
       border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), rgba(160,200,255,0.5));
       border: 2px solid rgba(255,255,255,0.75); box-shadow: 0 2px 10px rgba(0,0,0,0.45), 0 0 12px rgba(127,216,255,0.45); }
 

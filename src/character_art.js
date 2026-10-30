@@ -19,16 +19,16 @@
 
   // Palettes: main, dark, light, accent + skin/hair/misc.
   const PAL = {
-    fighter: { main: "#2f7bff", dark: "#1b4fb8", light: "#8fc0ff", accent: "#ffcf3a", skin: "#e8b48a", hair: "#2a1a12", pants: "#1c3f9e", boot: "#f2f2f2", glove: "#2f7bff", gloveDark: "#1b4fb8", tape: "#f4efe2", bruise: "#4a2a52" },
-    mage: { main: "#8c52ff", dark: "#4b2a96", light: "#c3a0ff", accent: "#ffd479", skin: "#f3d4b8", hair: "#e8e8f5", pants: "#3a2370", boot: "#2a1a55", glow: "#d6b8ff" },
+    fighter: { main: "#c98a3a", dark: "#5c3f1f", light: "#e8a85a", accent: "#d9611a", skin: "#c98d64", skinDark: "#8f5a3b", skinLight: "#e3ae84", hair: "#1d1714", pants: "#232226", pantsDark: "#141316", boot: "#2b221b", iron: "#5a5d64", ironDark: "#2f3136", bronze: "#8a6234", bronzeDark: "#53391c", bronzeLight: "#bd8f4c", leather: "#3b2a1e", energy: "#d9611a", energyHi: "#f0a64a", scar: "#ecc7a6" },
+    mage: { main: "#0c0a14", dark: "#07050d", light: "#b44bff", accent: "#e6bcff", skin: "#171229", hair: "#0c0a14", pants: "#0c0a14", boot: "#0c0a14", glow: "#b44bff" },
     assassin: { main: "#2a2d3a", dark: "#10121a", light: "#ff6b82", accent: "#ff2a45", skin: "#2b2230", hair: "#0f0f15", pants: "#181b26", boot: "#0c0d12", scarf: "#e4203f", scarfDark: "#8f1228", steel: "#e6ecf8", wrap: "#555c72", strap: "#5b2a2e" },
     hitter: { main: "#ff7a3d", dark: "#b8431a", light: "#ffb48a", accent: "#ffd24a", skin: "#e9b98f", hair: "#3a2414", pants: "#2f3a5a", boot: "#5a3a22", shirt: "#efe3cc", hat: "#8a5428", hatDark: "#4e2e14", band: "#d6342f", metal: "#aeb4c2", wood: "#6a3a1a" },
     tank: { main: "#7d8aa0", dark: "#454f62", light: "#c8d2e2", accent: "#f2b84b", skin: "#c9a98a", hair: "#303642", pants: "#3b4252", boot: "#2e3442", glow: "#ff7a2a", glowHi: "#ffd9a0" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
   const BUILD = {
-    fighter: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.72, hw: 0.52, lw: 0.22, aw: 0.19, arm: 0.33, stride: 0.45 },
-    mage: { leg: 0.36, tor: 0.33, hr: 0.115, sw: 0.66, hw: 0.56, lw: 0.17, aw: 0.15, arm: 0.32, stride: 0.30 },
+    fighter: { leg: 0.40, tor: 0.31, hr: 0.125, sw: 0.92, hw: 0.56, lw: 0.25, aw: 0.245, arm: 0.34, stride: 0.45 }, // heavyweight: wide shoulders, thick limbs
+    mage: { leg: 0.40, tor: 0.33, hr: 0.10, sw: 0.58, hw: 0.42, lw: 0.15, aw: 0.105, arm: 0.40, stride: 0.34 },
     assassin: { leg: 0.43, tor: 0.27, hr: 0.105, sw: 0.66, hw: 0.46, lw: 0.21, aw: 0.17, arm: 0.34, stride: 0.55 },
     hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.19, arm: 0.32, stride: 0.42 },
     tank: { leg: 0.36, tor: 0.33, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
@@ -40,15 +40,16 @@
       { wind: kf([-0.35, 0.35], [0.2, 0.6], -0.12, -3, 0.01), strike: kf([1.05, -0.02], [0.1, 0.6], 0.22, 7, 0.02) },
       { wind: kf([-0.1, 0.7], [0.1, 0.5], -0.14, -3, 0.03), strike: kf([1.0, 0.3], [0.1, 0.5], 0.3, 9, 0.05) },
       { wind: kf([-0.2, -0.95], [-0.05, -0.9], -0.32, -5, 0), strike: kf([0.85, 0.6], [0.8, 0.55], 0.48, 11, 0.07) },
-      // 4 = Power Strike (skill 1): deep crouch + fist pulled far back, then a long lunging straight
+      // 3 = Power Strike (skill 1): deep crouch + fist pulled far back, then a long lunging straight
       { wind: kf([-0.6, 0.3], [0.25, 0.5], -0.34, -7, 0.07), strike: kf([1.25, 0.0], [0.0, 0.6], 0.52, 15, 0.1) },
-      // 5 = Fist Rush (skill 2): body already leaning into the dash, fist cocked low, then a flat straight punch
+      // 4 = Fist Rush (skill 2): body already leaning into the dash, fist cocked low, then a flat straight punch
       { wind: kf([0.0, 0.25], [0.35, 0.45], 0.4, 6, 0.05), strike: kf([1.22, -0.04], [-0.1, 0.55], 0.6, 14, 0.09) },
-      // 6 = Rising Fist (skill 3): low crouching wind-up, then a vertical-lift punch
+      // 5 = Rising Fist (skill 3): low crouching wind-up, then a vertical-lift punch
       { wind: kf([-0.2, 0.8], [0.2, 0.6], -0.25, -4, 0.08), strike: kf([0.8, -0.7], [0.1, 0.6], 0.4, 10, 0.05) },
-      // 7 = Iron Guard (skill 4): brace pose
-      { wind: kf([-0.1, 0.4], [0.1, 0.6], -0.05, -1, 0.04), strike: kf([0.1, 0.5], [-0.1, 0.7], 0.0, 0, 0.02) },
-      // 8 = Meteor Breaker (ultimate): long, heavy wind-up, then a massive forward slam
+      // 6 = Iron Guard (skill 4): brace pose
+      // both gloves up in front of the face, braced low; the pose is held for the whole guard (no punch)
+      { wind: kf([0.5, -0.46], [0.36, -0.4], -0.02, 0, 0.06), strike: kf([0.5, -0.46], [0.36, -0.4], -0.02, 0, 0.07) },
+      // 7 = Meteor Breaker (ultimate): long, heavy wind-up, then a massive forward slam
       { wind: kf([-0.8, 0.2], [0.3, 0.7], -0.4, -10, 0.12), strike: kf([1.4, 0.0], [-0.2, 0.7], 0.7, 20, 0.15) },
     ],
     assassin: [
@@ -210,7 +211,7 @@
       let key = seq.length > 1 ? (id === "fighter" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
         t = ease(clamp(1 - f.stateTimer / Math.max(1, f.hit.startup), 0, 1)); a = guard; b = K.wind;
@@ -222,7 +223,7 @@
       fh = [lerp(a.fh[0], b.fh[0], t), lerp(a.fh[1], b.fh[1], t)];
       bh = [lerp(a.bh[0], b.bh[0], t), lerp(a.bh[1], b.bh[1], t)];
       lean = lerp(a.lean, b.lean, t); lunge = lerp(a.lunge, b.lunge, t); crouch = lerp(a.crouch, b.crouch, t) * H;
-      if (st === S.ATTACK_ACTIVE) { sx = 1.06; sy = 0.96; }
+      if (st === S.ATTACK_ACTIVE && f.hit.id !== "iron_guard") { sx = 1.06; sy = 0.96; }
       if (airborne) { ff = [Wd * 0.25, -H * 0.1]; bf = [-Wd * 0.2, -H * 0.05]; }
       else { ff = [Wd * 0.3 + lunge * 0.6, 0]; bf = [-Wd * 0.28, 0]; }
     } else if (airborne) {
@@ -231,6 +232,7 @@
       ff = rising ? [Wd * 0.34, -H * 0.2] : [Wd * 0.2, -H * 0.06];
       bf = rising ? [-Wd * 0.1, -H * 0.1] : [-Wd * 0.22, -H * 0.04];
       fh = rising ? [0.7, -0.5] : [0.55, -0.6]; bh = rising ? [-0.3, -0.4] : [-0.15, -0.65];
+      if (id === "fighter") { fh = rising ? [0.72, -0.3] : [0.58, -0.05]; bh = rising ? [0.4, -0.2] : [0.3, 0.1]; } // fists stay up in a guard while jumping
       sy = 1 + 0.08 * A.jump + (rising ? 0.02 : 0.03); sx = 1 - 0.05 * A.jump;
     } else if (st === S.RUN && vxa > 0.4) {
       const sp = clamp(vxa / (s.runSpeed || 5), 0, 1.3);
@@ -246,16 +248,32 @@
       ff = foot(ph); bf = foot(ph + Math.PI);
       const sw1 = Math.sin(ph + Math.PI), sw2 = Math.sin(ph);
       fh = [sw1 * 0.72, 0.66 - 0.2 * Math.abs(sw1)]; bh = [sw2 * 0.72, 0.66 - 0.2 * Math.abs(sw2)];
-      if (id === "mage") fh = [0.5, 0.5 + Math.abs(sw1) * 0.06]; // staff hand stays steady
+      if (id === "mage") { fh = [0.25 + sw1 * 0.4, 0.66 - 0.2 * Math.abs(sw1)]; bh = [0.05 + sw2 * 0.4, 0.7 - 0.2 * Math.abs(sw2)]; } // long arms, small swing
+      if (id === "fighter") { fh = [0.5 + sw1 * 0.26, 0.14 + 0.1 * (1 - Math.abs(sw1))]; bh = [0.3 + sw2 * 0.22, 0.24 + 0.1 * (1 - Math.abs(sw2))]; lean += 0.04; } // guard up, fists pump with each step
     } else {
       bob = idle * H * 0.008;
       crouch = H * 0.012 * (1 + idle);
       fh = [0.45 + idle * 0.03, 0.55 + idle * 0.05]; bh = [0.12, 0.7 - idle * 0.04];
       tilt = idle * 0.02;
+      if (id === "fighter") { // heavyweight stance: planted, gauntlets raised at chest height, slow breathing
+        const pump = Math.sin(now * 2.6);
+        fh = [0.66 + 0.02 * pump, 0.14 + 0.03 * idle]; bh = [0.36 - 0.02 * pump, 0.27 - 0.02 * idle];
+        bob = idle * H * 0.008; crouch = H * 0.02; lean = 0.1; tilt = idle * 0.02;
+        ff = [Wd * 0.22, 0]; bf = [-Wd * 0.26, 0]; // wider stance
+      }
     }
     if (A.land > 0 && !attacking && !stunned) {
       crouch += A.land * H * 0.09; sx *= 1 + 0.14 * A.land; sy *= 1 - 0.13 * A.land;
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
+    }
+
+    if (id === "fighter") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+      if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
+      else {
+        A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
+        A.sbh = [lerp(A.sbh[0], bh[0], 0.3), lerp(A.sbh[1], bh[1], 0.3)];
+        fh = A.sfh.slice(); bh = A.sbh.slice();
+      }
     }
 
     // --- joints (local space) ---
@@ -349,6 +367,411 @@
     ctx.fill();
   }
 
+  // ───────────── VANGUARD (id "fighter") ─────────────
+  // Bare-chested gladiator-brawler. Heavy engraved gauntlets with kinetic energy channels,
+  // one asymmetrical pauldron, dark combat trousers, layered waist cloth, heavy boots.
+  // His power is physical: energy gathers at the knuckles on wind-up and shows as ripples on impact.
+  // Gradients fall back to a flat colour if the context cannot make one (test mocks, odd browsers).
+  function gradFill(g, stops) {
+    if (!g || typeof g.addColorStop !== "function") return stops[Math.min(stops.length - 1, stops.length >> 1)][1];
+    for (const s of stops) g.addColorStop(s[0], s[1]);
+    return g;
+  }
+  function rr(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  // Two-segment limb with a taper (thigh wider than shin). Outlines first so the knee has no seam.
+  function taperLimb(ctx, pts, w1, w2, color) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const [a, b, w] of [[pts[0], pts[1], w1], [pts[1], pts[2], w2]]) {
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+      ctx.strokeStyle = OUT; ctx.lineWidth = w + 4; ctx.stroke();
+    }
+    for (const [a, b, w] of [[pts[0], pts[1], w1], [pts[1], pts[2], w2]]) {
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke();
+    }
+  }
+
+  function vanguard(k, e) {
+    const { ctx, M, d, P, col, hr, A, f, now, isFlash, st } = k;
+    const S = MW.STATE;
+    const { shW, hipW, hcw, armBw, armFw, strike, attackingNow, stunned } = e;
+    const heat = f._heat || 0;
+    const blocking = !!(f.hit && f.hit.id === "iron_guard" && attackingNow);
+    const heavy = !!(f.hit && (f.hit.isSkill || f.chainIndex === 2));
+    const charge = st === S.ATTACK_STARTUP ? e.windU * (heavy ? 1 : 0.5) : 0; // 0..1 energy gathering at the knuckles
+    const energy = clamp(0.3 + 0.45 * heat + 0.5 * charge + (strike ? 0.55 : 0) + (blocking ? 0.3 : 0), 0, 1.3);
+    const lin = (x0, y0, x1, y1, stops) => {
+      if (isFlash) return "#fff";
+      return gradFill(ctx.createLinearGradient(x0, y0, x1, y1), stops);
+    };
+    const line = (a, b) => { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); };
+
+    // ── torso axis: T(t, s) = point t of the way from shoulders to hips, s px toward the front ──
+    const sh = shW, hp = hipW;
+    let ux = hp[0] - sh[0], uy = hp[1] - sh[1];
+    const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+    let nx = -uy, ny = ux;
+    if (nx * d < 0) { nx = -nx; ny = -ny; } // n points toward the facing side
+    const T = (t, s) => [sh[0] + ux * ul * t + nx * s, sh[1] + uy * ul * t + ny * s];
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+    // ── gauntlet: engraved iron sleeve + knuckle block; the front one carries a mechanical reinforcement ──
+    const gauntlet = (pt, elbow, mech, power) => {
+      const dx = pt[0] - elbow[0], dy = pt[1] - elbow[1];
+      const len = Math.hypot(dx, dy) || 1, ang = Math.atan2(dy, dx);
+      const r = k.aw * 0.78;
+      const x0 = -len * 0.98;
+      ctx.save();
+      ctx.translate(pt[0], pt[1]); ctx.rotate(ang);
+      ctx.scale(1 + power * 0.12, d * (1 - power * 0.05));
+      // sleeve over the forearm
+      ctx.beginPath(); ctx.moveTo(x0, -r * 0.86); ctx.lineTo(-r * 0.15, -r * 1.04); ctx.lineTo(-r * 0.15, r * 1.04); ctx.lineTo(x0, r * 0.86); ctx.closePath();
+      fillOut(ctx, lin(0, -r, 0, r, [[0, "#80838a"], [0.4, P.iron], [1, P.ironDark]]), 2.2);
+      // elbow cuff (dark bronze) with a worn highlight
+      rr(ctx, x0 - 0.5, -r * 1.0, len * 0.17, r * 2.0, 1.6);
+      fillOut(ctx, lin(0, -r, 0, r, [[0, P.bronzeLight], [0.5, P.bronze], [1, P.bronzeDark]]), 2);
+      // panel seams
+      if (!isFlash) {
+        ctx.lineCap = "butt";
+        for (const u of [0.4, 0.64]) {
+          const x = x0 + len * u;
+          ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, -r * 0.96); ctx.lineTo(x, r * 0.96); ctx.stroke();
+          ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 1.3, -r * 0.94); ctx.lineTo(x + 1.3, r * 0.94); ctx.stroke();
+        }
+        // ancient engravings: zig-zag band and rune ticks
+        ctx.strokeStyle = P.bronzeLight; ctx.globalAlpha = 0.8; ctx.lineWidth = 1; ctx.lineJoin = "miter";
+        ctx.beginPath();
+        const zs = len * 0.07;
+        for (let i = 0, x = x0 + len * 0.22; x < x0 + len * 0.56; i++, x += zs) ctx.lineTo(x, i % 2 ? r * 0.17 : -r * 0.17);
+        ctx.stroke();
+        ctx.beginPath();
+        for (const sgn of [-1, 1]) for (const u of [0.28, 0.34, 0.5]) { const x = x0 + len * u; ctx.moveTo(x, sgn * r * 0.7); ctx.lineTo(x + 1.4, sgn * r * 0.84); }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // kinetic energy channels running up the forearm into the knuckle block
+        const ea = clamp(0.5 + 0.5 * energy, 0, 1);
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.shadowColor = P.energy; ctx.shadowBlur = 5 + 7 * energy;
+        ctx.strokeStyle = energy > 0.95 ? P.energyHi : P.energy; ctx.globalAlpha = ea; ctx.lineWidth = 1.7;
+        for (const sgn of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(x0 + len * 0.16, sgn * r * 0.55);
+          ctx.lineTo(x0 + len * 0.7, sgn * r * 0.55);
+          ctx.lineTo(-r * 0.15, sgn * r * 0.3);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      // mechanical reinforcement: bronze piston rail, linkage gear and hose
+      if (mech) {
+        rr(ctx, x0 + len * 0.1, -r * 1.42, len * 0.62, r * 0.4, r * 0.18);
+        fillOut(ctx, lin(0, -r * 1.42, 0, -r * 1.02, [[0, P.bronzeLight], [0.55, P.bronze], [1, P.bronzeDark]]), 1.8);
+        ctx.fillStyle = P.bronzeDark;
+        for (const u of [0.22, 0.4, 0.58]) ctx.fillRect(x0 + len * u, -r * 1.42, 1.2, r * 0.4);
+        for (const u of [0.18, 0.66]) { rr(ctx, x0 + len * u, -r * 1.06, 2.4, r * 0.2, 0.6); fillOut(ctx, col(P.ironDark), 1.2); }
+        ctx.beginPath(); ctx.arc(x0 + len * 0.5, r * 0.5, r * 0.34, 0, 7); fillOut(ctx, col(P.bronze), 1.8);
+        if (!isFlash) {
+          ctx.save(); ctx.translate(x0 + len * 0.5, r * 0.5); ctx.rotate(now * 1.2 * (0.4 + energy));
+          ctx.strokeStyle = P.bronzeDark; ctx.lineWidth = 1.3;
+          ctx.beginPath(); for (let i = 0; i < 3; i++) { const a = (i * Math.PI) / 3; ctx.moveTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3); ctx.lineTo(-Math.cos(a) * r * 0.3, -Math.sin(a) * r * 0.3); }
+          ctx.stroke(); ctx.restore();
+        }
+        ctx.beginPath(); ctx.arc(x0 + len * 0.5, r * 0.5, r * 0.11, 0, 7); ctx.fillStyle = isFlash ? "#fff" : P.energyHi; ctx.fill();
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x0 + len * 0.72, -r * 1.24); ctx.quadraticCurveTo(-r * 0.2, -r * 1.7, r * 0.3, -r * 1.06); ctx.stroke();
+        ctx.strokeStyle = isFlash ? "#fff" : "#4a3f36"; ctx.lineWidth = 1; ctx.stroke();
+      }
+      // knuckle block
+      rr(ctx, -r * 0.5, -r * 1.12, r * 1.85, r * 2.24, r * 0.45);
+      fillOut(ctx, lin(0, -r * 1.1, 0, r * 1.1, [[0, "#4b4e55"], [1, "#25272c"]]), 2.4);
+      if (!isFlash) {
+        ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 1; ctx.beginPath(); line([-r * 0.2, -r * 0.36], [r * 0.7, -r * 0.36]); line([-r * 0.2, r * 0.36], [r * 0.7, r * 0.36]); ctx.stroke(); // finger separations
+      }
+      rr(ctx, r * 0.66, -r * 1.04, r * 0.66, r * 2.08, r * 0.22); // reinforced knuckle plate
+      fillOut(ctx, lin(r * 0.66, 0, r * 1.32, 0, [[0, P.bronzeLight], [1, P.bronzeDark]]), 2);
+      ctx.fillStyle = col(P.bronzeLight);
+      for (const sy of [-0.62, 0, 0.62]) { ctx.beginPath(); ctx.arc(r * 1.04, sy * r, r * 0.17, 0, 7); fillOut(ctx, col(P.bronzeLight), 1.2); }
+      ctx.beginPath(); ctx.ellipse(r * 0.1, -r * 1.03, r * 0.52, r * 0.26, -0.08, 0, 7); fillOut(ctx, col("#6b6e75"), 1.8); // thumb guard
+      // energy source in the wrist plate
+      if (!isFlash) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const cxn = -r * 0.1, rad = r * (0.55 + 0.35 * energy);
+        ctx.fillStyle = gradFill(ctx.createRadialGradient(cxn, 0, 0.5, cxn, 0, rad), [[0, "rgba(255,200,110," + (0.55 * energy).toFixed(3) + ")"], [1, "rgba(217,97,26,0)"]]); ctx.beginPath(); ctx.arc(cxn, 0, rad, 0, 7); ctx.fill();
+        // glow gathering around the knuckles
+        const kr = r * (1.0 + 1.9 * charge + 0.7 * energy + (strike ? 0.8 : 0));
+        ctx.fillStyle = gradFill(ctx.createRadialGradient(r * 1.3, 0, 1, r * 1.3, 0, kr), [[0, "rgba(255,214,140," + clamp(0.18 + 0.5 * energy + 0.3 * charge, 0, 0.95).toFixed(3) + ")"], [0.5, "rgba(230,120,40," + (0.22 * energy + 0.2 * charge).toFixed(3) + ")"], [1, "rgba(180,60,10,0)"]]); ctx.beginPath(); ctx.arc(r * 1.3, 0, kr, 0, 7); ctx.fill();
+        // sparks of kinetic energy spiralling in
+        if (charge > 0.05) {
+          ctx.fillStyle = P.energyHi;
+          for (let i = 0; i < 7; i++) {
+            const a = now * 7 + i * 0.9, dist = r * (0.9 + (1 - charge) * 3.4) * (0.75 + 0.25 * Math.sin(i * 2.1 + now * 5));
+            ctx.globalAlpha = 0.35 + 0.6 * charge;
+            ctx.beginPath(); ctx.arc(r * 1.3 + Math.cos(a) * dist, Math.sin(a) * dist * 0.8, 1.1 + 0.8 * charge, 0, 7); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+      return { ang, r };
+    };
+
+    // ── upper arm with a muscle bulge and (front only) a scar ──
+    const upperArm = (pts, scar) => {
+      limb(ctx, [pts[0], pts[1]], k.aw * 1.12, col(P.skin));
+      if (isFlash) return;
+      const m = mid(pts[0], pts[1]);
+      const ang = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]);
+      ctx.save(); ctx.translate(m[0], m[1]); ctx.rotate(ang);
+      ctx.fillStyle = P.skinLight; ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.ellipse(-1, -k.aw * 0.22, k.aw * 0.55, k.aw * 0.28, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      if (scar) { ctx.strokeStyle = P.scar; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(1, -k.aw * 0.5); ctx.lineTo(3.2, k.aw * 0.5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-1.5, -k.aw * 0.2); ctx.lineTo(0, -k.aw * 0.05); ctx.moveTo(-0.5, k.aw * 0.15); ctx.lineTo(1, k.aw * 0.3); ctx.stroke(); }
+      ctx.restore();
+    };
+
+    // ═════ BACK ARM (behind the body) ═════
+    upperArm(armBw, false);
+    gauntlet(armBw[2], armBw[1], false, 0);
+
+    // ═════ CLOTH BEHIND THE LEGS (long dark layer + leather side tail) ═════
+    const vxw = clamp(k.vx || 0, -9, 9), vyw = clamp(k.vy || 0, -8, 8);
+    const wave = Math.sin(now * 2.3) * 1.6;
+    const cloth = (ax, ay, w0, w1, L, sway, fill, trim, tips) => {
+      L -= clamp(vyw * 0.7, -4, 8);
+      const pts = [[ax - w0 / 2, ay], [ax + w0 / 2, ay], [ax + w1 / 2 + sway, ay + L * 0.9]];
+      for (let i = 0; i <= tips; i++) pts.push([ax + sway + (0.5 - i / tips) * w1, ay + L * (i % 2 ? 0.8 : 1)]);
+      pts.push([ax - w1 / 2 + sway, ay + L * 0.9]);
+      poly(ctx, pts);
+      fillOut(ctx, col(fill), 2);
+      if (!isFlash && trim) {
+        ctx.strokeStyle = trim; ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.moveTo(ax - w0 / 2 + sway * 0.1 + 1, ay + L * 0.2); ctx.lineTo(ax + w0 / 2 + sway * 0.1 - 1, ay + L * 0.2); ctx.stroke();
+      }
+    };
+    cloth(hp[0] - d * k.hw * 0.22, hp[1] - 4, k.hw * 0.56, k.hw * 0.62, k.legL * 0.76, -vxw * 1.1 + wave * 1.4, "#2a2320", P.bronzeDark, 4);
+    cloth(hp[0] - d * k.hw * 0.52, hp[1] - 4, 6.5, 6, k.legL * 0.6, -vxw * 1.5 - d * 2 + wave * 2.2, P.leather, null, 2);
+
+    // ═════ LEGS: dark reinforced trousers, knee guards, heavy boots ═════
+    for (const [leg, back] of [[k.legB, true], [k.legF, false]]) {
+      const pts = MP2(leg, M);
+      const ankle = [pts[2][0], pts[2][1] - k.lw * 0.55];
+      taperLimb(ctx, [pts[0], pts[1], ankle], k.lw * 1.08, k.lw * 0.86, col(back ? P.pantsDark : P.pants));
+      if (!isFlash) { // trouser fold / seam highlights
+        ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1] + 3); ctx.lineTo(pts[1][0], pts[1][1]); ctx.stroke();
+      }
+      // knee guard
+      if (!back) {
+        ctx.beginPath(); ctx.arc(pts[1][0] + d * 1.4, pts[1][1], k.lw * 0.36, 0, 7); fillOut(ctx, col(P.iron), 1.8);
+        ctx.beginPath(); ctx.arc(pts[1][0] + d * 1.4, pts[1][1], k.lw * 0.15, 0, 7); fillOut(ctx, col(P.bronze), 1.1);
+      }
+      // boot: tall shaft, big toe box, metal toe cap, strap and cuff
+      const ft = pts[2], kn = pts[1];
+      const sx = ft[0] + (kn[0] - ft[0]) * 0.42, sy = ft[1] + (kn[1] - ft[1]) * 0.42; // top of the boot shaft
+      limb(ctx, [[sx, sy], [ft[0], ft[1] - k.lw * 0.62]], k.lw * 0.9, col(back ? shade(P.boot, -25) : P.boot));
+      const bl = k.lw * 1.3;
+      ctx.beginPath(); ctx.ellipse(ft[0] + d * bl * 0.26, ft[1] - k.lw * 0.3, bl * 0.58, k.lw * 0.42, 0, 0, 7); fillOut(ctx, col(back ? shade(P.boot, -25) : P.boot), 2);
+      ctx.beginPath(); ctx.ellipse(ft[0] + d * bl * 0.66, ft[1] - k.lw * 0.28, bl * 0.18, k.lw * 0.34, 0, 0, 7); fillOut(ctx, col(back ? P.ironDark : P.iron), 1.6);
+      ctx.beginPath(); ctx.moveTo(sx - k.lw * 0.46, sy - 0.5); ctx.lineTo(sx + k.lw * 0.46, sy + 0.5); ctx.strokeStyle = OUT; ctx.lineWidth = 4.4; ctx.stroke();
+      ctx.strokeStyle = col(P.bronze); ctx.lineWidth = 2.2; ctx.stroke(); // bronze cuff band
+      if (!isFlash) { ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(ft[0] - d * bl * 0.3, ft[1] - 1.4); ctx.lineTo(ft[0] + d * bl * 0.78, ft[1] - 1.4); ctx.stroke(); } // sole
+    }
+
+    // ═════ PELVIS (trousers) ═════
+    const hy = hp[1];
+    poly(ctx, [[hp[0] - k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.68, hy + k.legL * 0.17], [hp[0] - k.hw * 0.68, hy + k.legL * 0.17]]);
+    fillOut(ctx, lin(hp[0] - k.hw * 0.6, 0, hp[0] + k.hw * 0.6, 0, [[0, P.pantsDark], [0.6, P.pants], [1, "#2d2c31"]]), 2);
+
+    // ═════ NECK + TORSO (bare chest) ═════
+    limb(ctx, [[sh[0], sh[1] - 3], [hcw[0], hcw[1] + hr * 0.5]], hr * 1.2, col(shade(P.skin, -8)));
+    const wT = k.sw * 0.5, wM = k.sw * 0.47, wB = k.hw * 0.5;
+    const tp = [T(-0.14, -wT * 0.4), T(0.03, -wT * 1.02), T(0.34, -wM), T(1.0, -wB), T(1.0, wB), T(0.34, wM), T(0.03, wT * 1.02), T(-0.14, wT * 0.4)];
+    const torso = () => {
+      ctx.beginPath();
+      const m0 = mid(tp[7], tp[0]);
+      ctx.moveTo(m0[0], m0[1]);
+      for (let i = 0; i < 8; i++) { const m1 = mid(tp[i], tp[(i + 1) % 8]); ctx.quadraticCurveTo(tp[i][0], tp[i][1], m1[0], m1[1]); }
+      ctx.closePath();
+    };
+    torso();
+    const bk = T(0.5, -wM), fr = T(0.5, wM);
+    fillOut(ctx, lin(bk[0], bk[1], fr[0], fr[1], [[0, P.skinDark], [0.45, P.skin], [0.8, P.skinLight], [1, P.skin]]), 2.6);
+    if (!isFlash) {
+      ctx.save();
+      torso(); ctx.clip();
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      // pecs, sternum, abs, obliques
+      ctx.strokeStyle = "rgba(92,46,28,0.75)"; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const sg of [-1, 1]) {
+        const a = T(0.3, sg * 1.2), b = T(0.4, sg * wM * 0.55), c = T(0.2, sg * wM * 0.92);
+        ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(b[0], b[1], c[0], c[1]);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 1.1; ctx.strokeStyle = "rgba(92,46,28,0.55)";
+      ctx.beginPath();
+      line(T(0.07, 0), T(0.3, 0)); line(T(0.4, 0), T(0.98, 0)); // sternum + linea alba
+      for (const t of [0.52, 0.67, 0.82]) { line(T(t, -wB * 0.5), T(t, -1.5)); line(T(t, 1.5), T(t, wB * 0.5)); }
+      ctx.stroke();
+      // light on the front pec, shade under the pecs and at the waist
+      ctx.fillStyle = P.skinLight; ctx.globalAlpha = 0.22;
+      const hl = T(0.18, wM * 0.38); ctx.beginPath(); ctx.ellipse(hl[0], hl[1], wM * 0.3, ul * 0.14, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#4a2414"; ctx.globalAlpha = 0.16;
+      const ps = T(0.4, 0); ctx.beginPath(); ctx.ellipse(ps[0], ps[1], wM * 0.8, ul * 0.05, 0, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      // battle scars: pale ridges with stitch marks
+      const scar = (a, b, w) => {
+        ctx.strokeStyle = "rgba(70,30,20,0.55)"; ctx.lineWidth = w + 1.2; ctx.beginPath(); line(a, b); ctx.stroke();
+        ctx.strokeStyle = "rgba(240,200,165,0.95)"; ctx.lineWidth = w; ctx.beginPath(); line(a, b); ctx.stroke();
+        const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+        ctx.lineWidth = 0.9; ctx.beginPath();
+        for (let i = 1; i <= 3; i++) { const p = [a[0] + dx * (i / 4), a[1] + dy * (i / 4)]; ctx.moveTo(p[0] - dy / l * 2.2, p[1] + dx / l * 2.2); ctx.lineTo(p[0] + dy / l * 2.2, p[1] - dx / l * 2.2); }
+        ctx.stroke();
+      };
+      scar(T(0.1, -wM * 0.7), T(0.56, wM * 0.3), 1.5);
+      scar(T(0.66, wM * 0.35), T(0.92, wM * 0.78), 1.3);
+      scar(T(0.5, -wM * 0.78), T(0.68, -wM * 0.46), 1.2);
+      ctx.restore();
+    }
+
+    // ═════ BELT, BUCKLE, FRONT CLOTH ═════
+    const bw = k.hw * 1.22;
+    rr(ctx, hp[0] - bw / 2, hy - 11.5, bw, 9, 1.8);
+    fillOut(ctx, lin(0, hy - 11, 0, hy - 3, [[0, "#4a3526"], [1, "#241a13"]]), 2);
+    ctx.fillStyle = col(P.bronzeLight);
+    for (const u of [-0.42, -0.26, 0.26, 0.42]) { ctx.beginPath(); ctx.arc(hp[0] + u * bw, hy - 7, 1.3, 0, 7); ctx.fill(); }
+    rr(ctx, hp[0] - 6.5 + d * 1, hy - 13, 13, 12.5, 2.2); // buckle plate
+    fillOut(ctx, lin(0, hy - 13, 0, hy, [[0, P.bronzeLight], [0.6, P.bronze], [1, P.bronzeDark]]), 2);
+    if (!isFlash) {
+      ctx.strokeStyle = P.bronzeDark; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(hp[0] + d * 1 - 3.4, hy - 9); ctx.lineTo(hp[0] + d * 1 + 3.4, hy - 9); ctx.moveTo(hp[0] + d * 1, hy - 11.5); ctx.lineTo(hp[0] + d * 1, hy - 2.5); ctx.stroke();
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = gradFill(ctx.createRadialGradient(hp[0] + d, hy - 6.5, 0, hp[0] + d, hy - 6.5, 6), [[0, "rgba(255,170,70," + (0.5 * energy).toFixed(3) + ")"], [1, "rgba(217,97,26,0)"]]); ctx.beginPath(); ctx.arc(hp[0] + d, hy - 6.5, 6, 0, 7); ctx.fill(); ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(hp[0] + d * 1, hy - 6.5, 1.9, 0, 7); ctx.fillStyle = isFlash ? "#fff" : P.energyHi; ctx.fill();
+    // front layers of cloth: dark trouser flap with bronze hem, plus a short leather tassel
+    cloth(hp[0] + d * k.hw * 0.26, hy - 2, k.hw * 0.5, k.hw * 0.56, k.legL * 0.52, -vxw * 0.9 + wave, "#1d1c20", P.bronze, 3);
+
+    // ═════ HEAD ═════
+    const hx = hcw[0], hyy = hcw[1];
+    circle(ctx, hx - d * hr * 0.05, hyy, hr, col(P.skin), 2.4); // cranium
+    ctx.beginPath(); ctx.ellipse(hx + d * hr * 0.28, hyy + hr * 0.42, hr * 0.78, hr * 0.62, 0, 0, 7); fillOut(ctx, col(P.skin), 2.4); // heavy jaw
+    ctx.fillStyle = col(P.skin); // fill over the cranium/jaw seam so the head reads as one shape
+    ctx.beginPath(); ctx.arc(hx - d * hr * 0.05, hyy, hr - 1.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx + d * hr * 0.28, hyy + hr * 0.42, hr * 0.78 - 1.2, hr * 0.62 - 1.2, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx - d * hr * 0.8, hyy + hr * 0.2, hr * 0.15, hr * 0.26, 0, 0, 7); fillOut(ctx, col(shade(P.skin, -16)), 1); // ear
+    if (!isFlash) { // stubble shadow over the jaw
+      ctx.fillStyle = P.hair; ctx.globalAlpha = 0.28;
+      ctx.beginPath(); ctx.ellipse(hx + d * hr * 0.3, hyy + hr * 0.56, hr * 0.7, hr * 0.38, 0, 0, Math.PI); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    // short rugged hair with a ragged top edge
+    {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) { const a = Math.PI * (1.04 + (0.92 * i) / 8), rr0 = hr * (1.06 + (i % 2 ? 0.16 : 0)); pts.push([hx - d * hr * 0.05 + Math.cos(a) * rr0, hyy - hr * 0.08 + Math.sin(a) * rr0 * 0.98]); }
+      pts.push([hx + d * hr * 0.78, hyy - hr * 0.34], [hx + d * hr * 0.3, hyy - hr * 0.5], [hx - d * hr * 0.4, hyy - hr * 0.3], [hx - d * hr * 0.95, hyy - hr * 0.1]);
+      poly(ctx, pts); fillOut(ctx, col(P.hair), 2);
+      if (!isFlash) { // cropped strands
+        ctx.strokeStyle = "#3d322b"; ctx.lineWidth = 1; ctx.lineCap = "round"; ctx.beginPath();
+        for (let i = 0; i < 6; i++) { const a = Math.PI * (1.18 + i * 0.12), r0 = hr * 0.72, r1 = hr * 1.0; ctx.moveTo(hx - d * hr * 0.05 + Math.cos(a) * r0, hyy - hr * 0.08 + Math.sin(a) * r0); ctx.lineTo(hx - d * hr * 0.05 + Math.cos(a + 0.08) * r1, hyy - hr * 0.08 + Math.sin(a + 0.08) * r1); }
+        ctx.stroke();
+      }
+    }
+    const ex = hx + d * hr * 0.48, ey = hyy + hr * 0.1;
+    // eye, heavy brow, scar through the brow and cheek, nose, hard mouth
+    if (stunned) { ctx.strokeStyle = "#1a0f0c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex - hr * 0.22, ey - hr * 0.1); ctx.lineTo(ex + hr * 0.22, ey + hr * 0.1); ctx.moveTo(ex - hr * 0.22, ey + hr * 0.1); ctx.lineTo(ex + hr * 0.22, ey - hr * 0.1); ctx.stroke(); }
+    else {
+      ctx.fillStyle = col("#f1e6d6"); ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.24, hr * 0.17, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = isFlash ? "#fff" : (energy > 0.9 ? "#f0a64a" : "#2a1a10"); ctx.beginPath(); ctx.arc(ex + d * hr * 0.07, ey, hr * 0.12, 0, 7); ctx.fill();
+    }
+    ctx.strokeStyle = isFlash ? "#fff" : "#140d0a"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(ex - hr * 0.42, ey - hr * 0.5); ctx.lineTo(ex + hr * 0.38, ey - hr * 0.2); ctx.stroke(); // furrowed brow
+    if (!isFlash) {
+      ctx.strokeStyle = P.scar; ctx.lineWidth = 1.05; ctx.beginPath(); ctx.moveTo(ex - d * hr * 0.32, ey - hr * 0.6); ctx.quadraticCurveTo(ex - d * hr * 0.1, ey, ex - d * hr * 0.28, ey + hr * 0.6); ctx.stroke();
+      ctx.strokeStyle = "#7a4a30"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(hx + d * hr * 0.42, hyy + hr * 0.68); ctx.lineTo(hx + d * hr * 0.88, hyy + hr * 0.62); ctx.lineTo(hx + d * hr * 0.98, hyy + hr * 0.52); ctx.stroke(); // confident half-smirk
+    }
+    const nx0 = hx + d * hr * 0.96, ny0 = hyy + hr * 0.28;
+    ctx.beginPath(); ctx.moveTo(nx0 - d * hr * 0.2, ny0 - hr * 0.3); ctx.quadraticCurveTo(nx0 + d * hr * 0.3, ny0 - hr * 0.1, nx0 + d * hr * 0.12, ny0 + hr * 0.16); ctx.lineTo(nx0 - d * hr * 0.2, ny0 + hr * 0.2); ctx.closePath(); fillOut(ctx, col(shade(P.skin, -6)), 1.2);
+
+    // ═════ FRONT ARM, PAULDRON, GAUNTLET ═════
+    upperArm(armFw, true);
+    const shF = M(k.shF);
+    {
+      // one asymmetrical pauldron: three overlapping plates over the front shoulder (the back shoulder stays bare)
+      const pw = k.aw * 0.86, ph = k.aw * 0.46;
+      for (let i = 2; i >= 0; i--) {
+        ctx.save();
+        ctx.translate(shF[0] + d * (0.8 - i * 0.5), shF[1] - 2.2 + i * ph * 0.7);
+        ctx.rotate(-d * 0.28);
+        ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12), ph, 0, 0, 7);
+        fillOut(ctx, lin(0, -ph, 0, ph, [[0, i === 0 ? "#6d7077" : "#54575e"], [1, "#2b2d32"]]), 2);
+        if (!isFlash) { ctx.strokeStyle = P.bronze; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12) - 1, ph - 1, 0, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke(); }
+        ctx.restore();
+      }
+      ctx.beginPath(); ctx.arc(shF[0] - d * 0.4, shF[1] - 3.4, 1.2, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
+      ctx.beginPath(); ctx.arc(shF[0] + d * 4.2, shF[1] - 2.4, 1, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
+    }
+    const G = gauntlet(armFw[2], armFw[1], true, strike && !blocking ? 1 : 0);
+    // knuckle anchors used by brawler_fx.js (glow, embers, ghosts)
+    A.fist = [A.ox + armFw[2][0] + Math.cos(G.ang) * G.r * 0.9, A.oy + armFw[2][1] + Math.sin(G.ang) * G.r * 0.9];
+    A.fistB = [A.ox + armBw[2][0], A.oy + armBw[2][1]];
+
+    // ═════ Iron Guard: a kinetic energy barrier (no equipment) held out from the gauntlets ═════
+    if (blocking) {
+      const g = armFw[2];
+      const prog = st === S.ATTACK_STARTUP ? clamp(1 - f.stateTimer / Math.max(1, f.hit.startup), 0, 1) : st === S.ATTACK_RECOVERY ? clamp(f.stateTimer / Math.max(1, f.hit.recovery), 0, 1) : 1;
+      const R = k.H * 0.3 * (0.5 + 0.5 * prog);
+      const cx0 = g[0] + d * R * 0.55, cy0 = g[1] - k.H * 0.02;
+      const pulse = 0.8 + 0.2 * Math.sin(now * 16);
+      const hex = (rad, ph) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = ph + (i * Math.PI) / 3; const x = cx0 + Math.cos(a) * rad * 0.62, y = cy0 + Math.sin(a) * rad; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); };
+      ctx.save();
+      ctx.globalAlpha = (0.3 + 0.7 * prog) * (isFlash ? 1 : 1);
+      hex(R, Math.PI / 6);
+      ctx.fillStyle = isFlash ? "#fff" : "rgba(217,97,26," + (0.2 * pulse).toFixed(3) + ")"; ctx.fill();
+      ctx.shadowColor = P.energy; ctx.shadowBlur = isFlash ? 0 : 14;
+      ctx.strokeStyle = isFlash ? "#fff" : P.energyHi; ctx.lineWidth = 3 * pulse; ctx.stroke();
+      ctx.shadowBlur = 0;
+      if (!isFlash) {
+        hex(R * 0.62, Math.PI / 6); ctx.strokeStyle = "rgba(240,166,74,0.7)"; ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + (i * Math.PI) / 3; ctx.moveTo(cx0 + Math.cos(a) * R * 0.62 * 0.62, cy0 + Math.sin(a) * R * 0.62); ctx.lineTo(cx0 + Math.cos(a) * R * 0.62, cy0 + Math.sin(a) * R); }
+        ctx.strokeStyle = "rgba(240,166,74,0.5)"; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      ctx.restore();
+    } else if (strike) {
+      // kinetic distortion: ripples of displaced air ahead of the fist and a smeared streak behind it
+      const g = A.fist ? [A.fist[0] - A.ox, A.fist[1] - A.oy] : armFw[2];
+      const up = f.chainIndex === 2 || (f.hit && f.hit.id === "rising_fist");
+      const prog = f.hit ? clamp(1 - f.stateTimer / Math.max(1, f.hit.active || 1), 0, 1) : 0;
+      const dir = up ? -Math.PI / 2 : (d > 0 ? 0 : Math.PI);
+      const sc = heavy ? 1.5 : 1;
+      ctx.save();
+      ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const rad = k.aw * (1.1 + i * 0.85 + prog * 1.1) * sc;
+        ctx.globalAlpha = clamp((1 - i * 0.28) * (1 - prog * 0.55), 0, 1);
+        ctx.strokeStyle = isFlash ? "#fff" : i === 0 ? P.energyHi : P.energy; ctx.lineWidth = Math.max(1, 2.8 - i * 0.7);
+        ctx.beginPath(); ctx.arc(g[0], g[1], rad, dir - 0.75, dir + 0.75); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.55; ctx.strokeStyle = isFlash ? "#fff" : P.energy;
+      for (const off of [-4, 0, 4]) {
+        const bx = -Math.cos(dir), by = -Math.sin(dir), px = -by * off, py = bx * off;
+        ctx.lineWidth = off ? 1.6 : 2.6;
+        ctx.beginPath(); ctx.moveTo(g[0] + px + bx * 4, g[1] + py + by * 4); ctx.lineTo(g[0] + px + bx * (24 * sc - Math.abs(off) * 2), g[1] + py + by * (24 * sc - Math.abs(off) * 2)); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  // maps an IK joint list through the facing mirror (same as MP in draw())
+  function MP2(arr, M) { return arr.map(M); }
+
   function DETAIL(k, id) {
     const { ctx, M, MP, d, P, col, hr, hc, A, f, now, st } = k;
     const S = MW.STATE;
@@ -362,94 +785,17 @@
     const attackingNow = st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE || st === S.ATTACK_RECOVERY;
     const pulse = 0.5 + 0.5 * Math.sin(now * 8);
 
-    // ───────────── BRAWLER ─────────────
-    // Bare-chested boxer: big blue gloves, gold championship belt, black eye, taped nose.
+    // ───────────── VANGUARD ─────────────
+    // Drawn in vanguard() above: bare-chested gladiator with engraved kinetic gauntlets.
     if (id === "fighter") {
-      const glove = (pt, r) => {
-        circle(ctx, pt[0], pt[1], r, col(P.glove), 2.4);
-        ctx.beginPath(); ctx.arc(pt[0] - d * r * 0.25, pt[1] - r * 0.3, r * 0.38, 0, 7); ctx.fillStyle = col(P.light); ctx.globalAlpha = 0.55; ctx.fill(); ctx.globalAlpha = 1;
-        ctx.beginPath(); ctx.rect(pt[0] - r * 0.95, pt[1] + r * 0.55, r * 1.9, r * 0.45); ctx.fillStyle = col("#f4f4f4"); ctx.fill(); // cuff
-      };
-      limb(ctx, armBw, k.aw, col(P.skin));
-      glove(armBw[2], k.aw * 0.95);
-      legsAndFeet(k, P.skin, P.boot);
-      // torso: bare chest
-      torsoShape(k, k.sw * 0.86, k.hw, 0, 0, P.skin, "#b97c58", 5);
-      ctx.strokeStyle = "rgba(120,60,40,0.55)"; ctx.lineWidth = 1.6; // pecs / abs hint
-      ctx.beginPath(); ctx.moveTo(shW[0], shW[1] + 6); ctx.lineTo(hipW[0], hipW[1] - 8); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(shW[0] - 9, shW[1] + 10); ctx.quadraticCurveTo(shW[0], shW[1] + 14, shW[0] + 9, shW[1] + 10); ctx.stroke();
-      // trunks
-      const tw = k.hw * 0.62, ty = hipW[1] + k.legL * 0.3;
-      ctx.beginPath(); ctx.moveTo(hipW[0] - tw, hipW[1] - 8); ctx.lineTo(hipW[0] + tw, hipW[1] - 8); ctx.lineTo(hipW[0] + tw * 1.1, ty); ctx.lineTo(hipW[0] - tw * 1.1, ty); ctx.closePath(); fillOut(ctx, col(P.pants), 2);
-      // championship belt (gold plate)
-      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.56, hipW[1] - 10, k.hw * 1.12, 7); fillOut(ctx, col("#2a1a12"), 1.6);
-      ctx.beginPath(); ctx.ellipse(hipW[0] + d * 1, hipW[1] - 6.5, k.hw * 0.2, 6, 0, 0, 7); fillOut(ctx, col(P.accent), 1.8);
-      ctx.fillStyle = col("#fff2b0"); ctx.beginPath(); ctx.arc(hipW[0] + d * 1, hipW[1] - 6.5, 1.8, 0, 7); ctx.fill();
-      // head
-      circle(ctx, hcw[0], hcw[1], hr, col(P.skin), 2.4);
-      ctx.beginPath(); ctx.arc(hcw[0] - d * hr * 0.1, hcw[1] - hr * 0.25, hr * 1.05, Math.PI * 1.05, Math.PI * 1.95); ctx.closePath(); fillOut(ctx, col(P.hair), 2); // short cropped hair
-      const ex = hcw[0] + d * hr * 0.45, ey = hcw[1] + hr * 0.08;
-      if (!k.isFlash) { ctx.fillStyle = P.bruise; ctx.beginPath(); ctx.ellipse(ex, ey + 1, hr * 0.42, hr * 0.36, 0, 0, 7); ctx.fill(); } // black eye
-      ctx.fillStyle = col("#fff"); ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.24, hr * 0.2, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = stunned ? "#ff4040" : "#10131a"; ctx.beginPath(); ctx.arc(ex + d * 1.2, ey, hr * 0.12, 0, 7); ctx.fill();
-      ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex - hr * 0.35, ey - hr * 0.42); ctx.lineTo(ex + hr * 0.3, ey - hr * 0.24); ctx.stroke(); // determined brow
-      // taped nose
-      const nx = hcw[0] + d * hr * 0.98, ny = hcw[1] + hr * 0.22;
-      ctx.beginPath(); ctx.moveTo(nx - d * hr * 0.2, ny - hr * 0.3); ctx.lineTo(nx + d * hr * 0.18, ny - hr * 0.05); ctx.lineTo(nx - d * hr * 0.05, ny + hr * 0.3); ctx.closePath(); fillOut(ctx, col(P.tape), 1.6);
-      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(nx - d * hr * 0.1, ny - hr * 0.1); ctx.lineTo(nx + d * hr * 0.05, ny + hr * 0.05); ctx.stroke();
-      // front arm + glove
-      limb(ctx, armFw, k.aw, col(P.skin));
-      glove(armFw[2], k.aw * 1.05);
-      // swings: hook = flat swoosh, uppercut (chain 3) = rising swoosh
-      if (strike) {
-        const g = armFw[2], up = f.chainIndex === 2;
-        ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = col(up ? "#fff2b0" : "#cfe4ff"); ctx.lineWidth = up ? 5 : 3;
-        ctx.beginPath();
-        if (up) { ctx.moveTo(g[0] - d * 6, g[1] + k.H * 0.28); ctx.quadraticCurveTo(g[0] + d * 22, g[1] + k.H * 0.1, g[0] + d * 10, g[1] - k.H * 0.28); }
-        else { ctx.moveTo(g[0] - d * 28, g[1] + 4); ctx.quadraticCurveTo(g[0] - d * 12, g[1] - 8, g[0] + d * 4, g[1]); }
-        ctx.stroke(); ctx.restore();
-      }
+      vanguard(k, { shW, hipW, hcw, armBw, armFw, windU, strike, attackingNow, stunned });
       return;
     }
 
-    // ───────────── MAGE ─────────────
-    if (id === "mage") {
-      const robeHem = -k.legL * 0.1;
-      limb(ctx, armBw, k.aw, col(P.dark));
-      hand(k, armBw[2], k.aw * 0.7, P.skin);
-      // feet peeking out
-      legsAndFeet(k, P.pants, P.boot);
-      // robe: shoulders -> flared hem (swaying)
-      const sway = Math.sin(now * 3) * 1.5 - k.vx * d * 0.35;
-      const rb = [M([k.sh[0] - k.sw * 0.34, k.sh[1]]), M([k.sh[0] + k.sw * 0.34, k.sh[1]]), M([k.hip[0] + k.hw * 0.78 + sway, robeHem]), M([k.hip[0] - k.hw * 0.78 + sway, robeHem])];
-      ctx.beginPath(); ctx.moveTo(rb[0][0], rb[0][1]);
-      ctx.quadraticCurveTo((rb[0][0] + rb[3][0]) / 2 - 2, (rb[0][1] + rb[3][1]) / 2, rb[3][0], rb[3][1]);
-      for (let i = 0; i < 4; i++) ctx.lineTo(rb[3][0] + (rb[2][0] - rb[3][0]) * ((i + 0.5) / 4), robeHem - (i % 2 ? 0 : 3));
-      ctx.lineTo(rb[2][0], rb[2][1]);
-      ctx.quadraticCurveTo((rb[1][0] + rb[2][0]) / 2 + 2, (rb[1][1] + rb[2][1]) / 2, rb[1][0], rb[1][1]);
-      ctx.closePath(); fillOut(ctx, col(P.main), 2.4);
-      ctx.beginPath(); ctx.moveTo(shW[0], shW[1] + 2); ctx.lineTo(hipW[0] + sway * 0.6, robeHem - 2); ctx.strokeStyle = col(P.accent); ctx.lineWidth = 2.2; ctx.stroke();
-      ctx.beginPath(); ctx.rect(hipW[0] - k.hw * 0.38, hipW[1] - 6, k.hw * 0.76, 4); fillOut(ctx, col(P.accent), 1.4);
-      // head
-      circle(ctx, hcw[0], hcw[1], hr, col(P.skin), 2.4);
-      // beard
-      ctx.beginPath(); ctx.moveTo(hcw[0] - hr * 0.7, hcw[1] + hr * 0.2); ctx.quadraticCurveTo(hcw[0] + d * hr * 0.2, hcw[1] + hr * 2, hcw[0] + hr * 0.8, hcw[1] + hr * 0.1); ctx.quadraticCurveTo(hcw[0], hcw[1] + hr * 0.5, hcw[0] - hr * 0.7, hcw[1] + hr * 0.2); ctx.closePath(); fillOut(ctx, col(P.hair), 1.8);
-      const ex = hcw[0] + d * hr * 0.45, ey = hcw[1] - hr * 0.05;
-      ctx.save(); ctx.shadowColor = P.glow; ctx.shadowBlur = k.isFlash ? 0 : 8; ctx.fillStyle = col(stunned ? "#ff6060" : "#c9a2ff"); ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.28, hr * 0.2, 0, 0, 7); ctx.fill(); ctx.restore();
-      // hat: bent cone + brim + star
-      const bx = hcw[0], by = hcw[1] - hr * 0.55;
-      ctx.beginPath(); ctx.moveTo(bx - hr * 1.3, by); ctx.quadraticCurveTo(bx - hr * 0.3, by - hr * 1.4, bx + d * hr * 0.1, by - hr * 2.5); ctx.quadraticCurveTo(bx - d * hr * 0.2 - d * 8 + Math.sin(now * 4) * 2.5, by - hr * 3.0, bx - d * hr * 1.2, by - hr * 2.5); ctx.quadraticCurveTo(bx + hr * 0.6, by - hr * 1.2, bx + hr * 1.3, by); ctx.closePath(); fillOut(ctx, col("#6b3fb5"), 2.2);
-      ctx.beginPath(); ctx.ellipse(bx, by + 1, hr * 1.7, hr * 0.34, 0, 0, 7); fillOut(ctx, col("#51309a"), 2);
-      ctx.fillStyle = col(P.accent); ctx.beginPath(); ctx.arc(bx + d * hr * 0.15, by - hr * 0.7, hr * 0.2, 0, 7); ctx.fill();
-      // front arm + staff with orb
-      const hF = armFw[2];
-      const tipX = hF[0] + d * (windU * -4 + (strike ? 9 : 0)), tipY = hF[1] - k.H * 0.34 + (strike ? 6 : 0);
-      ctx.beginPath(); ctx.moveTo(hF[0] - d * 2, hF[1] + k.H * 0.16); ctx.lineTo(tipX, tipY); ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = col("#8a5a34"); ctx.lineWidth = 3; ctx.stroke();
-      A.orb = [A.ox + tipX, A.oy + tipY]; // staff orb position, used by mage_fx.js
-      const orbR = hr * (0.55 + 0.55 * windU + (strike ? 0.5 : 0) + 0.06 * pulse);
-      ctx.save(); ctx.shadowColor = P.glow; ctx.shadowBlur = k.isFlash ? 0 : 10 + 14 * windU; circle(ctx, tipX, tipY, orbR, col(strike || windU > 0.5 ? "#ffffff" : P.glow), 2); ctx.restore();
-      limb(ctx, armFw, k.aw, col(P.dark));
-      hand(k, armFw[2], k.aw * 0.7, P.skin);
+    // ───────────── VOID MAGE ─────────────
+    // Drawn in void_mage_art.js (faceless, obsidian, half-consumed by a dimensional void).
+    if (id === "mage" && MW.VoidMage) {
+      MW.VoidMage.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned });
       return;
     }
 

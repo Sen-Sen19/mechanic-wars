@@ -71,6 +71,7 @@
             t.takeHit(a, a.hit);
             a.onHitLanded(a.hit);
             this.emitMelee("hit", a, t);
+            this.emitStrike(a, t);
             this.emitImpact(a.hit, a, t);
           }
         }
@@ -149,6 +150,18 @@
       this.emitFx({
         type: "impact", fx: hit.impactFx, x: t.x + t.stats.width / 2, y: t.y + t.stats.height * 0.45, fy: t.y + t.stats.height,
         dir: a.x < t.x ? 1 : -1, ownerId: a.id, targetId: t.id, dmg: info.dmg || 0, empowered: !!hit.empowered,
+      });
+    }
+
+    // Visual-only "strike" event for characters that ask for it (stats.hitFx = "brawler"):
+    // every landed melee hit, with its punch shape, so brawler_fx.js can draw the impact.
+    emitStrike(a, t) {
+      if (!this.fx || this.fx.length > 100 || a.stats.hitFx !== "brawler" || !a.hit) return;
+      const info = t.lastHit || {};
+      this.fx.push({
+        type: "strike", shape: a.hit.fxShape || "hook", chain: a.chainIndex, empowered: !!a.hit.empowered,
+        x: a.facing > 0 ? t.x : t.x + t.stats.width, y: t.y + t.stats.height * 0.4, dir: a.facing,
+        ownerId: a.id, targetId: t.id, dmg: info.dmg || 0, blocked: !!info.absorbed, ko: t.hp <= 0,
       });
     }
 

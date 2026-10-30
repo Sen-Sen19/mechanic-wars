@@ -25,10 +25,11 @@ function duel(a, b, gap) {
 }
 const press = { ...MW.IDLE_INTENT, attackPressed: true };
 
-// names / roles
-check("fighter is the Brawler", C.fighter.name === "Brawler");
+// names / roles (roster: Vanguard, Arbiter, Wraith, Artillerist, Bulwark)
+check("roster names", [C.fighter, C.mage, C.assassin, C.hitter, C.tank].map((c) => c.name).join(",") === "Vanguard,Arbiter,Wraith,Artillerist,Bulwark");
+check("fighter is the Vanguard", C.fighter.name === "Vanguard");
 check("tank is the Bulwark", C.tank.name === "Bulwark");
-check("Brawler starts faster than the old Fighter (4 < 6 ticks)", C.fighter.attack.startup === 4);
+check("Vanguard starts faster than the old Fighter (4 < 6 ticks)", C.fighter.attack.startup === 4);
 
 // Brawler: uppercut finisher launches up, not out
 {

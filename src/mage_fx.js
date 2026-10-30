@@ -1,14 +1,15 @@
-// Mechanic Wars - Mage magic effects. VISUAL ONLY: the sim never reads this file.
-// Everything here is drawn with additive light ("lighter") over a soft dark underlay,
-// so it still reads on bright stages. All sizes and timings are in the TUNE block below.
+// Mechanic Wars - Void Mage effects. VISUAL ONLY: the sim never reads this file.
+// Gravity wells, dark liquid and dimensional energy: a dark underlay (so it reads on bright
+// stages) with electric-purple light on top. All sizes and timings are in the TUNE block below.
 //
 // What it draws:
-//   - aura:    rune glyphs circle the Mage, sparkles rise from the staff orb
-//   - cast:    a spinning magic circle opens where the bolt will appear; energy is sucked in
-//   - fire:    flash + ring + forward sparks when the bolt leaves
-//   - bolt:    glowing arcane orb with a comet tail, a double helix of sparks and a rune ring
-//   - impact:  star flash, two rings, spark burst, rising runes
-//   - fizzle:  soft fade when the bolt runs out of range
+//   - aura:    obsidian shards orbit the Mage, smoke and drips dissolve off the body and claws,
+//              gravity rings are drawn into the chest singularity
+//   - cast:    a spinning gravity vortex opens where the bolt will appear; energy is sucked in
+//   - fire:    inward-collapsing ring + flash, dark drops thrown forward
+//   - bolt:    a black singularity with a tilted accretion ring, lensing arcs and a liquid tail
+//   - impact:  collapse then burst: dark blob, contracting + expanding rings, sparks, drops
+//   - fizzle:  the singularity folds in on itself
 (function (g) {
   const MW = (g.MW = g.MW || {});
   const TAU = Math.PI * 2;
@@ -16,16 +17,16 @@
   const TUNE = {
     maxParticles: 260,
     circleRadius: 30, // magic circle radius at full charge (px)
-    runeCount: 3, // runes orbiting the Mage
+    shardCount: 3, // obsidian shards orbiting the Mage
     tailLength: 70, // bolt comet tail (px)
     helixLength: 58,
     impactSparks: 16,
   };
 
-  const LIGHT = "#d6b8ff";
-  const MID = "#a77cff";
-  const DEEP = "#4b2a96";
-  const GOLD = "#ffd479";
+  const LIGHT = "#e6bcff";
+  const MID = "#b44bff"; // electric purple
+  const DEEP = "#14082b"; // obsidian violet (dark underlays)
+  const GOLD = "#f1dcff"; // pale violet-white accent (name kept from the old palette)
   const WHITE = "#ffffff";
 
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -124,6 +125,13 @@
       } else if (p.kind === "ring") {
         ctx.globalAlpha = a * 0.9; ctx.strokeStyle = p.color; ctx.lineWidth = 0.8 + 3 * a;
         ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.5, p.size), 0, TAU); ctx.stroke();
+      } else if (p.kind === "void") { // a drop / wisp of dark liquid with a violet rim
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#07040f"; ctx.strokeStyle = "rgba(160,80,255,0.6)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * a) + 0.6, 0, TAU); ctx.fill(); ctx.stroke();
+      } else if (p.kind === "blob") { // soft dark mass (collapse before an impact bursts)
+        ctx.globalAlpha = a * 0.9;
+        glow(ctx, p.x, p.y, Math.max(1, p.size), "rgba(8,3,20,0.95)", "rgba(50,16,110,0)");
       } else if (p.kind === "rune") {
         ctx.globalAlpha = a * 0.9; ctx.strokeStyle = p.color; ctx.lineWidth = 1.6;
         drawRune(ctx, p.x, p.y, p.size, p.glyph || 0, p.rot);
@@ -141,192 +149,165 @@
   }
 
   // ─── events from the sim (sim.fx) ─────────────────────────────────
+  const inward = (x, y, n, r0, r1, life, color) => { // motes pulled into a point
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, r = rnd(r0, r1);
+      dot(x + Math.cos(a) * r, y + Math.sin(a) * r, (-Math.cos(a) * r) / life, (-Math.sin(a) * r) / life, life, rnd(1.4, 2.6), color(i), { drag: 1 });
+    }
+  };
+  const drops = (x, y, n, vx0, vx1, vy0, vy1) => {
+    for (let i = 0; i < n; i++) add({ kind: "void", x, y, vx: rnd(vx0, vx1), vy: rnd(vy0, vy1), life: 20 + (Math.random() * 16 | 0), size: rnd(1.8, 3.4), g: 0.12, drag: 0.95 });
+  };
   function event(ev) {
     if (!ev || ev.style !== "arcane") return;
     const { x, y, dir } = ev;
     if (ev.type === "fire") {
-      add({ kind: "flash", x, y, vx: 0, vy: 0, life: 9, size: 30, color: WHITE, rot: Math.PI / 8, drag: 1 });
-      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 14, size: 8, grow: 3, color: LIGHT, drag: 1 });
-      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 10, size: 4, grow: 2, color: GOLD, drag: 1 });
-      for (let i = 0; i < 10; i++) dot(x, y, dir * rnd(2, 7), rnd(-2.2, 2.2), 14 + (Math.random() * 10 | 0), rnd(1.5, 3), i % 3 ? MID : GOLD, { drag: 0.93 });
+      add({ kind: "blob", x, y, vx: 0, vy: 0, life: 12, size: 14, grow: 1.2, drag: 1 });
+      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 12, size: 30, grow: -2.3, color: LIGHT, drag: 1 }); // gravity pulls in
+      add({ kind: "flash", x, y, vx: 0, vy: 0, life: 7, size: 22, color: WHITE, rot: Math.PI / 8, drag: 1 });
+      inward(x, y, 8, 26, 42, 12, (i) => (i % 3 ? MID : LIGHT));
+      drops(x, y, 6, dir * 2, dir * 6, -2, 1);
     } else if (ev.type === "hit") {
-      add({ kind: "flash", x, y, vx: 0, vy: 0, life: 11, size: 44, color: WHITE, rot: Math.PI / 8, drag: 1 });
-      add({ kind: "flash", x, y, vx: 0, vy: 0, life: 9, size: 30, color: GOLD, rot: 0, drag: 1 });
-      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 18, size: 8, grow: 3.4, color: LIGHT, drag: 1 });
-      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 12, size: 4, grow: 2.4, color: GOLD, drag: 1 });
+      add({ kind: "blob", x, y, vx: 0, vy: 0, life: 16, size: 12, grow: 2.2, drag: 1 });
+      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 12, size: 38, grow: -2.8, color: LIGHT, drag: 1 }); // collapse...
+      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 18, size: 6, grow: 3.8, color: MID, drag: 1 }); // ...then burst
+      add({ kind: "flash", x, y, vx: 0, vy: 0, life: 9, size: 34, color: WHITE, rot: Math.PI / 8, drag: 1 });
       for (let i = 0; i < TUNE.impactSparks; i++) {
         const a = (i / TUNE.impactSparks) * TAU + rnd(-0.2, 0.2), sp = rnd(2, 7);
-        dot(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 18 + (Math.random() * 14 | 0), rnd(1.6, 3.4), i % 3 ? MID : (i % 2 ? LIGHT : GOLD), { drag: 0.92, g: 0.05 });
+        dot(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 18 + (Math.random() * 14 | 0), rnd(1.6, 3.2), i % 3 ? MID : LIGHT, { drag: 0.92, g: 0.04 });
       }
-      for (let i = 0; i < 4; i++) {
-        add({ kind: "star", x: x + rnd(-10, 10), y: y + rnd(-10, 10), vx: rnd(-1, 1), vy: rnd(-1.8, -0.4), life: 32, size: rnd(5, 9), color: i % 2 ? GOLD : LIGHT, vr: rnd(-0.12, 0.12), drag: 0.97 });
-      }
-      for (let i = 0; i < 2; i++) {
-        add({ kind: "rune", x: x + rnd(-14, 14), y: y + rnd(-6, 6), vx: rnd(-0.4, 0.4), vy: rnd(-1.2, -0.6), life: 42, size: rnd(6, 9), color: LIGHT, glyph: (Math.random() * 3) | 0, vr: rnd(-0.05, 0.05), drag: 0.98 });
-      }
+      drops(x, y, 8, -3, 3, -4, -0.5);
+      for (let i = 0; i < 3; i++) add({ kind: "star", x: x + rnd(-10, 10), y: y + rnd(-10, 10), vx: rnd(-1, 1), vy: rnd(-1.4, -0.3), life: 28, size: rnd(4, 7), color: i % 2 ? GOLD : MID, vr: rnd(-0.12, 0.12), drag: 0.97 });
     } else if (ev.type === "fizzle") {
-      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 12, size: 4, grow: 1.4, color: MID, drag: 1 });
-      for (let i = 0; i < 8; i++) dot(x, y, rnd(-1.6, 1.6), rnd(-1.6, 1.6), 16 + (Math.random() * 10 | 0), rnd(1.4, 2.6), i % 2 ? LIGHT : MID, { drag: 0.94 });
+      add({ kind: "ring", x, y, vx: 0, vy: 0, life: 14, size: 16, grow: -1.1, color: MID, drag: 1 });
+      add({ kind: "blob", x, y, vx: 0, vy: 0, life: 12, size: 10, grow: -0.5, drag: 1 });
+      inward(x, y, 8, 12, 22, 14, (i) => (i % 2 ? LIGHT : MID));
+      drops(x, y, 3, -1, 1, -1, 1);
     }
   }
 
   // ─── bolt ─────────────────────────────────────────────────────────
-  // Drawn at the projectile position (p.x, p.y), already inside the interpolation transform.
+  // A singularity: black sphere, tilted accretion ring (back half behind it, front half over it),
+  // lensing arcs and a tail of dark liquid. Drawn at the projectile position (p.x, p.y).
   function drawBolt(ctx, p) {
     const t = nowSec();
     const dir = p.dir, x = p.x, y = p.y;
-    const R = (p.size / 2) * 1.5; // drawn a bit bigger than the hitbox on purpose (glow is soft)
-    const pulse = 0.5 + 0.5 * Math.sin(t * 18);
-    const L = TUNE.tailLength, HL = TUNE.helixLength;
+    const R = (p.size / 2) * 1.5; // drawn a bit bigger than the hitbox on purpose
+    const pulse = 0.5 + 0.5 * Math.sin(t * 14);
+    const L = TUNE.tailLength;
+    const tilt = 0.45 * dir + Math.sin(t * 2.6) * 0.12;
+    const rx = R * 2.15, ry = R * 0.62;
 
     ctx.save();
     ctx.lineCap = "round";
 
-    // 1) solid violet body (normal blending): this is what keeps the bolt visible on bright stages
-    ctx.globalAlpha = 1;
-    glow(ctx, x, y, R * 2.8, "rgba(120,70,225,0.85)", "rgba(75,42,150,0)");
-    const tg0 = ctx.createLinearGradient(x, 0, x - dir * L, 0);
-    tg0.addColorStop(0, "rgba(110,62,215,0.75)");
-    tg0.addColorStop(1, "rgba(110,62,215,0)");
-    ctx.fillStyle = tg0;
+    // 1) dark liquid tail (normal blending: stays visible on bright stages)
+    const N = 12, top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, px = x - dir * u * L, w = R * (1.0 * (1 - u) + 0.12), wob = Math.sin(t * 14 - u * 7) * R * 0.4 * u;
+      top.push([px, y - w + wob]); bot.push([px, y + w + wob]);
+    }
     ctx.beginPath();
-    ctx.moveTo(x, y - R * 1.15); ctx.lineTo(x - dir * L, y); ctx.lineTo(x, y + R * 1.15); ctx.closePath();
-    ctx.fill();
-
-    // helix of sparks (solid colours, dark edge underneath)
-    for (let strand = 0; strand < 2; strand++) {
-      for (let k = 0; k < 10; k++) {
-        const u = k / 9;
-        const off = Math.sin(t * 16 - u * 9 + strand * Math.PI) * (6 - 3 * u);
-        const hx = x - dir * (6 + u * HL), hy = y + off, hr = 2.4 * (1 - u * 0.7) + 0.5;
-        ctx.globalAlpha = (1 - u) * 0.9;
-        ctx.fillStyle = DEEP;
-        ctx.beginPath(); ctx.arc(hx, hy, hr + 1.2, 0, TAU); ctx.fill();
-        ctx.fillStyle = strand ? GOLD : LIGHT;
-        ctx.beginPath(); ctx.arc(hx, hy, hr, 0, TAU); ctx.fill();
-      }
-    }
-
-    // rotating rune ring (dark edge + light line)
-    const ra = t * 7 * dir;
-    ctx.globalAlpha = 1;
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.strokeStyle = pass ? LIGHT : DEEP;
-      ctx.lineWidth = pass ? 1.7 : 3.6;
-      for (let i = 0; i < 3; i++) {
-        const a0 = ra + (i * TAU) / 3;
-        ctx.beginPath(); ctx.arc(x, y, R + 6, a0, a0 + 1.3); ctx.stroke();
-      }
-    }
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.strokeStyle = pass ? GOLD : DEEP;
-      ctx.lineWidth = pass ? 1.4 : 3.2;
-      for (let i = 0; i < 4; i++) {
-        const a = -ra * 0.8 + (i * TAU) / 4;
-        ctx.beginPath();
-        ctx.moveTo(x + Math.cos(a) * (R + 9), y + Math.sin(a) * (R + 9));
-        ctx.lineTo(x + Math.cos(a) * (R + 12), y + Math.sin(a) * (R + 12));
-        ctx.stroke();
-      }
-    }
-
-    // 2) additive light on top: bright core + soft glow (looks great on dark stages, subtle on bright ones)
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = 0.55 + 0.25 * pulse;
-    glow(ctx, x, y, R * 3.2 + pulse * 2, "rgba(190,150,255,0.7)", "rgba(140,82,255,0)");
-    ctx.globalAlpha = 1;
-    const tg = ctx.createLinearGradient(x, 0, x - dir * L * 0.8, 0);
-    tg.addColorStop(0, "rgba(205,175,255,0.55)");
-    tg.addColorStop(1, "rgba(140,82,255,0)");
+    ctx.moveTo(top[0][0], top[0][1]);
+    for (let i = 1; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    const tg = ctx.createLinearGradient(x, 0, x - dir * L, 0);
+    tg.addColorStop(0, "rgba(10,4,24,0.95)");
+    tg.addColorStop(1, "rgba(40,14,90,0)");
     ctx.fillStyle = tg;
-    ctx.beginPath();
-    ctx.moveTo(x, y - R * 0.8); ctx.lineTo(x - dir * L * 0.8, y); ctx.lineTo(x, y + R * 0.8); ctx.closePath();
     ctx.fill();
-    glow(ctx, x, y, R * 1.3, "rgba(255,255,255,1)", "rgba(167,124,255,0.3)");
-    ctx.fillStyle = WHITE;
-    ctx.beginPath(); ctx.arc(x, y, R * 0.5, 0, TAU); ctx.fill();
+
+    // 2) gravity halo
+    glow(ctx, x, y, R * 3.2, "rgba(30,10,70,0.8)", "rgba(60,20,130,0)");
+
+    // 3) additive light: lensing arcs + back half of the accretion ring
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = MID;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 3; i++) {
+      const a0 = t * (3 + i) * dir + i * 2.1, rr = R * (1.75 + 0.38 * i) + pulse * 1.2;
+      ctx.globalAlpha = 0.5 - i * 0.1;
+      ctx.beginPath(); ctx.arc(x, y, rr, a0, a0 + 1.1); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = MID;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, tilt, Math.PI, TAU); ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+
+    // 4) the black sphere with a thin bright rim (the event horizon)
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#020106";
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = LIGHT; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke();
+
+    // 5) front half of the accretion ring, bright, crossing over the sphere
+    ctx.globalCompositeOperation = "lighter";
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass ? WHITE : MID;
+      ctx.lineWidth = pass ? 1.2 : 3.4;
+      ctx.globalAlpha = pass ? 0.95 : 0.8;
+      ctx.beginPath(); ctx.ellipse(x, y, rx, ry, tilt, 0, Math.PI); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.5 + 0.25 * pulse;
+    glow(ctx, x, y, R * 2.6 + pulse * 2, "rgba(170,80,255,0.45)", "rgba(130,50,255,0)");
     ctx.restore();
 
-    // trailing sparkles (little stars and dots that linger behind)
-    if (Math.random() < 0.8) {
-      const star = Math.random() < 0.3;
-      if (star) add({ kind: "star", x: x - dir * rnd(4, 14), y: y + rnd(-7, 7), vx: -dir * rnd(0.2, 1), vy: rnd(-0.6, 0.6), life: 22, size: rnd(3, 5.5), color: Math.random() < 0.4 ? GOLD : LIGHT, vr: rnd(-0.2, 0.2), drag: 0.96 });
-      else dot(x - dir * rnd(4, 14), y + rnd(-6, 6), -dir * rnd(0.3, 1.4), rnd(-0.5, 0.5), 18 + (Math.random() * 10 | 0), rnd(1.2, 2.4), Math.random() < 0.5 ? MID : LIGHT, { drag: 0.95 });
+    // trailing dark drops + violet motes, and the odd mote being pulled in
+    if (Math.random() < 0.7) {
+      if (Math.random() < 0.45) add({ kind: "void", x: x - dir * rnd(4, 16), y: y + rnd(-6, 6), vx: -dir * rnd(0.2, 1), vy: rnd(-0.2, 0.6), life: 20, size: rnd(1.4, 2.6), g: 0.05, drag: 0.96 });
+      else dot(x - dir * rnd(4, 14), y + rnd(-6, 6), -dir * rnd(0.3, 1.4), rnd(-0.5, 0.5), 18 + (Math.random() * 10 | 0), rnd(1.2, 2.2), Math.random() < 0.5 ? MID : LIGHT, { drag: 0.95 });
+    }
+    if (Math.random() < 0.25) {
+      const a = Math.random() * TAU, r = R * 3.4;
+      dot(x + Math.cos(a) * r, y + Math.sin(a) * r, -Math.cos(a) * 0.9 + (p.vx || 0) * 0, -Math.sin(a) * 0.9, 8, rnd(1.2, 2), LIGHT, { drag: 1 });
     }
   }
 
-  // ─── magic circle ─────────────────────────────────────────────────
+  // ─── gravity vortex (replaces the old magic circle) ───────────────
   function drawCircle(ctx, x, y, R, rot, alpha) {
     ctx.save();
     ctx.translate(x, y);
-    // soft dark underlay
-    ctx.globalAlpha = 0.28 * alpha;
-    ctx.fillStyle = DEEP;
-    ctx.beginPath(); ctx.arc(0, 0, R * 1.05, 0, TAU); ctx.fill();
-
     ctx.lineCap = "round";
-    // dark outline under the main ring and the hexagram (readability on bright stages)
-    ctx.globalAlpha = 0.6 * alpha;
-    ctx.strokeStyle = DEEP;
-    ctx.lineWidth = 4.5;
-    ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
-    for (let tri = 0; tri < 2; tri++) {
-      ctx.beginPath();
-      for (let k = 0; k < 3; k++) {
-        const a = -rot + tri * (Math.PI / 3) + (k * TAU) / 3;
-        const px = Math.cos(a) * R * 0.72, py = Math.sin(a) * R * 0.72;
-        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    // dark well
+    ctx.globalAlpha = 0.9 * alpha;
+    glow(ctx, 0, 0, R * 1.15, "rgba(6,2,14,0.95)", "rgba(50,16,110,0)");
+    // three spiral arms: dark underlay first, bright line on top
+    for (let pass = 0; pass < 2; pass++) {
+      if (pass) ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = pass ? MID : DEEP;
+      ctx.lineWidth = pass ? 1.8 : 3.6;
+      ctx.globalAlpha = (pass ? 1 : 0.7) * alpha;
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.beginPath();
+        for (let st = 0; st <= 14; st++) {
+          const u = st / 14, r = R * (1 - u * 0.88), a = rot * 1.4 + (arm * TAU) / 3 + u * 2.8;
+          if (st === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.stroke();
       }
-      ctx.closePath();
-      ctx.stroke();
     }
-
-    ctx.globalCompositeOperation = "lighter";
+    // rim + inward ticks
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = LIGHT;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = LIGHT; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
-
-    // 8 tick marks
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 8; i++) {
-      const a = rot * 0.5 + (i * TAU) / 8;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R);
-      ctx.lineTo(Math.cos(a) * R * 1.16, Math.sin(a) * R * 1.16);
-      ctx.stroke();
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 1.3;
+    for (let i = 0; i < 6; i++) {
+      const a = -rot * 0.6 + (i * TAU) / 6;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 1.18, Math.sin(a) * R * 1.18); ctx.lineTo(Math.cos(a) * R * 0.98, Math.sin(a) * R * 0.98); ctx.stroke();
     }
-
-    // dashed inner ring, turning the other way
-    ctx.strokeStyle = MID;
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([3, 4]);
-    ctx.lineDashOffset = rot * 12;
-    ctx.beginPath(); ctx.arc(0, 0, R * 0.72, 0, TAU); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // hexagram (two triangles)
-    ctx.strokeStyle = LIGHT;
-    ctx.lineWidth = 1.5;
-    for (let tri = 0; tri < 2; tri++) {
-      ctx.beginPath();
-      for (let k = 0; k < 3; k++) {
-        const a = -rot + tri * (Math.PI / 3) + (k * TAU) / 3;
-        const px = Math.cos(a) * R * 0.72, py = Math.sin(a) * R * 0.72;
-        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-
-    // bright centre
-    ctx.globalAlpha = alpha;
-    glow(ctx, 0, 0, R * 0.45, "rgba(255,255,255,0.9)", "rgba(167,124,255,0)");
+    // black core
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#020106";
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = LIGHT; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, TAU); ctx.stroke();
     ctx.restore();
   }
 
-  // ─── per-fighter effects (aura, staff glow, cast circle) ──────────
+  // ─── per-fighter effects (aura, hand glow, cast vortex) ───────────
   // Called once per frame inside the fighter's interpolation transform.
   function drawFighter(ctx, f) {
     const S = MW.STATE;
@@ -339,50 +320,61 @@
     const stunned = f.state === S.HITSTUN;
     const power = stunned ? 0.15 : 0.35 + 0.65 * windU; // how strong the aura is right now
 
-    // spawn point of the bolt (same rule as projectiles.js) = where the circle opens
+    // spawn point of the bolt (same rule as projectiles.js) = where the vortex opens
     const px = f.facing > 0 ? f.x + s.width + 18 : f.x - 18;
     const py = f.y + s.height * 0.4;
     const orb = (f._art && f._art.orb) || [cx + f.facing * (s.width * 0.6), f.y + s.height * 0.2];
+    const core = (f._art && f._art.core) || [cx, f.y + s.height * 0.45];
 
+    // glow around the casting hand (additive)
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.lineCap = "round";
-
-    // staff orb glow
     const pulse = 0.5 + 0.5 * Math.sin(t * 6 + f.id);
-    ctx.globalAlpha = 0.45 + 0.5 * windU;
-    glow(ctx, orb[0], orb[1], 13 + 18 * windU + 2 * pulse, "rgba(214,184,255,0.9)", "rgba(140,82,255,0)");
+    ctx.globalAlpha = 0.3 + 0.55 * windU;
+    glow(ctx, orb[0], orb[1], 9 + 16 * windU + 2 * pulse, "rgba(214,160,255,0.9)", "rgba(140,50,255,0)");
+    ctx.restore();
 
-    // orbiting runes
-    ctx.strokeStyle = LIGHT;
-    ctx.lineWidth = 1.5;
-    const speed = 1.1 + 3.2 * windU;
+    // obsidian shards orbiting the body (normal blending, violet rim)
+    ctx.save();
+    ctx.lineWidth = 1.2;
+    const speed = 1.0 + 3.0 * windU;
     const rx = s.width * 0.95 - 8 * windU, ry = s.height * 0.44;
-    for (let i = 0; i < TUNE.runeCount; i++) {
-      const a = t * speed + (i * TAU) / TUNE.runeCount;
+    for (let i = 0; i < TUNE.shardCount; i++) {
+      const a = t * speed + (i * TAU) / TUNE.shardCount;
       const z = Math.sin(a); // front (+) or behind (-)
-      const sz = 5 + 1.6 * z + 2 * windU;
-      ctx.globalAlpha = clamp((0.3 + 0.45 * (z * 0.5 + 0.5)) * power * 1.5, 0, 0.9);
-      // each rune has its own height; the small up/down wobble fakes a tilted orbit
-      drawRune(ctx, cx + Math.cos(a) * rx, cy + (i - 1) * ry * 0.5 + z * 7, sz, i % 3, t * 1.5 + i);
+      const sz = 2.6 + 1.1 * z + 1.6 * windU;
+      const sx = cx + Math.cos(a) * rx, sy = cy + (i - 1) * ry * 0.5 + z * 7;
+      ctx.save();
+      ctx.translate(sx, sy); ctx.rotate(t * 1.5 + i);
+      ctx.globalAlpha = clamp((0.35 + 0.5 * (z * 0.5 + 0.5)) * power * 1.6, 0, 0.95);
+      ctx.fillStyle = "#0c0a14"; ctx.strokeStyle = MID;
+      ctx.beginPath(); ctx.moveTo(0, -sz * 1.5); ctx.lineTo(sz, 0); ctx.lineTo(0, sz * 1.5); ctx.lineTo(-sz, 0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
 
-    // ambient sparkles rising off the staff orb / robe
-    if (!stunned && Math.random() < 0.14 + 0.5 * windU) {
-      if (Math.random() < 0.35) add({ kind: "star", x: orb[0] + rnd(-6, 6), y: orb[1] + rnd(-6, 6), vx: rnd(-0.3, 0.3), vy: rnd(-1, -0.3), life: 28, size: rnd(2.5, 4.5), color: Math.random() < 0.4 ? GOLD : LIGHT, vr: rnd(-0.15, 0.15), drag: 0.97 });
-      else dot(orb[0] + rnd(-7, 7), orb[1] + rnd(-5, 5), rnd(-0.3, 0.3), rnd(-0.9, -0.3), 24 + (Math.random() * 12 | 0), rnd(1.2, 2.4), Math.random() < 0.5 ? MID : LIGHT, { drag: 0.97 });
+    // gravity rings drawn into the chest singularity
+    if (!stunned && Math.random() < 0.02 + 0.08 * windU) add({ kind: "ring", x: core[0], y: core[1], vx: 0, vy: 0, life: 16, size: 20, grow: -1.15, color: MID, drag: 1 });
+
+    // smoke dissolving off the body, violet motes, drips from the claws
+    if (!stunned && Math.random() < 0.12 + 0.3 * windU) {
+      const r = Math.random();
+      const bx = cx + rnd(-s.width * 0.6, s.width * 0.4) - f.facing * 3, by = f.y + rnd(s.height * 0.2, s.height * 0.95);
+      if (r < 0.5) add({ kind: "void", x: bx, y: by, vx: -f.facing * rnd(0.1, 0.6), vy: rnd(-0.7, -0.2), life: 26 + (Math.random() * 14 | 0), size: rnd(1.0, 2.0), drag: 0.97 });
+      else if (r < 0.8) dot(bx, by, -f.facing * rnd(0.1, 0.5), rnd(-0.9, -0.3), 24 + (Math.random() * 12 | 0), rnd(1.2, 2.2), Math.random() < 0.5 ? MID : LIGHT, { drag: 0.97 });
+      else add({ kind: "void", x: orb[0] + rnd(-3, 3), y: orb[1] + rnd(0, 4), vx: rnd(-0.2, 0.2), vy: rnd(0.2, 0.8), life: 26, size: rnd(1.4, 2.4), g: 0.12, drag: 0.98 });
     }
 
     if (casting) {
-      // spinning magic circle that opens where the bolt will appear
+      // spinning gravity vortex that opens where the bolt will appear
       const e = 1 - Math.pow(1 - windU, 2);
       drawCircle(ctx, px, py, 6 + (TUNE.circleRadius - 6) * e, t * 3 + windU * 4, 0.35 + 0.6 * windU);
-      // energy is sucked into the circle
+      // energy is sucked into the vortex
       for (let i = 0; i < 2; i++) {
         const a = Math.random() * TAU, d = rnd(34, 62);
         const sx = px + Math.cos(a) * d, sy = py + Math.sin(a) * d;
-        dot(sx, sy, (px - sx) / 13, (py - sy) / 13, 13, rnd(1.4, 2.6), Math.random() < 0.3 ? GOLD : LIGHT, { drag: 1 });
+        dot(sx, sy, (px - sx) / 13, (py - sy) / 13, 13, rnd(1.4, 2.6), Math.random() < 0.3 ? GOLD : MID, { drag: 1 });
       }
     }
   }

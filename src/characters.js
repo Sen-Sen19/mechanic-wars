@@ -2,7 +2,7 @@
 // All characters share one movement/combat system (fighter.js); they differ only by these numbers.
 //
 // Units: distances in px, speeds in px per tick (60 ticks/sec), times in ticks (frames).
-// Brawler (id "fighter") is the movement baseline; the others are balanced around it.
+// Vanguard (id "fighter") is the movement baseline; the others are balanced around it.
 // Combat values (hp, armor, weight, attack) are defined now but first used in Stage 3+,
 // and will be tuned from balance-sim results.
 (function (g) {
@@ -15,14 +15,15 @@
   }
 
   MW.CHARACTERS = {
-    // BRAWLER (internal id stays "fighter"): close-range combo specialist.
+    // VANGUARD (internal id stays "fighter"; was "Brawler"): bare-chested gauntlet fighter, close-range combo specialist.
     // Fast short-reach jab > hook > uppercut. The uppercut launches straight UP (launchH small,
     // launchV big), which sets up follow-ups and punishes jumpers. Low reach is the trade-off.
     fighter: define({
       id: "fighter",
-      name: "Brawler",
-      color: "#4aa3ff",
-      look: "boxer",
+      name: "Vanguard",
+      color: "#c98a3a", // dark bronze: select card, chips, HUD
+      look: "gauntlet",
+      hitFx: "brawler", // sim sends "strike" events for every landed punch (visual only, see brawler_fx.js)
       width: 52,
       height: 88,
       maxHP: 100,
@@ -31,7 +32,7 @@
       // PASSIVE - Combat Momentum: every hit you LAND adds 1 momentum (whiffs add nothing).
       // At max, the next momentumBonus skill spends it all for +bonus damage (once).
       // Momentum fades after decayDelay ticks without landing a hit (then 1 per decayStep ticks)
-      // and hurtLoss is lost every time the Fighter takes a hit.
+      // and hurtLoss is lost every time the Vanguard takes a hit.
       passive: { type: "momentum", max: 5, decayDelay: 150, decayStep: 60, hurtLoss: 2, bonus: 0.5 },
       skills: [
         // SKILL 1 - Power Strike: slow heavy punch, big damage + stagger (fixed stun, little launch).
@@ -39,7 +40,7 @@
         {
           id: "power_strike", name: "Power", icon: "PWR", cooldown: 240,
           attack: {
-            type: "melee", isSkill: true, momentumBonus: true, fxShape: "power", pose: 3,
+            id: "power_strike", type: "melee", isSkill: true, momentumBonus: true, fxShape: "power", pose: 3,
             damage: 24, startup: 16, active: 5, recovery: 30,
             knockback: 3.5, launchH: 0.35, launchV: 0.2, stun: 34, // stagger, not a launch
             range: 66, boxH: 0.85, advance: 1.6, manaGain: 18,
@@ -50,7 +51,7 @@
         {
           id: "fist_rush", name: "Rush", icon: "RSH", cooldown: 300,
           attack: {
-            type: "melee", isSkill: true, momentumBonus: true, fxShape: "rush", pose: 4,
+            id: "fist_rush", type: "melee", isSkill: true, momentumBonus: true, fxShape: "rush", pose: 4,
             damage: 14, startup: 10, active: 4, recovery: 26, // startup = the dash itself
             dashSpeed: 9, // px per tick while dashing (about 90 px total)
             knockback: 4, launchH: 0.6, launchV: 0.2, stun: 20, // brief hit-stun
@@ -59,11 +60,11 @@
         },
         // SKILL 3 - Rising Fist: powerful upward punch that launches the opponent high.
         // Tall hit area (also catches jumpers), big damage, and a real launch (about 190 px up)
-        // so the Brawler can jump after them for a follow-up. impactFx = flame pillar + shake.
+        // so the Vanguard can jump after them for a follow-up. impactFx = flame pillar + shake.
         {
           id: "rising_fist", name: "Rising", icon: "RIS", cooldown: 300,
           attack: {
-            id: "rising_fist", type: "melee", isSkill: true, momentumBonus: true, fxShape: "rising", pose: 6,
+            id: "rising_fist", type: "melee", isSkill: true, momentumBonus: true, fxShape: "rising", pose: 5,
             impactFx: "rising",
             damage: 22, startup: 12, active: 6, recovery: 26,
             knockback: 8, launchH: 0.25, launchV: 2.0, stun: 40, // sends them straight up
@@ -79,7 +80,7 @@
         {
           id: "iron_guard", name: "Guard", icon: "GRD", cooldown: 300,
           attack: {
-            id: "iron_guard", type: "buff", isSkill: true, fxShape: "guard", pose: 7,
+            id: "iron_guard", type: "buff", isSkill: true, fxShape: "guard", pose: 6,
             damage: 0, startup: 6, active: 54, recovery: 12, // active is the guard duration
             damageReduction: 0.35,
             momentumBonus: false, // does not consume momentum
@@ -91,13 +92,13 @@
           },
         },
       ],
-      // ULTIMATE - Meteor Breaker: needs a full mana bar. The Brawler charges forward (and stops
+      // ULTIMATE - Meteor Breaker: needs a full mana bar. The Vanguard charges forward (and stops
       // when he reaches the enemy), then smashes the ground with a huge crater slam.
       // Super armor the whole time. Big damage, big launch, big screen effect.
       ultimate: {
         id: "meteor_breaker", name: "Meteor", icon: "ULT",
         attack: {
-          id: "meteor_breaker", type: "melee", isSkill: true, fxShape: "meteor", pose: 8,
+          id: "meteor_breaker", type: "melee", isSkill: true, fxShape: "meteor", pose: 7,
           impactFx: "meteor",
           damage: 45, startup: 28, active: 10, recovery: 38,
           knockback: 6, launchH: 1.0, launchV: 0.9,
@@ -118,12 +119,12 @@
       },
     }),
 
-    // Fragile ranged spacer. Slow basic attack on purpose: the Mage will rely on skills later,
+    // ARBITER (internal id "mage"): fragile ranged spacer. Slow basic attack on purpose: the Mage will rely on skills later,
     // not on normal hits. Bolt is still the longest-range, fastest-flying projectile.
     mage: define({
       id: "mage",
-      name: "Mage",
-      color: "#b06cff",
+      name: "Arbiter", // was "Mage"
+      color: "#b44bff",
       look: "hat",
       width: 34,
       height: 76,
@@ -143,10 +144,10 @@
       },
     }),
 
-    // Fast and fragile: many weak hits, best mobility.
+    // WRAITH (internal id "assassin"): fast and fragile, many weak hits, best mobility.
     assassin: define({
       id: "assassin",
-      name: "Assassin",
+      name: "Wraith", // was "Assassin"
       color: "#ff3355", // crimson: slash arcs, select card, chips
       look: "scarf",
       width: 32,
@@ -160,12 +161,12 @@
       attack: { type: "melee", damage: 5.2, startup: 3, active: 3, recovery: 3, knockback: 3.2, range: 54, fxStyle: "blood" },
     }),
 
-    // Gunslinger: quick draw, fast straight bullets, lighter and quicker than the Fighter
-    // (but slower than the Assassin). Bullets fly faster than the Mage bolt but die sooner.
+    // Artillerist: quick draw, fast straight bullets, lighter and quicker than the Vanguard
+    // (but slower than the Wraith). Bullets fly faster than the Arbiter bolt but die sooner.
     // (internal id stays "hitter" so saved references and tools keep working)
     hitter: define({
       id: "hitter",
-      name: "Gunner",
+      name: "Artillerist", // was "Gunner"
       color: "#ff7a3d",
       look: "gun",
       width: 36,

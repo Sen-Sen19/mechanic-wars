@@ -154,8 +154,16 @@
     floats.push({ x: ev.x, y: ev.y - 30, text: String(Math.round(ev.dmg)), life: 54, maxLife: 54, size: big ? 46 : 30, color: big ? "#ff6a4a" : "#ffe27a" });
   }
 
+  const STRIKE_SHAKE = { hook: 1.5, upper: 4, power: 7, rush: 4, rising: 0, meteor: 0, slam: 2 }; // rising / meteor shake in their own impact code
   function onSkillEvent(ev) {
     if (!ev) return;
+    if (ev.type === "strike") {
+      if (!ev.blocked) {
+        addShake((STRIKE_SHAKE[ev.shape] || 0) + (ev.empowered ? 2 : 0));
+        if (ev.ko) { addShake(14); addFlash(0.4, "#ffffff"); }
+      }
+      return;
+    }
     if (ev.type === "cast") {
       if (ev.id === "rising_fist") {
         addRing(ev.x + ev.dir * 20, ev.fy, 8, 70, 18, "#ffcc44", 3, 0.22);
@@ -1711,17 +1719,19 @@
       tickParticles();
       tickTrails();
       tickSkillFx();
-      if (MW.MageFx || MW.AssassinFx) {
+      if (MW.MageFx || MW.AssassinFx || MW.BrawlerFx) {
         // sim events (fire / hit / fizzle / swing) -> effects
         if (!sim.fx) sim.fx = [];
         for (const ev of sim.fx) {
           if (MW.MageFx) MW.MageFx.event(ev);
           if (MW.AssassinFx) MW.AssassinFx.event(ev);
+          if (MW.BrawlerFx) MW.BrawlerFx.event(ev);
           onSkillEvent(ev);
         }
         sim.fx.length = 0;
         if (MW.MageFx) MW.MageFx.tick();
         if (MW.AssassinFx) { MW.AssassinFx.update(sim); MW.AssassinFx.tick(); }
+        if (MW.BrawlerFx) { MW.BrawlerFx.update(sim); MW.BrawlerFx.tick(); }
       }
 
       if (!this.bg && typeof document !== "undefined") {
@@ -1743,6 +1753,7 @@
       // trails (behind characters)
       drawTrails(ctx);
       if (MW.AssassinFx) MW.AssassinFx.drawBehind(ctx); // red dash ghosts
+      if (MW.BrawlerFx) MW.BrawlerFx.drawBehind(ctx); // blue dash ghosts
 
       // fighters
       const S = MW.STATE;
@@ -1750,6 +1761,8 @@
         const s = f.stats;
         ctx.save();
         ctx.translate((f.px - f.x) * (1 - alpha), (f.py - f.y) * (1 - alpha));
+        const jt = MW.BrawlerFx && MW.BrawlerFx.jitter(f); // victim trembles during hit-stop
+        if (jt) ctx.translate(jt[0], jt[1]);
 
         // check for hit bursts
         checkHitBurst(f);
@@ -1778,7 +1791,8 @@
         const isFlash = f.flash > 0;
 
         if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(ctx, f);
-        drawMomentumAura(ctx, f);
+        if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawAura(ctx, f); // flame aura replaces the static glow
+        else drawMomentumAura(ctx, f);
         // draw the full character body
         drawCharacterBody(ctx, f, isFlash);
 
@@ -1788,6 +1802,7 @@
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
         if (s.id === "mage" && MW.MageFx) MW.MageFx.drawFighter(ctx, f);
+        if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawFighter(ctx, f);
         ctx.restore();
       }
 
@@ -1796,6 +1811,7 @@
       drawSkillFxWorld(ctx);
       if (MW.MageFx) MW.MageFx.draw(ctx);
       if (MW.AssassinFx) MW.AssassinFx.draw(ctx);
+      if (MW.BrawlerFx) MW.BrawlerFx.draw(ctx);
 
       // projectiles
       for (const p of sim.projectiles) {
