@@ -652,25 +652,98 @@
     }
 
     // Meteor Fist: enormous spectral gauntlet punching forward from his own fist
+   
+    // Meteor Fist: COLOSSAL SPECTRAL ARM
     for (const G of giants) {
-      const k = clamp(G.prog, 0, 1), e = 1 - (1 - k) * (1 - k);
-      const len = 170 + 150 * e, hh = 76 + 30 * e;
+      const k = clamp(G.prog, 0, 1);
+      const e = 1 - (1 - k) * (1 - k);
+
+      const len = 1800 + 1200 * e;
+      const hh = 900 + 600 * e;
+      const armH = hh * 0.72;
+
       ctx.save();
-      ctx.translate(G.x, G.y); ctx.scale(G.d, 1);
+      ctx.translate(G.x, G.y);
+      ctx.scale(G.d, 1);
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.9 - 0.35 * k;
-      const gr = ctx.createLinearGradient(0, 0, len, 0);
-      gr.addColorStop(0, "rgba(255,120,40,0)"); gr.addColorStop(0.45, "rgba(255,170,70,0.75)"); gr.addColorStop(1, "rgba(255,245,210,0.95)");
-      ctx.fillStyle = gr;
+      ctx.globalAlpha = 0.95 - 0.2 * k;
+
+      // Long, massive forearm
+      const armGrad = ctx.createLinearGradient(0, 0, len, 0);
+      armGrad.addColorStop(0, "rgba(255,90,20,0)");
+      armGrad.addColorStop(0.2, "rgba(255,100,30,0.65)");
+      armGrad.addColorStop(0.75, "rgba(255,150,50,0.9)");
+      armGrad.addColorStop(1, "rgba(255,230,180,0.95)");
+
+      ctx.fillStyle = armGrad;
       ctx.beginPath();
-      ctx.moveTo(0, -hh * 0.3); ctx.lineTo(len * 0.55, -hh * 0.5);
-      ctx.quadraticCurveTo(len * 1.04, -hh * 0.55, len * 1.06, 0);
-      ctx.quadraticCurveTo(len * 1.04, hh * 0.55, len * 0.55, hh * 0.5);
-      ctx.lineTo(0, hh * 0.3); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.8)"; // knuckles
-      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(len * 0.9, (i - 1.5) * hh * 0.24, hh * 0.15, 0, TAU); ctx.fill(); }
+      ctx.moveTo(0, -armH * 0.28);
+      ctx.lineTo(len * 0.72, -armH * 0.35);
+      ctx.lineTo(len * 0.86, -hh * 0.34);
+      ctx.lineTo(len, -hh * 0.25);
+      ctx.lineTo(len * 1.08, 0);
+      ctx.lineTo(len, hh * 0.25);
+      ctx.lineTo(len * 0.86, hh * 0.34);
+      ctx.lineTo(len * 0.72, armH * 0.35);
+      ctx.lineTo(0, armH * 0.28);
+      ctx.closePath();
+      ctx.fill();
+
+      // Huge fist silhouette
+      const fx = len * 0.88;
+      const fy = 0;
+      const fistW = len * 0.34;
+      const fistH = hh * 0.85;
+
+      const fistGrad = ctx.createRadialGradient(
+        fx, fy, 10,
+        fx, fy, fistW
+      );
+      fistGrad.addColorStop(0, "#ffffff");
+      fistGrad.addColorStop(0.3, "#fff0c0");
+      fistGrad.addColorStop(0.65, "#ff9b42");
+      fistGrad.addColorStop(1, "#ff3825");
+
+      ctx.fillStyle = fistGrad;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 18;
+      ctx.shadowColor = "#ff8a32";
+      ctx.shadowBlur = 65;
+
+      ctx.beginPath();
+      ctx.ellipse(fx, fy, fistW, fistH * 0.5, 0, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+
+      // Four enormous knuckles
+      ctx.shadowBlur = 35;
+      for (let i = 0; i < 4; i++) {
+        const ny = (i - 1.5) * fistH * 0.2;
+        ctx.fillStyle = "#fff4d8";
+        ctx.beginPath();
+        ctx.ellipse(
+          len * 1.05,
+          ny,
+          fistW * 0.28,
+          fistH * 0.115,
+          0,
+          0,
+          TAU
+        );
+        ctx.fill();
+      }
+
+      // Bright energy outline
+      ctx.shadowBlur = 80;
+      ctx.strokeStyle = "rgba(255,240,200,0.8)";
+      ctx.lineWidth = 28;
+      ctx.beginPath();
+      ctx.ellipse(fx, fy, fistW * 1.08, fistH * 0.56, 0, -1.2, 1.2);
+      ctx.stroke();
+
       ctx.restore();
     }
+
 
     // words
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";

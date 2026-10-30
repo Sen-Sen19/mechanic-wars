@@ -456,13 +456,25 @@
       look: "shield",
       width: 60,
       height: 92,
-      maxHP: 500,
+      maxHP: 600,
       armor: 50,
       weight: 150,
       runSpeed: 3.8,
       jumpStrength: 12.6,
       airJumpStrength: 11.2,
-      attack: { type: "melee", damage: 10, startup: 18, active: 6, recovery: 34, knockback: 10, range: 70, advance: 1.4, superArmor: true, fxShape: "slam", boxH: 0.85 },
+      attack: {
+  type: "melee",
+  damage: 10,
+  startup: 18,
+  active: 6,
+  recovery: 34,
+  knockback: 5,
+  range: 70,
+  advance: 1.4,
+  superArmor: true,
+  fxShape: "slam",
+  boxH: 0.85
+},
     }),
   };
 
