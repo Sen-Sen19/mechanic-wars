@@ -488,9 +488,10 @@
     }),
 
     // BULWARK (internal id stays "tank"): immovable shield-bearer.
-    // One slow shield bash with SUPER ARMOR while winding up and swinging: hits still hurt him,
-    // but cannot interrupt or launch him (lethal hits still KO). A miss is very punishable.
-        tank: define({
+    // BASIC ATTACK: tap = Shield Slam (slow bash with SUPER ARMOR while winding up and swinging: hits still hurt him,
+    // but cannot interrupt or launch him; lethal hits still KO; a miss is very punishable).
+    // HOLD the attack button = Holy Guard (see `guard` below).
+    tank: define({
       id: "tank",
       name: "Bulwark",
       color: "#a9b2c2", // weathered silver: select card, chips, HUD
@@ -503,19 +504,133 @@
       runSpeed: 3.8,
       jumpStrength: 12.6,
       airJumpStrength: 11.2,
+      // PASSIVE - Holy Deflection: auto-deflects projectiles back to source, or activates a Holy Shield
+      // for 97% damage reduction (3% passes through) on non-projectile hits.
+      // Has an internal cooldown to prevent repeated activation.
+      passive: {
+        type: "holy_deflection",
+        projectileDeflect: true, // a projectile that strikes him is sent back at whoever fired it (no damage to him)
+        deflectSpeedMul: 1.15,   // the returned projectile flies this much faster than it arrived
+        deflectDamageMul: 1.0,   // share of the original damage the returned projectile deals to its shooter
+        damageReduction: 0.97,   // 97% damage reduction for non-projectiles (3% passes through)
+        cooldown: 90,            // internal cooldown in ticks (90 = 1.5 s), shared by both halves of the passive
+        manaOnProc: 12,          // ultimate meter gained each time the passive triggers (he can charge the ult by defending)
+        // While Holy Guard is standing it handles the FRONT, so the passive does not fire. Hits from BEHIND land normally
+        // (that is the guard's weakness). Set true to let the passive still soften hits from behind while he guards.
+        coversBackWhileGuarding: false,
+      },
       attack: {
-  type: "melee",
-  damage: 10,
-  startup: 18,
-  active: 6,
-  recovery: 34,
-  knockback: 5,
-  range: 70,
-  advance: 1.4,
-  superArmor: true,
-  fxShape: "slam",
-  boxH: 0.85
-},
+        type: "melee",
+        damage: 10,
+        startup: 12,   // was 18: quicker to connect
+        active: 9,     // was 6: a longer window to catch a moving target
+        recovery: 24,  // was 34: still slower than the others, but he can keep swinging (45 ticks per swing, was 58)
+        knockback: 3,  // was 5: the enemy is not shoved out of reach, so the next slam can still connect
+        range: 88,     // was 70
+        advance: 2.0,  // was 1.4: he steps into the swing, so it tracks a retreating enemy
+        stopOnContact: true, // the step stops as soon as the enemy is in reach, so he never slides through them (was the cause of 'the enemy is a ghost')
+
+        superArmor: true,
+        fxShape: "slam",
+        boxH: 1.05,    // was 0.85: taller hit shape, so a jumping or short enemy is not missed
+      },
+      // BASIC ATTACK (HOLD) - HOLY GUARD: keep the attack button held for `holdStart` ticks (a shorter press is the Shield Slam).
+      // He plants the shield (startup = 42 ticks = 0.7 s, he can be hit and interrupted meanwhile), then the barrier stands for
+      // `active` ticks (120 = 2 s). While it stands he cannot walk, jump or turn; hits and projectiles from the FRONT are blocked
+      // (damage x frontMul, no flinch, no launch). Hits from BEHIND hurt normally. Ground only.
+      //   releaseCancel: ticks of recovery when the button is let go before the barrier is up (the stance just drops)
+      //   endOnRelease: true = letting go also drops an established barrier (default: it lasts its full duration)
+      guard: {
+        holdStart: 20, // ticks the button must be held before the stance starts (60 = 1 s). Was 10: normal taps (esp. on a phone) were turning into the stationary Holy Guard
+        attack: {
+          id: "holy_guard", type: "melee", isSkill: true, utility: true, holyGuard: true, pose: 1,
+          startup: 42, active: 120, recovery: 16,
+          frontMul: 0.05, // share of the damage that gets through from the front
+          releaseCancel: 10, endOnRelease: false,
+          blockMana: 8, // mana gained for every blocked hit (blocking charges the ultimate)
+          advance: 0,
+        },
+      },
+      skills: [
+        // SKILL 1 (slot U) - GROUNDBREAKER: plants his feet, raises the shield, slams it into the ground. A SMALL circular shockwave
+        // (radius px, measured from his body centre) damages and staggers everyone inside. It does NOT launch anyone up
+        // (launchV 0), only a short push away. Short startup / recovery: an interrupt / punish tool, not a big knockback skill.
+        // Everything below is tunable; no super armor by default (set superArmor: true if it should be uninterruptible).
+        {
+          id: "groundbreaker", name: "Break", icon: "GRB", cooldown: 240,
+          attack: {
+            id: "groundbreaker", type: "melee", isSkill: true, shockwave: true, pose: 2,
+            radius: 118,
+            damage: 18, startup: 14, active: 3, recovery: 20,
+            knockback: 3.2, launchH: 0.9, launchV: 0, stun: 28, // stagger, not a launch
+            advance: 0, manaGain: 12, superArmor: false,
+          },
+        },
+        // SKILL 2 (slot I) - DIVINE RESTORATION: channels holy energy through his shield, instantly restoring
+        // `heal` HP (cannot exceed maxHP). Simple self-heal with a cooldown. Long recovery = punishable.
+        {
+          id: "divine_restoration", name: "Restore", icon: "RST", cooldown: 600,
+          attack: {
+            id: "divine_restoration", type: "melee", isSkill: true, utility: true, pose: 0,
+            damage: 0, startup: 18, active: 2, recovery: 34, knockback: 0, range: 1, advance: 0, manaGain: 0,
+            heal: 50, // flat HP restored (tunable; 50 per the design)
+            healPct: 0, // > 0 = restore this share of max HP instead (e.g. 0.08), so it scales with maxHP
+          },
+        },
+        // SKILL 3 (slot O) - UNRELENTING WRATH: a rooted series of consecutive forward shield smashes (like Hundred Fists:
+        // `multiHit` ticks between strikes, `sequence` beats in order, repeating until `active` runs out).
+        // Every hit deals damage + a little knockback. He keeps swinging even if nothing is in front of him.
+        {
+          id: "unrelenting_wrath", name: "Wrath", icon: "WTH", cooldown: 720,
+          attack: {
+            id: "unrelenting_wrath", type: "melee", isSkill: true, fxShape: "slam", pose: 2,
+            damage: 2.2, startup: 12, active: 150, recovery: 44, multiHit: 8,
+            knockback: 2.4, launchH: 0.5, launchV: 0, stun: 10,
+            range: 74, boxH: 0.85, advance: 0, manaGain: 2, momentumGain: 0,
+            superArmor: true, // committed to the sequence; not easily interrupted
+            sequence: [
+              { fxShape: "slam", range: 74, kb: 1 },
+              { fxShape: "slam", range: 72, kb: 1.1 },
+              { fxShape: "slam", range: 78, boxH: 1.0, kb: 1.3 },
+            ],
+          },
+        },
+        // SKILL 4 (slot L) - DIVINE TAUNT: a radial divine taunt. Enemies inside `radius` lose control and are forced to
+        // basic-attack him for `duration` ticks; the hits instead damage themselves (redirectMul = share of the
+        // damage reflected back). Forced actions are basic attacks only, not skills/ultimates.
+        {
+          id: "divine_taunt", name: "Taunt", icon: "TNT", cooldown: 900,
+          attack: {
+            id: "divine_taunt", type: "melee", isSkill: true, utility: true, pose: 0,
+            damage: 0, startup: 16, active: 2, recovery: 30, knockback: 0, range: 1, advance: 0, manaGain: 0,
+            taunt: {
+              radius: 230, duration: 120, // 120 ticks = 2 s of forced basic attacks
+              redirectMul: 1.0, // share of forced-attack damage reflected back at the attacker
+            },
+          },
+        },
+      ],
+      // ULTIMATE - DIVINE JUDGMENT: summons a colossal spectral shield above a targeted enemy position.
+      // The enemy is locked while aiming; the shield falls at that spot after `fallDelay` ticks with a
+      // telegraph indicator (impactFx shows the marker + crash). Direct hit = huge damage + stun; the
+      // shockwave (radius px) pushes anyone nearby out and away (ring-out threat).
+      ultimate: {
+        id: "divine_judgment", name: "Divine Judgment", icon: "ULT",
+        attack: {
+          id: "divine_judgment", type: "melee", isSkill: true, utility: true, pose: 0,
+          damage: 55, startup: 14, active: 2, recovery: 60, knockback: 0, range: 1, advance: 0, manaGain: 0,
+          judgment: {
+            range: 520,        // how far away he can target
+            fallDelay: 42,     // telegraph ticks before the shield lands
+            radius: 150,       // shockwave radius from the impact point
+            directDamage: 55,  // damage to enemies directly under the shield
+            directStun: 50,    // stun / knockdown on the direct hit
+            waveKnockback: 14, // knockback applied by the shockwave to nearby enemies
+            waveDamage: 30,    // damage to enemies caught in the outer shockwave
+            waveLaunchH: 1.5, waveLaunchV: 0.4, // outward + slight up = ring-out threat
+          },
+        },
+      },
     }),
   };
 

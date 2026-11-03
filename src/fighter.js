@@ -69,6 +69,11 @@
       this.overload = false; // Void Mage passive: next basic attack is the empowered gravity orb
       this.overloadHits = 0; // successful hits counted towards Void Overload
       this.overloadIdle = 0;
+      this.taunt = null; // Bulwark: Divine Taunt in progress { radius, duration, redirectMul }
+      this.tauntedBy = null; // current fighter is taunted: { owner, left }
+      this.judgment = null; // Bulwark: Divine Judgment in progress { targetPos, t, cfg }
+      this.holyDeflectionCooldown = 0; // Bulwark: internal cooldown for passive
+      this.deflectFlag = false; // Bulwark: set by takeHit when a projectile was deflected; sim.js reads it and turns the projectile around
       this.rand = null; // seeded random function, set by Sim.step (Abyssal Transit destination)
       this.respawn(arena);
       this.invuln = 0; // no blink on the very first spawn
@@ -96,6 +101,8 @@
       this.chargeLock = false; // one charge per button press
       this.chargeTicks = 0;
       this.chargeReleased = true;
+      this.tapPending = false; // Bulwark: a grounded press that is still being read as tap (Shield Slam) or hold (Holy Guard)
+      this.guardLock = false; // Bulwark: one Holy Guard per press, release the button to raise it again
       this.swingHit = false; // did the current swing land anything? (Momentum whiff loss)
       this.lockState = null; // Meteor Fist lock-on: null = not decided yet, true / false once the swing is committed
       this.scythe = null; // Assassin Chained Scythe in progress: { target, phase: "pull" | "bomb", t, cfg, mul }
@@ -237,6 +244,13 @@
       if (this.armorHit > 0) this.armorHit--;
       switch (this.state) {
         case STATE.ATTACK_STARTUP:
+          if (this.hit && this.hit.holyGuard && !this.attackHeld) {
+            // Holy Guard: letting go before the barrier is up drops the stance (short recovery, no barrier)
+            this.hit = Object.assign({}, this.hit, { recovery: this.hit.releaseCancel || 10 });
+            this.state = STATE.ATTACK_RECOVERY;
+            this.stateTimer = this.hit.recovery;
+            break;
+          }
           if (this.hit && this.hit.chargeHold && !this.chargeReleased && this.overload && this.overloadData()) {
             // Void Overload became ready while charging: the empowered orb replaces the Singularity right away
             this.hit = this.orbHit();
@@ -280,6 +294,12 @@
             if (this.hit.spikes) this.pendingZone = { type: "spikes", cfg: this.hit.spikes };
             else if (this.hit.grasp) this.pendingZone = { type: "grasp", cfg: this.hit.grasp };
             if (this.hit.execution) this.beginExecution();
+            if (this.hit.judgment) this.beginJudgment();
+            if (this.hit.taunt) this.beginTaunt(this.hit.taunt);
+            if (this.hit.heal) {
+                this.hp = Math.min(this.stats.maxHP, this.hp + (this.hit.healPct ? this.stats.maxHP * this.hit.healPct : this.hit.heal));
+                this.fxPush({ type: "bulwark", kind: "heal", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5 });
+            }
             if (this.hit.type === "projectile") {
               this.pendingProjectile = this.hit;
               if (this.hit.overloadOrb) this.consumeOverload(); // spent when fired, even if it misses
@@ -287,6 +307,7 @@
           }
           break;
         case STATE.ATTACK_ACTIVE:
+          if (this.hit.holyGuard && this.hit.endOnRelease && !this.attackHeld) this.stateTimer = 1; // optional: let go = barrier drops
           // barrage (Hundred Fists): every multiHit ticks the swing may hit the same target again
           if (this.hit.multiHit && this.stateTimer % this.hit.multiHit === 0) {
             this.hitTargets = new Set();
@@ -787,7 +808,58 @@
       }
     }
 
-    // ── Ultimate: Void Execution. A visible startup, then a rift opens at the enemy's position. If the enemy is still inside the
+    // ── Skill 4: Divine Taunt (Bulwark)
+    beginTaunt(cfg) {
+      if (!this.foe || this.foe.state === STATE.KO || this.foe.untouchable()) return;
+      const dx = this.foe.x + this.foe.stats.width / 2 - (this.x + this.stats.width / 2);
+      const dy = this.foe.y + this.foe.stats.height / 2 - (this.y + this.stats.height / 2);
+      if (Math.hypot(dx, dy) <= cfg.radius) {
+        this.foe.tauntedBy = { owner: this, left: cfg.duration, redirectMul: cfg.redirectMul || 1.0 };
+        this.fxPush({ type: "bulwark", kind: "taunt", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5, radius: cfg.radius });
+      }
+    }
+
+    // ── Ultimate: Divine Judgment (Bulwark)
+    beginJudgment() {
+      const C = this.hit.judgment, s = this.stats, v = this.foe;
+      if (!v || v.state === STATE.KO) return;
+      const targetX = v.x + v.stats.width / 2;
+      const targetY = v.y + v.stats.height;
+      this.judgment = { cfg: C, targetX: targetX, targetY: targetY, t: 0, phase: "warn" };
+      this.fxPush({ type: "bulwark", kind: "judgment_warn", x: targetX, y: targetY, radius: C.radius });
+    }
+
+    judgmentStep() {
+      const J = this.judgment;
+      if (!J) return;
+      const C = J.cfg;
+      J.t++;
+      if (J.phase === "warn") {
+        if (J.t >= C.fallDelay) {
+          J.phase = "impact";
+          this.fxPush({ type: "bulwark", kind: "judgment_impact", x: J.targetX, y: J.targetY, radius: C.radius });
+          // Deal damage / shockwave in Sim (handled by sim.js or direct hit)
+          for (const target of [this.foe]) {
+            if (!target || target.state === STATE.KO || target.untouchable()) continue;
+            const dx = target.x + target.stats.width / 2 - J.targetX;
+            const dy = target.y + target.stats.height / 2 - J.targetY;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= C.radius) {
+              const direct = dist <= target.stats.width / 2;
+              const dmg = direct ? C.directDamage : C.waveDamage;
+              const stun = direct ? C.directStun : 20;
+              const kb = direct ? 5 : C.waveKnockback;
+              const dir = dx >= 0 ? 1 : -1;
+              target.takeHit(this, {
+                id: "divine_judgment", isSkill: true, noMark: true,
+                damage: dmg, knockback: kb, launchH: C.waveLaunchH, launchV: C.waveLaunchV, stun: stun
+              }, dir);
+            }
+          }
+          this.judgment = null;
+        }
+      }
+    }
     // grab zone when the rift finishes opening it is seized, lifted, impaled by tentacles and slammed. Leaving the zone = a clean miss.
     beginExecution() {
       const C = this.hit.execution, s = this.stats, v = this.foe;
@@ -868,6 +940,22 @@
       if (P && P.type === "momentum" && P.whiffLoss && !this.swingHit && this.hit && this.hit.type === "melee" && this.momentum > 0) {
         this.momentum = Math.max(0, this.momentum - P.whiffLoss);
       }
+    }
+
+    // Bulwark Holy Guard (stats.guard): plant the shield. The barrier itself is the ACTIVE phase of this "attack".
+    startGuard(cfg) {
+      this.guardLock = true; // one guard per press: release the button to raise it again
+      this.tapPending = false;
+      this.vx = 0; // the feet plant right away: no sliding on
+      this.startSkill(-3, Object.assign({}, cfg.attack));
+    }
+
+    // Is a hit coming at this fighter from the side he is facing? Melee / blasts: by where the attacker stands.
+    // Projectiles: by their travel direction (they may have been fired from far away).
+    isFrontHit(attacker, hit, dir) {
+      if (hit && hit.type === "projectile" && dir !== undefined) return dir === -this.facing;
+      if (attacker && attacker !== this) return (attacker.x + attacker.stats.width / 2 - (this.x + this.stats.width / 2)) * this.facing > 0;
+      return dir !== undefined && dir === -this.facing;
     }
 
     // Charged punch (stats.charge): wind up while the attack button is held.
@@ -1062,7 +1150,53 @@
         (this.state === STATE.ATTACK_STARTUP || this.state === STATE.ATTACK_ACTIVE));
       // a blocked hit does not break Combat Momentum
       if (P && P.type === "momentum" && !guarding) this.momentum = Math.max(0, this.momentum - (P.hurtLoss || 0));
-      const reduction = guarding ? (this.hit.damageReduction || 1) : 1;
+
+      if (attacker && attacker.tauntedBy && attacker.tauntedBy.owner === this) {
+        // Redirect damage back to attacker!
+        const redirectedDmg = hit.damage * (attacker.tauntedBy.redirectMul || 1.0);
+        attacker.takeHit(attacker, Object.assign({}, hit, { damage: redirectedDmg }), attacker.x >= this.x ? 1 : -1); // shoved away from the Bulwark
+        this.flash = C.hitFlashFrames;
+        this.lastHit = { by: attacker.stats.name, combo: 0, raw: hit.damage, armor: s.armor, dmg: 0, knockback: 0, stun: 0, lost: 1 - this.hp / s.maxHP, redirected: true };
+        return this.lastHit;
+      }
+
+      // ── Bulwark Passive: Holy Deflection
+      // Projectile -> sent back at its shooter (sim.js reads deflectFlag). Anything else -> Holy Shield, 97% less damage.
+      // While Holy Guard stands, a FRONT hit is the guard's job (the passive stays out of it and keeps its cooldown);
+      // a hit from BEHIND still gets the passive if passive.coversBackWhileGuarding is on.
+      const PD = this.stats.passive;
+      if (PD && PD.type === "holy_deflection" && this.holyDeflectionCooldown <= 0) {
+        const guardUp = !!(this.hit && this.hit.holyGuard && this.state === STATE.ATTACK_ACTIVE);
+        const guardFront = guardUp && this.isFrontHit(attacker, hit, dir);
+        const passiveOff = guardUp && (guardFront || PD.coversBackWhileGuarding === false);
+        if (!passiveOff) {
+          if (hit.type === "projectile" && PD.projectileDeflect !== false) {
+            this.holyDeflectionCooldown = PD.cooldown;
+            this.deflectFlag = true;
+            this.addMana({ manaGain: PD.manaOnProc || 0 });
+            this.fxPush({ type: "bulwark", kind: "shield", x: this.x + s.width / 2, y: this.y + s.height * 0.45, radius: 70 });
+            this.flash = C.hitFlashFrames;
+            this.armorHit = 8; // the shield flares
+            this.lastHit = { by: attacker.stats.name, combo: 0, raw: hit.damage, armor: s.armor, dmg: 0, knockback: 0, stun: 0, lost: 1 - this.hp / s.maxHP, deflected: true };
+            return this.lastHit;
+          }
+          if (hit.type !== "projectile") {
+            const reduction = PD.damageReduction === undefined ? 0.97 : PD.damageReduction;
+            const dmg = Combat.damageTaken(hit.damage, s.armor) * (1 - reduction);
+            this.hp = Math.max(0, this.hp - dmg);
+            this.holyDeflectionCooldown = PD.cooldown;
+            this.armorHit = 8;
+            this.addMana({ manaGain: PD.manaOnProc || 0 });
+            this.fxPush({ type: "bulwark", kind: "shield", x: this.x + s.width / 2, y: this.y + s.height * 0.45, radius: 70 });
+            this.lastHit = { by: attacker.stats.name, combo: 0, raw: hit.damage, armor: s.armor, dmg: dmg, knockback: 0, stun: 0, lost: 1 - this.hp / s.maxHP, absorbed: true, passive: true };
+            return this.lastHit;
+          }
+        }
+      }
+
+      // Holy Guard (Bulwark): while the barrier stands, hits from the front are blocked (tiny damage, no flinch); from behind they land.
+      const holy = !!(this.hit && this.hit.holyGuard && this.state === STATE.ATTACK_ACTIVE && this.isFrontHit(attacker, hit, dir));
+      const reduction = guarding ? (this.hit.damageReduction || 1) : holy ? (this.hit.frontMul === undefined ? 0.05 : this.hit.frontMul) : 1;
       const dmg = Combat.damageTaken(hit.damage, s.armor) * reduction;
       if (guarding) {
         const G = this.hit;
@@ -1081,11 +1215,20 @@
       this.hp = Math.max(0, this.hp - dmg);
       if (this.stats.id === "hitter") this.gunnerHop = null; // a hit interrupts the mobility burst
       if (this.cloak && this.cloak.revealOnHit) this.cloak = null; // getting hit reveals the cloaked Assassin
-      if (hit.rupture && this.hp > 0 && attacker && attacker !== this) this.startBleed(attacker, hit); // Rupture: bleeding starts (also on armored targets)
+      if (hit.rupture && !holy && this.hp > 0 && attacker && attacker !== this) this.startBleed(attacker, hit); // Rupture: bleeding starts (also on armored targets; a blocked hit does not bleed)
       const lost = 1 - this.hp / s.maxHP;
       const kb = Combat.knockback(hit.knockback, lost, s.weight);
       const stun = hit.stun !== undefined ? hit.stun : Combat.hitstun(kb); // hit.stun = fixed stagger
       if (dir === undefined) dir = attacker.facing;
+
+      if (holy && this.hp > 0) { // blocked: no flinch, no launch, the stance holds (a lethal hit is never absorbed)
+        this.flash = 0;
+        this.armorHit = 8; // visual only: the barrier flares
+        this.addMana({ manaGain: this.hit.blockMana || 0 });
+        this.blockFx = { dir: this.facing };
+        this.lastHit = { by: attacker.stats.name, combo: attacker.chainIndex + 1, raw: hit.damage, armor: s.armor, dmg: dmg, knockback: 0, stun: 0, lost: 1 - this.hp / s.maxHP, absorbed: true, blocked: true };
+        return this.lastHit;
+      }
 
       // Super armor: while winding up / swinging an armored attack the hit still hurts but does
       // not interrupt or launch. A lethal hit is never absorbed.
@@ -1150,7 +1293,7 @@
       this.heldDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
       this.attackHeld = !!intent.attackHeld;
       if (this.attackHeld) this.atkHeldTicks++;
-      else { this.atkHeldTicks = 0; this.chargeLock = false; }
+      else { this.atkHeldTicks = 0; this.chargeLock = false; this.guardLock = false; }
       this.advanceState();
       if (this.scythe) this.scytheStep();
       this.vanished = false;
@@ -1161,6 +1304,26 @@
       if (this.wraiths) this.wraithStep();
       if (this.gravSlam) this.gravSlamStep();
       if (this.execution) this.executionStep();
+      if (this.judgment) this.judgmentStep();
+
+      if (this.holyDeflectionCooldown > 0) this.holyDeflectionCooldown--;
+
+      if (this.tauntedBy) {
+        if (--this.tauntedBy.left <= 0 || this.tauntedBy.owner.state === STATE.KO) {
+          this.tauntedBy = null;
+        } else {
+          // Force basic attack & face taunter
+          const tOwner = this.tauntedBy.owner;
+          const dir = tOwner.x >= this.x ? 1 : -1;
+          intent = Object.assign({}, intent, {
+            left: false, right: false, jumpPressed: false,
+            attackPressed: true,
+            skillPressed: [false, false, false, false],
+            ultPressed: false
+          });
+          this.facing = dir;
+        }
+      }
       const PV = this.stats.passive; // Void Overload: the hit counter fades if no hit lands for idleReset ticks (0 = never)
       if (PV && PV.type === "voidoverload" && !this.overload && this.overloadHits > 0 && PV.idleReset && ++this.overloadIdle >= PV.idleReset) this.overloadHits = 0;
       const DMK = this.stats.passive;
@@ -1182,6 +1345,20 @@
       }
 
       if (intent.ultPressed && LOCOMOTION.has(this.state)) this.useUltimate();
+
+      // Bulwark (stats.guard): on the ground a press waits to be read. Released within holdStart ticks = a tap (Shield Slam);
+      // still held at holdStart = Holy Guard. In the air (or when presses come from a bot with no hold) it is always a tap.
+      const GD = s.guard;
+      if (GD) {
+        if (!LOCOMOTION.has(this.state)) this.tapPending = false;
+        else if (this.tapPending && !(wasGrounded && this.attackHeld)) { // let go early (or left the ground): it was a tap
+          this.tapPending = false;
+          this.atkBuf = Math.max(this.atkBuf, 1);
+        } else if (wasGrounded && this.attackHeld && !this.guardLock && !this.overload) {
+          if (this.atkHeldTicks >= GD.holdStart) { this.startGuard(GD); this.atkBuf = 0; }
+          else if (this.atkBuf > 0) { this.tapPending = true; this.atkBuf = 0; }
+        }
+      }
 
       // Attack: starts a swing from any locomotion state (ground or air),
       // or queues the next chain hit while already swinging.

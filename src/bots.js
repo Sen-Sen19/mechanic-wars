@@ -252,6 +252,7 @@
 
       const enemyWinding = real.state === S.ATTACK_STARTUP || real.state === S.ATTACK_ACTIVE;
       if (!isMage && enemyWinding && d.gap < 60 && me.cooldowns[3] === 0) intent.skillPressed = [false, false, false, true]; // Iron Guard
+      if (me.stats.id === "tank" && d.gap < 110 && me.cooldowns[0] === 0 && rng() < 0.08) intent.skillPressed = [true, false, false, false]; // Bulwark: Groundbreaker at point blank
       if (isMage) voidMageSkills(me, real, d, intent, rng);
 
       if (intent.attackPressed) {

@@ -88,6 +88,7 @@
         if (--this.koTimer === 0) this.newRound();
       } else {
         this.resolveHits();
+        this.resolveShockwaves();
         this.resolveGunnerUltimates();
         this.stepProjectiles(true);
         this.stepZones();
@@ -114,6 +115,31 @@
             this.emitImpact(a.hit, a, t);
           }
         }
+      }
+    }
+
+    // Radial ground shockwave (Bulwark Groundbreaker: hit.shockwave + hit.radius). Fires once, on the first active tick,
+    // at everyone whose body touches the circle around the caster. Launch direction = away from the caster. Misses still
+    // play the effect (the slam hits the floor either way).
+    resolveShockwaves() {
+      const S = MW.STATE;
+      for (const a of this.fighters) {
+        const h = a.hit;
+        if (!h || !h.shockwave || a.state !== S.ATTACK_ACTIVE || h._resolved) continue;
+        h._resolved = true;
+        const cx = a.x + a.stats.width / 2, cy = a.y + a.stats.height / 2;
+        for (const t of this.fighters) {
+          if (t === a || t.state === S.KO || t.invuln > 0 || t.untargetable) continue;
+          const r = t.rect();
+          const px = Math.max(r.x, Math.min(cx, r.x + r.w)), py = Math.max(r.y, Math.min(cy, r.y + r.h)); // nearest point of the body
+          if ((px - cx) * (px - cx) + (py - cy) * (py - cy) > h.radius * h.radius) continue;
+          const dir = t.x + t.stats.width / 2 >= cx ? 1 : -1;
+          a.hitTargets.add(t.id);
+          t.takeHit(a, h, dir);
+          a.onHitLanded(h);
+          this.emitImpact(h, a, t);
+        }
+        this.emitFx({ type: "impact", fx: "groundbreaker", x: cx, y: a.y + a.stats.height * 0.5, fy: a.y + a.stats.height, radius: h.radius, ownerId: a.id });
       }
     }
 
@@ -245,6 +271,12 @@
             if (overlap(p.hit && p.hit.piercing ? swept : box, t.rect())) {
               const before = p.batch && t.gunnerBatch === p.batch ? { vx: t.vx, vy: t.vy } : null;
               t.takeHit(owner, p.hit, p.dir);
+              if (t.deflectFlag) { // Bulwark Holy Deflection: the projectile turns around and now belongs to him
+                t.deflectFlag = false;
+                this.deflectProjectile(p, t, owner);
+                this.emit("deflect", p);
+                break;
+              }
               if (p.batch && t.state === MW.STATE.HITSTUN) { // every bullet of a barrage / shotgun blast adds its knockback (capped)
                 t.gunnerBatch = p.batch;
                 if (before) {
@@ -278,6 +310,26 @@
 
     // Void Mage projectile riders: the Singularity briefly pulls the target toward its centre,
     // the empowered gravity orb starts the lift-and-slam on the victim.
+    // Holy Deflection: send projectile p (fired by `shooter`) back from the Bulwark `t`. It keeps its attack data but
+    // changes owner, so it can hit the shooter and cannot hit the Bulwark again. Barrage / shotgun batches lose it.
+    deflectProjectile(p, t, shooter) {
+      const D = t.stats.passive || {};
+      if (p.batch) { p.batch.remaining--; this.finishGunnerBatch(p.batch); p.batch = null; }
+      p.ownerId = t.id;
+      p.dir = -p.dir;
+      p.speed *= D.deflectSpeedMul || 1;
+      p.traveled = 0; // a fresh flight, so it can always make it back
+      p.hitTargets = new Set([t.id]);
+      p.deflected = true;
+      p.color = t.stats.color;
+      p.angle = 0; p.vy = 0;
+      p.hit = Object.assign({}, p.hit, { damage: p.hit.damage * (D.deflectDamageMul === undefined ? 1 : D.deflectDamageMul), gunnerAim: false, gunnerBasic: false });
+      p.x = t.x + t.stats.width / 2 + p.dir * (t.stats.width / 2 + p.size / 2);
+      p.y = t.y + t.stats.height * 0.4;
+      p.px = p.x; p.py = p.y;
+      t.fxPush({ type: "bulwark", kind: "deflect", x: p.x, y: p.y, dir: p.dir });
+    }
+
     projectileExtras(owner, t, p) {
       if (t.state === MW.STATE.KO) return;
       const pr = p.hit.projectile;

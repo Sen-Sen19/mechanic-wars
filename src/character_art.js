@@ -74,7 +74,13 @@
       // 8 = Phantom Decoy: crouched, both blades drawn in across the body (the cast)
       { wind: kf([0.45, 0.35], [0.4, 0.35], 0.1, 0, 0.14), strike: kf([0.5, 0.3], [0.45, 0.3], 0.15, 2, 0.16) },
     ],
-    tank: [{ wind: kf([-0.3, 0.05], [0.0, 0.5], -0.32, -5, 0.03), strike: kf([1.0, 0.1], [0.1, 0.5], 0.46, 8, 0.07) }],
+    tank: [
+      { wind: kf([-0.3, 0.05], [0.0, 0.5], -0.32, -5, 0.03), strike: kf([1.0, 0.1], [0.1, 0.5], 0.46, 8, 0.07) },
+      // 1 = Holy Guard (hold attack): sinks into a crouch and plants the tower shield tip-first into the floor ahead of him; held for the whole barrier
+      { wind: kf([0.9, 0.5], [0.4, 0.4], 0.1, 3, 0.06), strike: kf([0.9, 0.5], [0.4, 0.4], 0.1, 3, 0.06) },
+      // 2 = Groundbreaker (skill 1): shield hoisted high overhead, then driven down into the ground in a heavy forward slam
+      { wind: kf([0.25, -1.0], [-0.1, -0.75], -0.18, -3, 0.03), strike: kf([0.85, 0.62], [0.4, 0.5], 0.3, 8, 0.09) },
+    ],
     mage: [{ wind: kf([0.15, -0.55], [0.2, 0.5], -0.16, -2, 0.02), strike: kf([0.95, -0.2], [0.2, 0.5], 0.2, 3, 0.02) }],
     hitter: [{ wind: kf([0.95, 0.08], [0.5, 0.04], -0.05, -1, 0.02), strike: kf([0.92, -0.02], [0.46, -0.06], 0.08, -3, 0.02) }], // two-handed rifle: raised level, small kick
   };
@@ -1168,7 +1174,7 @@
     // ───────────── BULWARK (id "tank") ─────────────
     // Drawn in bulwark_art.js. The old knight below is only a fallback if that file is not loaded.
     if (id === "tank" && MW.Bulwark) {
-      const armorOn = !!(f.hit && f.hit.superArmor && (st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE));
+      const armorOn = !!(f.hit && ((f.hit.superArmor && (st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE)) || (f.hit.holyGuard && st === S.ATTACK_ACTIVE))); // super armor or a standing Holy Guard barrier
       MW.Bulwark.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned, armorOn, spark: f.armorHit > 0 });
       return;
     }

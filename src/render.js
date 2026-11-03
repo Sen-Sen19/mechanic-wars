@@ -184,6 +184,40 @@
   const STRIKE_SHAKE = { hook: 1.5, upper: 4, power: 7, rush: 4, rising: 0, meteor: 0, slam: 2 }; // rising / meteor shake in their own impact code
   function onSkillEvent(ev) {
     if (!ev) return;
+    if (ev.type === "bulwark") { // Bulwark: Holy Deflection / Taunt / Restoration / Divine Judgment one-shots
+      const R = ev.radius || 100;
+      if (ev.kind === "judgment_warn") {
+        addRing(ev.x, ev.y - 2, R * 1.6, R, 26, "#f4dd9e", 4, 0.22); // the zone closes in: get out
+        addShake(3);
+      } else if (ev.kind === "judgment_impact") {
+        addRing(ev.x, ev.y - 3, 12, R * 1.25, 26, "#ffffff", 8, 0.24);
+        addRing(ev.x, ev.y - 3, 8, R, 20, "#f4dd9e", 6, 0.24);
+        addRing(ev.x, ev.y - 3, 10, R * 1.6, 34, "#7fb2dd", 4, 0.24);
+        for (let i = 0; i < 26; i++) {
+          const dx = i % 2 ? 1 : -1;
+          spawnParticle(ev.x + dx * (6 + Math.random() * 60), ev.y - 4, dx * (1.5 + Math.random() * 5), -2 - Math.random() * 5, i % 3 ? "#cfe6fa" : "#f4dd9e", 24 + (Math.random() * 16 | 0), 2.5 + Math.random() * 3);
+        }
+        spawnBurst(ev.x, ev.y - 10, "#ffffff", 14, 8);
+        addShake(22); addFlash(0.45, "#eaf4ff");
+      } else if (ev.kind === "taunt") {
+        addRing(ev.x, ev.y, 20, R, 22, "#f4dd9e", 5, 0.5);
+        addRing(ev.x, ev.y, 12, R * 0.7, 16, "#ffffff", 3, 0.5);
+        spawnBurst(ev.x, ev.y, "#f4dd9e", 12, 5);
+        addShake(5);
+      } else if (ev.kind === "heal") {
+        addRing(ev.x, ev.y, 10, 60, 20, "#bff5c8", 4, 0.6);
+        for (let i = 0; i < 14; i++) spawnParticle(ev.x + (Math.random() - 0.5) * 50, ev.y + 20 + Math.random() * 20, (Math.random() - 0.5) * 0.8, -1 - Math.random() * 2, i % 2 ? "#bff5c8" : "#fff6d8", 26 + (Math.random() * 14 | 0), 2.5);
+      } else if (ev.kind === "deflect") {
+        addRing(ev.x, ev.y, 6, 54, 14, "#ffffff", 4, 1);
+        spawnBurst(ev.x, ev.y, "#f4dd9e", 10, 6);
+        addShake(4); addFlash(0.12, "#fff6d8");
+      } else if (ev.kind === "shield") {
+        addRing(ev.x, ev.y, 10, R, 14, "#f4dd9e", 4, 1);
+        spawnBurst(ev.x, ev.y, "#fff3b0", 8, 4);
+        addShake(2);
+      }
+      return;
+    }
     if (ev.aim) { // Perfect Aim shot: muzzle blast when it leaves, a beam trail + starburst when it lands
       if (ev.type === "fire") {
         aimStart[ev.ownerId] = { x: ev.x, y: ev.y };
@@ -263,6 +297,17 @@
         spawnBurst(ev.x, ev.y, "#ffe27a", 14, 6);
         spawnBurst(ev.x, ev.y, "#ffffff", 6, 4);
         addShake(ev.empowered ? 6 : 8); addFloat(ev, false);
+      } else if (ev.fx === "groundbreaker") {
+        const R = ev.radius || 118, gy = ev.fy - 3; // Bulwark Groundbreaker: a flat shockwave ring races out along the floor
+        addRing(ev.x, gy, 14, R, 22, "#f4dd9e", 6, 0.24);
+        addRing(ev.x, gy, 8, R * 0.72, 16, "#ffffff", 3, 0.24);
+        addRing(ev.x, gy, 10, R * 1.12, 30, "#7fb2dd", 3, 0.24);
+        for (let i = 0; i < 18; i++) { // dust and stone chips thrown up
+          const dirx = i % 2 ? 1 : -1;
+          spawnParticle(ev.x + dirx * (8 + Math.random() * 40), gy - 2, dirx * (1 + Math.random() * 3.6), -1.4 - Math.random() * 3.2, i % 3 ? "#9aa3b4" : "#d9c98f", 20 + (Math.random() * 14 | 0), 2.2 + Math.random() * 2.8);
+        }
+        spawnBurst(ev.x, gy - 6, "#fff3c4", 8, 4);
+        addShake(9); addFlash(0.1, "#fff6d8");
       } else if (ev.fx === "self_destruct") {
         addSelfDestruct(ev);
       } else if (ev.fx === "explosion") {
@@ -516,6 +561,8 @@
       }
       ctx.restore();
       if (f.grounded && Math.random() < 0.7) spawnParticle(cx - f.facing * 14, f.y + s.height - 2, -f.facing * (1 + Math.random() * 2), -0.4 - Math.random() * 0.6, "#c9c2b0", 14, 2.6);
+    } else if (f.state === S.ATTACK_STARTUP && (f.hit.holyGuard || f.hit.shockwave)) {
+      // Bulwark Holy Guard / Groundbreaker: bulwark_art.js (drawFx) draws the whole tell
     } else if (f.state === S.ATTACK_STARTUP && f.hit.id === "iron_guard") {
       // the shield dome (drawGuardAura) is the whole effect
     } else if (f.state === S.ATTACK_STARTUP && f.hit.id === "meteor_breaker") {
@@ -662,7 +709,7 @@
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
-    if (h.fxStyle) return;
+    if (h.fxStyle || h.holyGuard || h.shockwave) return; // (Bulwark guard / ground shockwave have no frontal swing arc)
     const s = f.stats;
     const e = f.meleeShape();
     const d = e.dir;
@@ -2083,6 +2130,7 @@
 
         // Iron Guard aura
         drawGuardAura(ctx, f);
+        if (s.id === "tank" && MW.Bulwark && MW.Bulwark.drawFx) MW.Bulwark.drawFx(ctx, f); // Holy Guard barrier / Groundbreaker tell
 
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
@@ -2100,6 +2148,7 @@
       // particles (between characters and projectiles for depth)
       drawParticles(ctx);
       drawSkillFxWorld(ctx);
+      if (MW.Bulwark && MW.Bulwark.drawJudgment) for (const f of sim.fighters) if (f.stats.id === "tank" && f.state !== MW.STATE.KO) MW.Bulwark.drawJudgment(ctx, f); // Divine Judgment: holy-light shield, above the fighters
       if (MW.MageFx) MW.MageFx.draw(ctx);
       if (MW.AssassinFx) MW.AssassinFx.draw(ctx);
       if (MW.BrawlerFx) MW.BrawlerFx.draw(ctx);

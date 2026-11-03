@@ -383,5 +383,165 @@
     pauldron(armFw[0], 0.82, true);
   }
 
-  MW.Bulwark = { draw, C };
+  // ── effects drawn in WORLD space around the Bulwark (render only). render.js calls this right after the body. ──
+  // Holy Guard: a gold rune circle on the floor while he plants the shield, then a translucent barrier arch in front of
+  //   the shield for as long as it stands (blinks in its last 0.4 s, flares white when it blocks a hit).
+  // Groundbreaker: while he raises the shield, a dashed ring on the floor shows how far the shockwave will reach.
+  // Heater-shield outline centred on (0,0), w wide, h tall.
+  function shieldPath(ctx, w, h) {
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(w / 2, h * 0.08);
+    ctx.quadraticCurveTo(w / 2, h * 0.38, 0, h / 2);
+    ctx.quadraticCurveTo(-w / 2, h * 0.38, -w / 2, h * 0.08);
+    ctx.closePath();
+  }
+
+  // Divine Judgment: a shining yellow holy-light silhouette of a huge shield falls onto the marked spot.
+  // Drawn from render.js in a layer ABOVE the fighters (see MW.Bulwark.drawJudgment), so it always shows.
+  function drawJudgment(ctx, f) {
+    const J = f.judgment;
+    if (!J || J.phase !== "warn") return;
+    const C0 = J.cfg, k = clamp(J.t / Math.max(1, C0.fallDelay), 0, 1), t = Date.now() * 0.001;
+    const R = C0.radius, tx = J.targetX, ty = J.targetY;
+    const w = R * 1.5, hh = R * 1.85;                       // the shield is big: wider than the shockwave marker
+    const fall = Math.pow(clamp((k - 0.12) / 0.88, 0, 1), 1.7);
+    const sy = lerp(ty - hh * 0.5 - 360, ty - hh * 0.5 + 8, fall); // starts in plain view, slams down onto the spot
+    const appear = clamp(k / 0.18, 0, 1);
+    const pulse = 0.85 + 0.15 * Math.sin(t * 30);
+    ctx.save();
+    // floor marker: golden shield glyph + shockwave ring (the warning)
+    ctx.shadowColor = "#ffd34a"; ctx.shadowBlur = 18;
+    ctx.setLineDash([12, 8]); ctx.lineDashOffset = -t * 50;
+    ctx.strokeStyle = "rgba(255,222,120," + (0.45 + 0.5 * k) + ")"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(tx, ty - 1, R, R * 0.2, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.save(); ctx.translate(tx, ty - 2); ctx.scale(1, 0.26); shieldPath(ctx, R * 1.1, R * 1.3);
+    ctx.fillStyle = "rgba(255,200,70," + (0.2 + 0.45 * k) * pulse + ")"; ctx.fill();
+    ctx.strokeStyle = "rgba(255,246,200," + (0.6 + 0.4 * k) + ")"; ctx.lineWidth = 6; ctx.stroke(); ctx.restore();
+    // pillar of holy light from the sky down to the spot
+    ctx.globalCompositeOperation = "lighter";
+    const beam = ctx.createLinearGradient(0, sy - 600, 0, ty);
+    beam.addColorStop(0, "rgba(255,225,120,0)"); beam.addColorStop(0.6, "rgba(255,200,70," + 0.07 * appear + ")"); beam.addColorStop(1, "rgba(255,215,100," + (0.06 + 0.1 * k) + ")");
+    ctx.fillStyle = beam; ctx.fillRect(tx - w * 0.42, sy - 600, w * 0.84, ty - sy + 600);
+    // rotating light rays behind the shield
+    ctx.save(); ctx.translate(tx, sy);
+    for (let i = 0; i < 12; i++) {
+      const ang = t * 0.9 + (i * TAU) / 12, len = hh * (0.95 + 0.25 * Math.sin(t * 6 + i));
+      ctx.strokeStyle = "rgba(255,200,70," + 0.16 * appear + ")"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(Math.cos(ang) * w * 0.4, Math.sin(ang) * hh * 0.4); ctx.lineTo(Math.cos(ang) * len, Math.sin(ang) * len); ctx.stroke();
+    }
+    // the silhouette itself: glowing yellow, normal blending so the shield SHAPE stays readable
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = (0.6 + 0.35 * appear) * pulse;
+    ctx.shadowColor = "#ffcf3a"; ctx.shadowBlur = 55;
+    shieldPath(ctx, w, hh);
+    const gr = ctx.createLinearGradient(0, -hh / 2, 0, hh / 2);
+    gr.addColorStop(0, "rgba(255,226,120,0.9)"); gr.addColorStop(0.55, "rgba(255,196,50,0.8)"); gr.addColorStop(1, "rgba(235,150,20,0.7)");
+    ctx.fillStyle = gr; ctx.fill();
+    ctx.shadowBlur = 24; ctx.strokeStyle = "#fff2b8"; ctx.lineWidth = 8; ctx.stroke();
+    ctx.save(); ctx.scale(0.76, 0.76); shieldPath(ctx, w, hh); ctx.strokeStyle = "rgba(255,244,190,0.75)"; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = "rgba(255,250,215,0.9)"; ctx.lineWidth = 9; // holy cross emblem
+    ctx.beginPath(); ctx.moveTo(0, -hh * 0.34); ctx.lineTo(0, hh * 0.3); ctx.moveTo(-w * 0.26, -hh * 0.1); ctx.lineTo(w * 0.26, -hh * 0.1); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  // Divine Taunt: a gold aura around him while the enemy is forced to hit themselves, and a mark over the enemy's head.
+  function drawTaunt(ctx, f) {
+    const v = f.foe;
+    if (!v || !v.tauntedBy || v.tauntedBy.owner !== f) return;
+    const t = Date.now() * 0.001, s = f.stats, cx = f.x + s.width / 2, cy = f.y + s.height * 0.5;
+    ctx.save();
+    ctx.shadowColor = C.paleGold; ctx.shadowBlur = 14;
+    ctx.strokeStyle = "rgba(244,221,158," + (0.35 + 0.25 * Math.sin(t * 12)) + ")"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(cx, cy, s.width * 0.9 + 6 * Math.sin(t * 9), s.height * 0.62, 0, 0, TAU); ctx.stroke();
+    const vx = v.x + v.stats.width / 2, vy = v.y - 18 + 4 * Math.sin(t * 10); // a gold "!" over the enemy
+    ctx.fillStyle = C.paleGold; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("!", vx, vy);
+    ctx.restore();
+  }
+
+  // Divine Restoration: a rising gold glow while he channels.
+  function drawRestore(ctx, f) {
+    const S = MW.STATE, h = f.hit;
+    if (!h || !h.heal || !(f.state === S.ATTACK_STARTUP || f.state === S.ATTACK_ACTIVE)) return;
+    const k = f.state === S.ATTACK_ACTIVE ? 1 : clamp(1 - f.stateTimer / Math.max(1, h.startup), 0, 1);
+    const s = f.stats, cx = f.x + s.width / 2, fy = f.y + s.height, t = Date.now() * 0.001;
+    ctx.save();
+    ctx.shadowColor = "#bff5c8"; ctx.shadowBlur = 18;
+    const gr = ctx.createLinearGradient(0, fy, 0, fy - s.height * 1.3);
+    gr.addColorStop(0, "rgba(190,245,200," + 0.45 * k + ")"); gr.addColorStop(1, "rgba(255,246,214,0)");
+    ctx.fillStyle = gr; ctx.fillRect(cx - s.width * 0.8, fy - s.height * 1.3, s.width * 1.6, s.height * 1.3);
+    ctx.fillStyle = "rgba(255,246,214," + (0.5 + 0.4 * k) + ")";
+    for (let i = 0; i < 6; i++) { const u = (t * 0.9 + i / 6) % 1; ctx.beginPath(); ctx.arc(cx + Math.sin(i * 2.4 + t * 2) * s.width * 0.6, fy - u * s.height * 1.2, 2.2, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+
+  function drawFx(ctx, f) {
+    const S = MW.STATE, h = f.hit, s = f.stats;
+    if (f.state !== S.KO) { drawTaunt(ctx, f); drawRestore(ctx, f); }
+    if (!h || f.state === S.KO || !(h.holyGuard || h.shockwave)) return;
+    const st = f.state, t = Date.now() * 0.001, d = f.facing;
+    const cx = f.x + s.width / 2, fy = f.y + s.height;
+    if (h.holyGuard && (st === S.ATTACK_STARTUP || st === S.ATTACK_ACTIVE)) {
+      const up = st === S.ATTACK_ACTIVE;
+      const k = up ? 1 : clamp(1 - f.stateTimer / Math.max(1, h.startup), 0, 1); // setup progress
+      let a = up ? 1 : k * k * 0.5; // the barrier materialises while he sets up
+      if (up && f.stateTimer < 24) a *= 0.6 + 0.4 * Math.sin(f.stateTimer * 0.9); // about to drop: blinks
+      // floor rune circle
+      const rx = 28 + 30 * k, ry = rx * 0.2;
+      ctx.save();
+      ctx.shadowColor = C.paleGold; ctx.shadowBlur = 12;
+      ctx.strokeStyle = "rgba(244,221,158," + (0.35 + 0.5 * a) + ")"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(cx, fy - 1, rx, ry, 0, 0, TAU); ctx.stroke();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(244,221,158," + (0.2 + 0.4 * a) + ")";
+      ctx.beginPath(); ctx.ellipse(cx, fy - 1, rx * 0.66, ry * 0.66, 0, 0, TAU); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,246,214," + (0.5 + 0.4 * a) + ")";
+      for (let i = 0; i < 6; i++) { // slow-turning rune marks
+        const ang = t * 1.4 + (i * TAU) / 6;
+        ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rx, fy - 1 + Math.sin(ang) * ry, 2, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+      // barrier arch in front of the shield
+      const x0 = cx + d * (s.width * 0.5 + 40), hgt = s.height * 1.2, bul = 30 + 5 * Math.sin(t * 5); // stands just in front of the planted shield
+      ctx.save();
+      ctx.translate(x0, fy); ctx.scale(d, 1);
+      ctx.globalAlpha = Math.max(0, Math.min(1, a));
+      const arch = () => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(bul * 1.35, -hgt * 0.2, bul * 1.35, -hgt * 0.82, 0, -hgt); ctx.closePath(); };
+      arch();
+      const gr = ctx.createLinearGradient(0, 0, bul, 0);
+      gr.addColorStop(0, "rgba(244,221,158,0.14)"); gr.addColorStop(1, "rgba(255,240,190,0.55)");
+      ctx.fillStyle = gr; ctx.fill();
+      ctx.save(); // scrolling shimmer bands, clipped to the arch
+      arch(); ctx.clip();
+      ctx.strokeStyle = "rgba(255,246,214,0.3)"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 5; i++) {
+        const y = -((i * hgt) / 5 + t * 46) % hgt;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(bul * 1.4, y - 10); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.shadowColor = C.paleGold; ctx.shadowBlur = 14;
+      ctx.strokeStyle = C.paleGold; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(bul * 1.35, -hgt * 0.2, bul * 1.35, -hgt * 0.82, 0, -hgt); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = C.goldHi; // keystone at the top of the arch
+      ctx.beginPath(); ctx.moveTo(-3, -hgt); ctx.lineTo(4, -hgt - 7); ctx.lineTo(11, -hgt); ctx.lineTo(4, -hgt + 7); ctx.closePath(); ctx.fill();
+      if (f.armorHit > 0) { arch(); ctx.fillStyle = "rgba(255,255,255," + 0.55 * (f.armorHit / 8) + ")"; ctx.fill(); } // took a hit: flares white
+      ctx.restore();
+    } else if (h.shockwave && st === S.ATTACK_STARTUP) {
+      const k = clamp(1 - f.stateTimer / Math.max(1, h.startup), 0, 1), R = h.radius;
+      ctx.save();
+      ctx.shadowColor = C.paleGold; ctx.shadowBlur = 10;
+      ctx.setLineDash([10, 8]);
+      ctx.strokeStyle = "rgba(244,221,158," + (0.2 + 0.45 * k) + ")"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(cx, fy - 2, R, R * 0.22, 0, 0, TAU); ctx.stroke(); // where the shockwave will reach
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "rgba(255,246,214," + (0.3 + 0.5 * k) + ")"; ctx.lineWidth = 3;
+      const r2 = R * (1 - 0.8 * k);
+      ctx.beginPath(); ctx.ellipse(cx, fy - 2, r2, r2 * 0.22, 0, 0, TAU); ctx.stroke(); // closes in on him: the tell
+      ctx.restore();
+    }
+  }
+
+  MW.Bulwark = { draw, drawFx, drawJudgment, C };
 })(globalThis);
