@@ -248,13 +248,13 @@ const pressSkill = { ...IDLE, skillPressed: [true, false, false, false] };
   check("... and the shooter is hit by their own projectile", B.hp < hpB, (hpB - B.hp).toFixed(2));
 }
 {
-  // non-projectile: 97% reduction, then the internal cooldown lets the next hit through
+  // non-projectile: 60% reduction (40% passes), then the internal cooldown lets the next hit through
   const { sim, A, B } = duel("fighter", 6);
   const hp0 = A.hp;
   B.startAttack(0);
   for (let i = 0; i < 30 && A.hp === hp0; i++) sim.step([IDLE, IDLE]);
   const full = MW.Combat.damageTaken(C.fighter.attack.damage, C.tank.armor);
-  check("Holy Shield lets only 3% through", Math.abs((hp0 - A.hp) - full * 0.03) < 1e-6, (hp0 - A.hp).toFixed(3));
+  check("Holy Shield lets 40% through", Math.abs((hp0 - A.hp) - full * (1 - C.tank.passive.damageReduction)) < 1e-6, (hp0 - A.hp).toFixed(3));
   check("passive goes on cooldown", A.holyDeflectionCooldown > 0, String(A.holyDeflectionCooldown));
 }
 {

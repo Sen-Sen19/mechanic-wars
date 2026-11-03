@@ -35,6 +35,13 @@
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
   const kf = (fh, bh, lean, lunge, crouch) => ({ fh, bh, lean, lunge: lunge || 0, crouch: crouch || 0 });
+  // Unrelenting Wrath: raised ("up") and slammed ("dn") hand / body positions for each of the four slams (the 5th beat is the leap)
+  const WRATH_POSES = [
+    { up: { fh: [0.25, -1.0], bh: [-0.1, -0.75], lean: -0.22, crouch: 0.02 }, dn: { fh: [0.9, 0.66], bh: [0.4, 0.5], lean: 0.34, crouch: 0.1 } },     // 0 overhead
+    { up: { fh: [-0.45, 0.15], bh: [0.0, 0.4], lean: -0.38, crouch: 0.05 }, dn: { fh: [1.0, 0.72], bh: [0.35, 0.5], lean: 0.4, crouch: 0.11 } },     // 1 side hook: wound back low, swung round
+    { up: { fh: [0.12, -1.22], bh: [0.22, -1.05], lean: -0.4, crouch: 0.0 }, dn: { fh: [0.95, 0.78], bh: [0.7, 0.62], lean: 0.45, crouch: 0.14 } }, // 2 two-handed crush
+    { up: { fh: [0.75, -0.55], bh: [0.3, -0.2], lean: -0.1, crouch: 0.04 }, dn: { fh: [1.05, 0.8], bh: [0.45, 0.55], lean: 0.5, crouch: 0.12 } },   // 3 diagonal hammer
+  ];
   const ATK = {
     fighter: [
       { wind: kf([-0.35, 0.35], [0.2, 0.6], -0.12, -3, 0.01), strike: kf([1.05, -0.02], [0.1, 0.6], 0.22, 7, 0.02) },
@@ -259,7 +266,28 @@
         lean = (up ? -0.02 : low ? 0.34 : 0.28) * (0.5 + 0.5 * ext);
         lunge = 4 * ext; crouch = H * (up ? 0.07 : low ? 0.09 : 0.04) * ext;
       }
-      if (st === S.ATTACK_ACTIVE && f.hit.id !== "iron_guard") { sx = 1.06; sy = 0.96; }
+      if (f.hit.id === "unrelenting_wrath" && st === S.ATTACK_ACTIVE) { // five heavy slams, each its own animation, then the leap
+        if (f.wrath) { // FINALE: leap, hang at the top with the shield high, then plummet
+          const W = f.wrath, ph = W.phase;
+          if (ph === "rise") { const k = clamp(W.t / W.cfg.riseTicks, 0, 1); fh = [lerp(0.55, 0.12, k), lerp(0.1, -1.25, k)]; bh = [lerp(0.3, 0.22, k), lerp(0.4, -1.05, k)]; lean = lerp(0.05, -0.4, k); crouch = H * lerp(0.12, 0, k); }
+          else if (ph === "hang") { fh = [0.12 + 0.03 * Math.sin(now * 80), -1.25]; bh = [0.22, -1.05]; lean = -0.42 + 0.03 * Math.sin(now * 70); crouch = 0; }
+          else { fh = [1.0, 0.85]; bh = [0.75, 0.7]; lean = 0.55; crouch = H * 0.04; sx = 0.94; sy = 1.08; }
+          lunge = 0;
+        } else {
+          const beat = Math.max(1, f.hit.multiHit || 36), p = ((beat - (f.stateTimer % beat)) % beat) / beat; // 0 right after a slam -> 1 just before the next
+          const v = WRATH_POSES[(f.hit.variant | 0) % WRATH_POSES.length];
+          let ext; // 1 = shield on the ground, 0 = raised
+          if (p < 0.12) ext = 1;                          // resting where it landed
+          else if (p < 0.8) ext = 1 - ease((p - 0.12) / 0.68); // the slow, heavy heave up
+          else if (p < 0.9) ext = 0;                      // trembling at the top
+          else ext = Math.pow((p - 0.9) / 0.1, 2);        // the drop
+          fh = [lerp(v.up.fh[0], v.dn.fh[0], ext), lerp(v.up.fh[1], v.dn.fh[1], ext)];
+          bh = [lerp(v.up.bh[0], v.dn.bh[0], ext), lerp(v.up.bh[1], v.dn.bh[1], ext)];
+          lean = lerp(v.up.lean, v.dn.lean, ext) + (p >= 0.8 && p < 0.9 ? 0.025 * Math.sin(now * 90) : 0);
+          crouch = H * lerp(v.up.crouch, v.dn.crouch, ext); lunge = 0; sx = 1 + 0.05 * ext; sy = 1 - 0.05 * ext;
+        }
+      }
+      if (st === S.ATTACK_ACTIVE && f.hit.id !== "iron_guard" && f.hit.id !== "unrelenting_wrath") { sx = 1.06; sy = 0.96; }
       if (airborne) { ff = [Wd * 0.25, -H * 0.1]; bf = [-Wd * 0.2, -H * 0.05]; }
       else { ff = [Wd * 0.3 + lunge * 0.6, 0]; bf = [-Wd * 0.28, 0]; }
     } else if (airborne) {

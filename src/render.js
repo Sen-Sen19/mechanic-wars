@@ -142,10 +142,11 @@
   let shakeMag = 0, flashA = 0, flashCol = "#ffffff", darkLife = 0, banner = null;
   const DARK_MAX = 110;
 
-  function addRing(x, y, r0, r1, life, color, lw, sy) {
+  function addRing(x, y, r0, r1, life, color, lw, sy, noGlow) {
     if (rings.length > 40) rings.shift();
-    rings.push({ x, y, r0, r1, life, maxLife: life, color, lw: lw || 3, sy: sy === undefined ? 1 : sy });
+    rings.push({ x, y, r0, r1, life, maxLife: life, color, lw: lw || 3, sy: sy === undefined ? 1 : sy, noGlow: !!noGlow });
   }
+  const aftershocks = []; // {t,x,y,R,dir}: delayed echo rings / tremors of the Bulwark's Wrath slams
   function addShake(n) { shakeMag = Math.max(shakeMag, n); }
   function addFlash(a, col) { flashA = Math.max(flashA, a); flashCol = col || "#ffffff"; }
   MW.fxShake = addShake; // other effect files (brawler_fx.js) can shake / flash the screen too
@@ -204,6 +205,43 @@
         addRing(ev.x, ev.y, 12, R * 0.7, 16, "#ffffff", 3, 0.5);
         spawnBurst(ev.x, ev.y, "#f4dd9e", 12, 5);
         addShake(5);
+      } else if (ev.kind === "wrath_slam") { // Unrelenting Wrath: 4 heavy slams, each lands differently (variant 0-3)
+        const gy = ev.y - 3, d = ev.dir || 1, v = ev.variant | 0;
+        addRing(ev.x, gy, 10, R * (v === 3 ? 1.15 : 1), 18, "#f4dd9e", 6, 0.22, true);
+        addRing(ev.x, gy, 8, R * 1.5, 28, "#7fb2dd", 3, 0.22, true);
+        const nLines = v === 2 ? 8 : 6, lines = [];
+        for (let i = 0; i < nLines; i++) lines.push([(i / (nLines - 1)) * Math.PI - Math.PI, 40 + Math.random() * (v === 2 ? 110 : 80), (Math.random() - 0.5) * 0.5]);
+        if (cracks.length < 5) cracks.push({ x: ev.x, y: ev.y, life: 60, maxLife: 60, lines, cheap: true });
+        for (let i = 0; i < 12; i++) { // stone chips thrown up (all of them for the side hook thrown sideways)
+          const dx = v === 1 ? d : (i % 2 ? 1 : -1);
+          spawnParticle(ev.x + dx * (4 + Math.random() * 30), gy - 2, dx * (1 + Math.random() * 4.5), -2 - Math.random() * 4.2, i % 3 ? "#9aa3b4" : "#d9c98f", 20 + (Math.random() * 12 | 0), 2.2 + Math.random() * 3);
+        }
+        for (let i = 0; i < 7; i++) { // dust rolling out along the ground
+          const dx = v === 3 ? d : (i % 2 ? 1 : -1);
+          spawnParticle(ev.x + dx * (10 + Math.random() * 20), gy - 1, dx * (3 + Math.random() * 3), -0.2 - Math.random() * 0.8, "#b9ad92", 24 + (Math.random() * 10 | 0), 3 + Math.random() * 3);
+        }
+        if (v === 2) { addRing(ev.x - d * 46, gy, 6, R * 0.9, 20, "#ffffff", 3, 0.22, true); addRing(ev.x + d * 46, gy, 6, R * 0.9, 20, "#ffffff", 3, 0.22, true); } // two-handed: twin shockwaves
+        if (v === 3) for (let i = 0; i < 6; i++) spawnParticle(ev.x + d * (20 + i * 22), gy - 2, d * 2, -0.6 - Math.random(), "#b9ad92", 22, 3); // hammer: a trail of dust runs ahead
+        addShake(10 + 2 * v); addFlash(0.06, "#fff6d8");
+        aftershocks.push({ t: 6, x: ev.x - d * 55, y: gy, R: R * 1.5 }, { t: 12, x: ev.x + d * 65, y: gy, R: R * 1.8 });
+      } else if (ev.kind === "wrath_leap") { // takeoff: the floor bursts under him
+        addRing(ev.x, ev.y - 3, 8, 90, 16, "#f4dd9e", 5, 0.22, true);
+        for (let i = 0; i < 12; i++) { const dx = i % 2 ? 1 : -1; spawnParticle(ev.x + dx * (6 + Math.random() * 20), ev.y - 3, dx * (1 + Math.random() * 3), -1 - Math.random() * 3, i % 2 ? "#b9ad92" : "#9aa3b4", 22, 2.5 + Math.random() * 2.5); }
+        addShake(8);
+      } else if (ev.kind === "wrath_finale") { // THE ground pound: huge shockwave, radial cracks, earthquake and a long chain of aftershocks
+        const gy = ev.y - 3, FR = ev.radius || 190;
+        addRing(ev.x, gy, 12, FR, 24, "#f4dd9e", 9, 0.24, true);
+        addRing(ev.x, gy, 8, FR * 0.7, 18, "#ffffff", 5, 0.24, true);
+        addRing(ev.x, gy, 10, FR * 1.5, 36, "#7fb2dd", 4, 0.24, true);
+        addRing(ev.x, gy, 6, FR * 2.0, 46, "#9aa3b4", 3, 0.24, true);
+        const lines = [];
+        for (let i = 0; i < 11; i++) lines.push([(i / 10) * Math.PI - Math.PI, 90 + Math.random() * 150, (Math.random() - 0.5) * 0.6]);
+        cracks.push({ x: ev.x, y: ev.y, life: 110, maxLife: 110, lines });
+        for (let i = 0; i < 28; i++) { const dx = i % 2 ? 1 : -1; spawnParticle(ev.x + dx * (6 + Math.random() * 60), gy - 2, dx * (1.5 + Math.random() * 6), -3 - Math.random() * 6, i % 3 ? "#9aa3b4" : "#d9c98f", 28 + (Math.random() * 16 | 0), 2.5 + Math.random() * 3.5); }
+        for (let i = 0; i < 14; i++) { const dx = i % 2 ? 1 : -1; spawnParticle(ev.x + dx * (10 + Math.random() * 30), gy - 1, dx * (4 + Math.random() * 4), -0.3 - Math.random(), "#b9ad92", 34, 4 + Math.random() * 3); }
+        spawnBurst(ev.x, gy - 8, "#fff3c4", 10, 5);
+        addShake(34); addFlash(0.4, "#fff6d8");
+        for (let i = 1; i <= 5; i++) aftershocks.push({ t: i * 7, x: ev.x + (i % 2 ? 1 : -1) * i * 22, y: gy, R: FR * (0.8 + 0.25 * i) });
       } else if (ev.kind === "heal") {
         addRing(ev.x, ev.y, 10, 60, 20, "#bff5c8", 4, 0.6);
         for (let i = 0; i < 14; i++) spawnParticle(ev.x + (Math.random() - 0.5) * 50, ev.y + 20 + Math.random() * 20, (Math.random() - 0.5) * 0.8, -1 - Math.random() * 2, i % 2 ? "#bff5c8" : "#fff6d8", 26 + (Math.random() * 14 | 0), 2.5);
@@ -327,6 +365,13 @@
 
   function tickSkillFx() {
     shakeMag *= 0.88; if (shakeMag < 0.3) shakeMag = 0;
+    for (let i = aftershocks.length - 1; i >= 0; i--) { // Wrath aftershocks: fading echo rings + a small tremor
+      const a = aftershocks[i];
+      if (--a.t > 0) continue;
+      addRing(a.x, a.y, 6, a.R, 18, "#9aa3b4", 3, 0.22, true);
+      addShake(4);
+      aftershocks.splice(i, 1);
+    }
     flashA *= 0.82; if (flashA < 0.01) flashA = 0;
     if (darkLife > 0) darkLife--;
     if (banner && --banner.life <= 0) banner = null;
@@ -349,7 +394,7 @@
     for (const c of cracks) {
       const a = Math.min(1, c.life / 25);
       ctx.strokeStyle = rgba("#ffb066", a); ctx.lineWidth = 3.5;
-      ctx.shadowColor = "#ff5a1f"; ctx.shadowBlur = 12;
+      if (c.cheap) ctx.shadowBlur = 0; else { ctx.shadowColor = "#ff5a1f"; ctx.shadowBlur = 12; }
       for (const L of c.lines) {
         const ang = L[0], len = L[1] * (1 - 0.35 * (c.life / c.maxLife));
         const mx = c.x + Math.cos(ang) * len * 0.55, my = c.y + 2 + L[2] * 18 * Math.sign(Math.sin(ang) || 1);
@@ -417,7 +462,7 @@
       const rad = r.r0 + (r.r1 - r.r0) * (1 - (1 - k) * (1 - k)); // fast start, slow end
       ctx.globalAlpha = Math.min(1, r.life / (r.maxLife * 0.6));
       ctx.strokeStyle = r.color; ctx.lineWidth = Math.max(1, r.lw * (1 - k * 0.6));
-      ctx.shadowColor = r.color; ctx.shadowBlur = 12;
+      if (r.noGlow) ctx.shadowBlur = 0; else { ctx.shadowColor = r.color; ctx.shadowBlur = 12; }
       ctx.beginPath(); ctx.ellipse(r.x, r.y, Math.max(1, rad), Math.max(1, rad * r.sy), 0, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
@@ -467,6 +512,37 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = alpha;
     ctx.drawImage(fadeCv, 0, 0);
+    ctx.restore();
+  }
+
+  // Divine Taunt: a taunted fighter gets a glowing red outline (the body is painted once off-screen, then a red
+  // silhouette is stamped around it before the normal picture goes on top).
+  let tauntCv = null, tauntSil = null;
+  function drawTauntOutlined(ctx, paintBody) {
+    if (typeof document === "undefined" || !ctx.canvas || !ctx.getTransform) { paintBody(ctx); return; }
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    if (!tauntCv || tauntCv.width !== w || tauntCv.height !== h) {
+      tauntCv = document.createElement("canvas"); tauntCv.width = w; tauntCv.height = h;
+      tauntSil = document.createElement("canvas"); tauntSil.width = w; tauntSil.height = h;
+    }
+    const m = ctx.getTransform(), scale = Math.hypot(m.a, m.b) || 1;
+    const c = tauntCv.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
+    c.setTransform(m);
+    paintBody(c);
+    const sc = tauntSil.getContext("2d");
+    sc.setTransform(1, 0, 0, 1, 0, 0); sc.globalCompositeOperation = "source-over"; sc.clearRect(0, 0, w, h);
+    sc.drawImage(tauntCv, 0, 0);
+    sc.globalCompositeOperation = "source-in"; sc.fillStyle = "#ff2d2d"; sc.fillRect(0, 0, w, h);
+    sc.globalCompositeOperation = "source-over";
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.012), r = (2.6 + 0.9 * pulse) * scale;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.shadowColor = "#ff1a1a"; ctx.shadowBlur = (10 + 8 * pulse) * scale;
+    ctx.globalAlpha = 0.7 + 0.3 * pulse;
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ctx.drawImage(tauntSil, Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    ctx.drawImage(tauntCv, 0, 0);
     ctx.restore();
   }
 
@@ -709,7 +785,7 @@
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
-    if (h.fxStyle || h.holyGuard || h.shockwave) return; // (Bulwark guard / ground shockwave have no frontal swing arc)
+    if (h.fxStyle || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
     const s = f.stats;
     const e = f.meleeShape();
     const d = e.dir;
@@ -2126,6 +2202,7 @@
           drawCharacterBody(c, f, isFlash);
         };
         if (cloaked) drawFaded(ctx, f.fade, paintBody); // cloaked Assassin: the art resets alpha itself, so fade the finished picture
+        else if (f.tauntedBy && f.tauntedBy.left > 0 && f.state !== S.KO) drawTauntOutlined(ctx, paintBody); // Divine Taunt: red outline = taunted
         else paintBody(ctx);
 
         // Iron Guard aura

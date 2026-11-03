@@ -511,20 +511,20 @@
         type: "holy_deflection",
         projectileDeflect: true, // a projectile that strikes him is sent back at whoever fired it (no damage to him)
         deflectSpeedMul: 1.15,   // the returned projectile flies this much faster than it arrived
-        deflectDamageMul: 1.0,   // share of the original damage the returned projectile deals to its shooter
-        damageReduction: 0.97,   // 97% damage reduction for non-projectiles (3% passes through)
-        cooldown: 90,            // internal cooldown in ticks (90 = 1.5 s), shared by both halves of the passive
-        manaOnProc: 12,          // ultimate meter gained each time the passive triggers (he can charge the ult by defending)
+        deflectDamageMul: 0.7,   // share of the original damage the returned projectile deals to its shooter
+        damageReduction: 0.6,    // 60% damage reduction for non-projectiles (40% passes through; was 97%, which made him untouchable)
+        cooldown: 180,           // internal cooldown in ticks (180 = 3 s; was 90), shared by both halves of the passive
+        manaOnProc: 8,           // ultimate meter gained each time the passive triggers (he can charge the ult by defending)
         // While Holy Guard is standing it handles the FRONT, so the passive does not fire. Hits from BEHIND land normally
         // (that is the guard's weakness). Set true to let the passive still soften hits from behind while he guards.
         coversBackWhileGuarding: false,
       },
       attack: {
         type: "melee",
-        damage: 10,
-        startup: 12,   // was 18: quicker to connect
-        active: 9,     // was 6: a longer window to catch a moving target
-        recovery: 24,  // was 34: still slower than the others, but he can keep swinging (45 ticks per swing, was 58)
+        damage: 7,     // was 10: the basic bash hurts less
+        startup: 17,   // was 12: slower wind-up
+        active: 7,     // was 9
+        recovery: 36,  // was 24: heavy and punishable (60 ticks per swing, was 45)
         knockback: 3,  // was 5: the enemy is not shoved out of reach, so the next slam can still connect
         range: 88,     // was 70
         advance: 2.0,  // was 1.4: he steps into the swing, so it tracks a retreating enemy
@@ -577,22 +577,32 @@
             healPct: 0, // > 0 = restore this share of max HP instead (e.g. 0.08), so it scales with maxHP
           },
         },
-        // SKILL 3 (slot O) - UNRELENTING WRATH: a rooted series of consecutive forward shield smashes (like Hundred Fists:
-        // `multiHit` ticks between strikes, `sequence` beats in order, repeating until `active` runs out).
-        // Every hit deals damage + a little knockback. He keeps swinging even if nothing is in front of him.
+        // SKILL 3 (slot O) - UNRELENTING WRATH: FIVE slow, heavy shield slams, each with its own animation (overhead / side hook /
+        // two-handed crush / diagonal hammer), then a FINALE: he leaps and drives the shield into the ground with a big shockwave.
+        //   multiHit: ticks per slam (36 = 0.6 s: slow, the shield is heavy). active must be 5 x multiHit (the 5th beat is the finale).
+        //   hitWindow: ticks after each slam lands during which it can still connect (the slow raise in between cannot hit)
+        //   finale: riseTicks / riseSpeed (px per tick, fades out) / hang (ticks at the top) / dropSpeed / drift (forward px per tick)
+        //           damage + radius + knockback + launchH / launchV + stun = the landing shockwave; recovery = ticks of recovery after landing
         {
           id: "unrelenting_wrath", name: "Wrath", icon: "WTH", cooldown: 720,
           attack: {
             id: "unrelenting_wrath", type: "melee", isSkill: true, fxShape: "slam", pose: 2,
-            damage: 2.2, startup: 12, active: 150, recovery: 44, multiHit: 8,
-            knockback: 2.4, launchH: 0.5, launchV: 0, stun: 10,
-            range: 74, boxH: 0.85, advance: 0, manaGain: 2, momentumGain: 0,
+            damage: 6, startup: 30, active: 180, recovery: 48, multiHit: 36, hitWindow: 4,
+            knockback: 3.2, launchH: 0.5, launchV: 0, stun: 30,
+            range: 76, boxH: 0.95, advance: 0, manaGain: 3, momentumGain: 0,
             superArmor: true, // committed to the sequence; not easily interrupted
             sequence: [
-              { fxShape: "slam", range: 74, kb: 1 },
-              { fxShape: "slam", range: 72, kb: 1.1 },
-              { fxShape: "slam", range: 78, boxH: 1.0, kb: 1.3 },
+              { variant: 0, fxShape: "slam", range: 76, kb: 1,   damage: 5 },   // overhead
+              { variant: 1, fxShape: "slam", range: 80, kb: 1.1, damage: 5.5 }, // wide side hook
+              { variant: 2, fxShape: "slam", range: 78, boxH: 1.05, kb: 1.3, damage: 6 }, // two-handed crush
+              { variant: 3, fxShape: "slam", range: 84, kb: 1.5, damage: 6.5 }, // diagonal hammer
+              { variant: 4, finaleBeat: true },                                   // leap + ground pound
             ],
+            finale: {
+              riseTicks: 20, riseSpeed: 10, hang: 5, dropSpeed: 30, drift: 2.4,
+              damage: 22, radius: 190, directRange: 90, waveMul: 0.6,
+              knockback: 14, launchH: 1.7, launchV: 0.9, stun: 60, recovery: 70,
+            },
           },
         },
         // SKILL 4 (slot L) - DIVINE TAUNT: a radial divine taunt. Enemies inside `radius` lose control and are forced to

@@ -446,7 +446,7 @@
     ctx.restore();
   }
 
-  // Divine Taunt: a gold aura around him while the enemy is forced to hit themselves, and a mark over the enemy's head.
+  // Divine Taunt: a gold aura around him while the enemy is forced to hit themselves, and a red "!" over the enemy's head (render.js adds the red outline).
   function drawTaunt(ctx, f) {
     const v = f.foe;
     if (!v || !v.tauntedBy || v.tauntedBy.owner !== f) return;
@@ -456,7 +456,7 @@
     ctx.strokeStyle = "rgba(244,221,158," + (0.35 + 0.25 * Math.sin(t * 12)) + ")"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.ellipse(cx, cy, s.width * 0.9 + 6 * Math.sin(t * 9), s.height * 0.62, 0, 0, TAU); ctx.stroke();
     const vx = v.x + v.stats.width / 2, vy = v.y - 18 + 4 * Math.sin(t * 10); // a gold "!" over the enemy
-    ctx.fillStyle = C.paleGold; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#ff4a3a"; ctx.shadowColor = "#ff1a1a"; ctx.shadowBlur = 10; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("!", vx, vy);
     ctx.restore();
   }

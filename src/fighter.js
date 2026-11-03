@@ -72,6 +72,7 @@
       this.taunt = null; // Bulwark: Divine Taunt in progress { radius, duration, redirectMul }
       this.tauntedBy = null; // current fighter is taunted: { owner, left }
       this.judgment = null; // Bulwark: Divine Judgment in progress { targetPos, t, cfg }
+      this.wrath = null; // Bulwark: Unrelenting Wrath finale (leap + ground pound) in progress { cfg, phase, t }
       this.holyDeflectionCooldown = 0; // Bulwark: internal cooldown for passive
       this.deflectFlag = false; // Bulwark: set by takeHit when a projectile was deflected; sim.js reads it and turns the projectile around
       this.rand = null; // seeded random function, set by Sim.step (Abyssal Transit destination)
@@ -296,6 +297,7 @@
             if (this.hit.execution) this.beginExecution();
             if (this.hit.judgment) this.beginJudgment();
             if (this.hit.taunt) this.beginTaunt(this.hit.taunt);
+            if (this.hit.id === "unrelenting_wrath" && this.foe) this.hitTargets.add(this.foe.id); // the first slam is the first beat, not a free extra hit
             if (this.hit.heal) {
                 this.hp = Math.min(this.stats.maxHP, this.hp + (this.hit.healPct ? this.stats.maxHP * this.hit.healPct : this.hit.heal));
                 this.fxPush({ type: "bulwark", kind: "heal", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5 });
@@ -316,6 +318,7 @@
               const step = base.sequence[this.barrageBeat++ % base.sequence.length];
               this.hit = Object.assign({}, base, step, { knockback: base.knockback * (step.kb || 1) });
             }
+            if (this.hit.id === "unrelenting_wrath") this.wrathBeat();
           }
           if (--this.stateTimer <= 0) {
             this.state = STATE.ATTACK_RECOVERY;
@@ -819,6 +822,63 @@
       }
     }
 
+    // ── Skill 3: Unrelenting Wrath (Bulwark). Called on every beat (a slam every `multiHit` ticks).
+    wrathBeat() {
+      const H = this.hit, sw = this.stats.width, cx = this.x + sw / 2, fy = this.y + this.stats.height;
+      if (H.finaleBeat) { // 5th beat: no melee box, he leaps and ground-pounds instead
+        if (this.foe) this.hitTargets.add(this.foe.id);
+        this.wrath = { cfg: H.finale, phase: "rise", t: 0, safety: 0 };
+        this.fxPush({ type: "bulwark", kind: "wrath_leap", x: cx, y: fy, dir: this.facing });
+      } else {
+        this.fxPush({ type: "bulwark", kind: "wrath_slam", x: cx + this.facing * (sw / 2 + 36), y: fy, dir: this.facing, radius: 120, variant: H.variant | 0 });
+      }
+    }
+
+    wrathStep() {
+      const W = this.wrath, H = this.hit;
+      if (!W) { // normal slams only connect for the first `hitWindow` ticks after landing, not during the slow raise
+        if (this.state === STATE.ATTACK_ACTIVE && H && H.id === "unrelenting_wrath" && H.hitWindow && this.foe &&
+            this.stateTimer % H.multiHit === H.multiHit - 1 - H.hitWindow) this.hitTargets.add(this.foe.id);
+        return;
+      }
+      if (this.state !== STATE.ATTACK_ACTIVE) { this.wrath = null; return; } // knocked out of it (lethal hit etc.)
+      const F = W.cfg, d = this.facing;
+      if (this.stateTimer < 3) this.stateTimer = 3; // the timer must not run out while he is in the air
+      W.t++;
+      if (W.phase === "rise") {
+        const k = W.t / F.riseTicks;
+        this.ctl = { vx: d * F.drift, vy: -F.riseSpeed * (1 - 0.85 * k), left: 1 };
+        if (W.t >= F.riseTicks) { W.phase = "hang"; W.t = 0; }
+      } else if (W.phase === "hang") {
+        this.ctl = { vx: 0, vy: 0, left: 1 };
+        if (W.t >= F.hang) { W.phase = "drop"; W.t = 0; }
+      } else {
+        W.safety++;
+        this.ctl = { vx: d * F.drift * 0.5, vy: F.dropSpeed, left: 1 };
+        if ((this.grounded && W.t > 1) || W.safety > 90) this.wrathLand();
+      }
+    }
+
+    wrathLand() {
+      const W = this.wrath, F = W.cfg, s = this.stats;
+      this.wrath = null; this.ctl = null; this.vx = 0; this.vy = 0;
+      const cx = this.x + s.width / 2, fy = this.y + s.height;
+      for (const t of [this.foe]) {
+        if (!t || t === this || t.state === STATE.KO || t.untouchable()) continue;
+        const dx = t.x + t.stats.width / 2 - cx, dy = t.y + t.stats.height / 2 - (fy - s.height / 2);
+        if (Math.hypot(dx, dy) > F.radius) continue;
+        const direct = Math.abs(dx) <= F.directRange;
+        t.takeHit(this, {
+          id: "wrath_finale", isSkill: true, noMark: true,
+          damage: direct ? F.damage : F.damage * F.waveMul, knockback: direct ? F.knockback : F.knockback * 0.8,
+          launchH: F.launchH, launchV: F.launchV, stun: F.stun,
+        }, dx >= 0 ? 1 : -1);
+      }
+      this.fxPush({ type: "bulwark", kind: "wrath_finale", x: cx, y: fy, radius: F.radius });
+      this.hit = Object.assign({}, this.hit, { recovery: F.recovery });
+      this.stateTimer = 1; // next tick: recovery
+    }
+
     // ── Ultimate: Divine Judgment (Bulwark)
     beginJudgment() {
       const C = this.hit.judgment, s = this.stats, v = this.foe;
@@ -1305,6 +1365,7 @@
       if (this.gravSlam) this.gravSlamStep();
       if (this.execution) this.executionStep();
       if (this.judgment) this.judgmentStep();
+      this.wrathStep();
 
       if (this.holyDeflectionCooldown > 0) this.holyDeflectionCooldown--;
 
