@@ -1,24 +1,34 @@
+
 // Mechanic Wars - Artillerist art (render only, never touches the sim).
 // An elite arcane weapons specialist: obsidian split-tail combat coat, gunmetal shoulder and forearm
 // armor with aged bronze trim, a cartridge bandolier, a mechanical eyepiece, a holstered sidearm and a
 // blackened-steel arcane rifle with a glowing blue energy chamber and a floating-ring barrel.
-// Called from character_art.js DETAIL() for id === "hitter".
-// k = the shared rig state from character_art.js, e = a few precomputed values (see DETAIL).
-// The rifle is drawn between the two hands: grip in the back hand, handguard on the front hand.
+//
+// Refactor Notes:
+// - Head design changed to "The Anonymous Marksman": deep black hood, matte-black angular mask,
+//   narrow golden-yellow glowing eye slits, and subtle orange-glowing mechanical vents.
+// - No exposed skin or traditional facial features. The character remains anonymous.
+// - Energy colors (rifle, eyepiece, ammo) remain yellow/orange as per previous iteration.
+
 (function (g) {
   const MW = (g.MW = g.MW || {});
   const TAU = Math.PI * 2;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
 
-  // Palette: obsidian black, gunmetal gray, aged bronze / muted gold, controlled arcane blue.
+  // Palette: obsidian black, gunmetal gray, aged bronze / muted gold, controlled arcane yellow/orange.
   // rim = soft edge light so the black coat still reads on dark stages.
   const C = {
     line: "#040508", obs: "#0b0c11", obs2: "#151821", obs3: "#222733",
     rim: "#3b4659", steel: "#343c4b", steel2: "#4c5567", steelHi: "#7a869b",
-    bronze: "#8c6330", bronzeHi: "#c79a4e", gold: "#d4b36a", leather: "#2b1f17",
-    blue: "#3fa0ff", blueHi: "#b5e2ff", blueDeep: "#12306a",
-    skin: "#c6a089", skinDark: "#8f6c5a", hair: "#14151b",
+    bronze: "#8c6330", bronzeHi: "#c79a4e", gold: "#d4b36a",
+    leather: "#2b1f17",
+
+    // Yellow/orange arcane energy palette
+    yellowLight: "#FFD229", // Electric Yellow
+    yellowBright: "#FFC766", // Golden Glow - for brighter yellow highlights
+    orange: "#FF8C1A",      // Burnt Orange
+    fireOrange: "#E04000",   // Intense fiery orange for deeper parts of glow/muzzle
   };
 
   // ── tiny drawing helpers ───────────────────────────────────────────
@@ -80,29 +90,25 @@
     ctx.stroke();
     ctx.restore();
   }
-  // soft additive blue glow
+  // soft additive yellow/orange glow
   function glow(k, x, y, r, a) {
     if (k.isFlash || a <= 0) return;
     const { ctx } = k;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, "rgba(120,200,255," + a + ")");
-    gr.addColorStop(0.45, "rgba(63,160,255," + a * 0.45 + ")");
-    gr.addColorStop(1, "rgba(30,90,200,0)");
+    gr.addColorStop(0, "rgba(255,240,180," + a * 0.9 + ")"); // White-yellow core
+    gr.addColorStop(0.45, "rgba(255,199,102," + a * 0.5 + ")"); // Golden glow
+    gr.addColorStop(1, "rgba(255,140,26,0)"); // Burnt Orange fade
     ctx.fillStyle = gr;
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
     ctx.restore();
-  }
-  function dot(k, x, y, r, color) {
-    k.ctx.beginPath(); k.ctx.arc(x, y, r, 0, TAU);
-    k.ctx.fillStyle = k.col(color); k.ctx.fill();
   }
 
   function draw(k, e) {
     const { ctx, d, now, A } = k;
     const F = k.isFlash;
-    const { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned } = e;
+    const { shW, hipW, hcw, armBw, armFw, windU, pulse, stunned } = e;
     const torL = k.torL, sw = k.sw, hw = k.hw, aw = k.aw, lw = k.lw, hr = k.hr, legL = k.legL;
     const back = -d;
     const sc = k.H / 74;
@@ -146,13 +152,13 @@
         [p1[0] + tx * aw * 0.35, p1[1] + ty * aw * 0.35],
         [p1[0] - qx * w1, p1[1] - qy * w1], [p0[0] - qx * w0, p0[1] - qy * w0],
       ], front ? C.steel : C.obs3, C.rim, 1.4);
-      // bronze cuff bands + one blue rune dot
+      // bronze cuff bands + one yellow/orange rune dot
       for (const u of [0.18, 0.78]) {
         const c = [lerp(p0[0], p1[0], u), lerp(p0[1], p1[1], u)], w = lerp(w0, w1, u);
         line(k, [[c[0] + qx * w, c[1] + qy * w], [c[0] - qx * w, c[1] - qy * w]], C.bronzeHi, 1.4, 0.95);
       }
       const m = [lerp(p0[0], p1[0], 0.48), lerp(p0[1], p1[1], 0.48)];
-      glowStroke(k, [[m[0] - tx * 2, m[1] - ty * 2], [m[0] + tx * 2, m[1] + ty * 2]], C.blue, 0.9, 4, 0.5 + 0.4 * en);
+      glowStroke(k, [[m[0] - tx * 2, m[1] - ty * 2], [m[0] + tx * 2, m[1] + ty * 2]], C.yellowBright, 0.9, 4, 0.5 + 0.4 * en);
     };
     const glove = (pt, ang) => {
       ctx.beginPath(); ctx.ellipse(pt[0], pt[1], aw * 0.62, aw * 0.5, ang, 0, TAU);
@@ -163,7 +169,7 @@
       fillPoly(k, [J(sP, -aw * 0.9 * s, aw * 1.7 * s), J(sP, aw * 0.5 * s, aw * 2.0 * s), J(sP, aw * 1.8 * s, aw * 0.7 * s), J(sP, aw * 1.8 * s, -aw * 1.2 * s), J(sP, -aw * 0.5 * s, -aw * 1.9 * s), J(sP, -aw * 1.3 * s, -aw * 0.2 * s)], C.steel, C.rim, 1.5);
       fillPoly(k, [J(sP, aw * 0.1 * s, aw * 1.4 * s), J(sP, aw * 1.3 * s, aw * 0.5 * s), J(sP, aw * 1.3 * s, -aw * 0.9 * s), J(sP, aw * 0.0, -aw * 1.2 * s)], C.obs3, C.bronze, 1.2);
       line(k, [J(sP, -aw * 0.7 * s, aw * 1.5 * s), J(sP, aw * 0.6 * s, aw * 1.8 * s), J(sP, aw * 1.6 * s, aw * 0.6 * s)], C.bronzeHi, 1.3, 0.95); // bronze rim
-      if (big) glowStroke(k, [J(sP, aw * 0.3, aw * 0.2), J(sP, aw * 0.9, -aw * 0.1)], C.blue, 0.9, 4, 0.4 + 0.4 * en);
+      if (big) glowStroke(k, [J(sP, aw * 0.3, aw * 0.2), J(sP, aw * 0.9, -aw * 0.1)], C.yellowLight, 0.9, 4, 0.4 + 0.4 * en);
     };
 
     // ── 2) back arm: sleeve, small pauldron, bracer ──
@@ -200,12 +206,13 @@
       line(k, [[fx, fy], [hipW[0] + d * hw * 0.06 + drift * 0.2, fy + 4]], C.bronze, 1.3, 0.9);
     }
 
-    // ── 4) torso: fitted coat, lapel, bandolier, belt, pouches, sidearm ──
-    fillPoly(k, [T(torL * 1.02, -sw * 0.32), T(torL * 1.02, sw * 0.3), T(torL * 0.55, sw * 0.34), T(2, hw * 0.38), T(2, -hw * 0.42), T(torL * 0.55, -sw * 0.36)], C.obs, C.rim, 1.5);
-    // fitted shirt strip + asymmetrical lapel (gunmetal)
-    fillPoly(k, [T(torL * 0.98, sw * 0.12), T(torL * 0.98, sw * 0.28), T(torL * 0.5, sw * 0.32), T(torL * 0.3, sw * 0.2)], C.obs3, C.rim, 1.1);
-    fillPoly(k, [T(torL * 1.0, -sw * 0.02), T(torL * 0.96, sw * 0.26), T(torL * 0.38, sw * 0.16), T(torL * 0.5, -sw * 0.04)], C.steel, C.bronze, 1.2);
-    // cartridge bandolier: strap from the back shoulder to the front hip, bronze rounds with blue tips
+    // ── 4) torso: oversized cloak, bandolier, belt, pouches, sidearm ──
+    // Widen the torso for an "oversized cloak" feel. Adjust points to be slightly wider.
+    fillPoly(k, [T(torL * 1.02, -sw * 0.4), T(torL * 1.02, sw * 0.38), T(torL * 0.55, sw * 0.42), T(2, hw * 0.46), T(2, -hw * 0.5), T(torL * 0.55, -sw * 0.44)], C.obs, C.rim, 1.5);
+    // This forms the interior lining/front opening of the cloak.
+    fillPoly(k, [T(torL * 0.98, sw * 0.1), T(torL * 0.98, sw * 0.25), T(torL * 0.3, sw * 0.28), T(torL * 0.3, sw * 0.05)], C.obs3, C.rim, 1.1);
+
+    // cartridge bandolier: strap from the back shoulder to the front hip, bronze rounds with yellow/orange tips
     {
       const s0 = T(torL * 0.97, -sw * 0.24), s1 = T(torL * 0.14, sw * 0.3);
       line(k, [s0, s1], C.line, 3.6);
@@ -213,7 +220,7 @@
       for (let i = 0; i < 5; i++) {
         const u = 0.14 + i * 0.17, c = [lerp(s0[0], s1[0], u), lerp(s0[1], s1[1], u)];
         fillPoly(k, [[c[0] - 1.5, c[1] - 2.4], [c[0] + 1.5, c[1] - 2.4], [c[0] + 1.5, c[1] + 2.4], [c[0] - 1.5, c[1] + 2.4]], C.bronzeHi, C.line, 0.9);
-        if (!F) { ctx.fillStyle = C.blue; ctx.fillRect(c[0] - 1, c[1] - 3.2, 2, 1.6); }
+        if (!F) { ctx.fillStyle = C.yellowLight; ctx.fillRect(c[0] - 1, c[1] - 3.2, 2, 1.6); } // Yellow tips
       }
     }
     // belt + buckle + two ammo pouches
@@ -222,43 +229,88 @@
     for (const b of [-0.02, 0.34]) {
       fillPoly(k, [T(0, hw * b), T(0, hw * (b + 0.34)), T(-7, hw * (b + 0.32)), T(-7.4, hw * (b + 0.02))], C.obs3, C.bronze, 1.1);
     }
-    // sidearm: holster on the back hip, pistol grip and slide with a thin blue line
+    // sidearm: holster on the back hip, pistol grip and slide with a thin yellow/orange line
     {
       fillPoly(k, [T(0, -hw * 0.5), T(0, -hw * 0.95), T(-13, -hw * 0.98), T(-13.5, -hw * 0.55)], C.leather, C.line, 1.2);
       fillPoly(k, [T(0, -hw * 0.62), T(5.5, -hw * 0.7), T(4.6, -hw * 0.96), T(0, -hw * 0.9)], C.steel2, C.rim, 1.1); // grip
-      line(k, [T(-5, -hw * 0.72), T(-11, -hw * 0.74)], C.blue, 0.9, 0.35 + 0.4 * en);
+      line(k, [T(-5, -hw * 0.72), T(-11, -hw * 0.74)], C.yellowLight, 0.9, 0.35 + 0.4 * en); // Yellow line
       line(k, [T(0.5, -hw * 0.62), T(0.5, -hw * 0.92)], C.bronzeHi, 1.1, 0.9);
     }
 
-    // ── 5) neck, high collar, head ──
-    taper(k, [T(torL * 1.0, 0), [hcw[0], hcw[1] + hr * 0.6]], 4.6, 3.8, C.skinDark, C.line, 1.2);
+    // ── 5) neck, high collar, hooded head with angular mask and glowing eyes ──
+    // Neck (hidden beneath cloak/mask)
+    taper(k, [T(torL * 1.0, 0), [hcw[0], hcw[1] + hr * 0.6]], 4.6, 3.8, C.obs3, C.line, 1.2);
+    // High collar
     fillPoly(k, [T(torL * 0.9, -sw * 0.34), T(torL + hr * 0.7, -sw * 0.24), T(torL + hr * 0.78, sw * 0.12), T(torL * 0.88, sw * 0.2)], C.obs3, C.rim, 1.4);
     line(k, [T(torL + hr * 0.7, -sw * 0.2), T(torL + hr * 0.74, sw * 0.1)], C.bronzeHi, 1.1, 0.9);
+
     const hx = hcw[0], hy = hcw[1];
     const H_ = (a, b) => [hx + d * hr * a, hy + hr * b]; // head-space point (a forward, b down), in head radii
-    // swept-back hair behind the head
-    fillPoly(k, [H_(-0.2, -1.1), H_(-1.3, -0.9), H_(-2.3, -0.3 + Math.sin(now * 2.2) * 0.08), H_(-1.2, -0.2), H_(-0.9, 0.5)], C.hair, C.rim, 1.1);
-    // face with a sharp brow, nose and jaw
-    fillPoly(k, [H_(0.1, -1.05), H_(0.75, -0.8), H_(0.92, -0.2), H_(1.08, 0.18), H_(0.8, 0.3), H_(0.86, 0.55), H_(0.55, 0.98), H_(-0.2, 0.95), H_(-0.85, 0.3), H_(-0.9, -0.5)], C.skin, C.line, 1.4);
-    // jaw shading
-    fillPoly(k, [H_(-0.85, 0.3), H_(-0.2, 0.95), H_(0.55, 0.98), H_(0.1, 0.5), H_(-0.4, 0.35)], C.skinDark, C.skinDark, 0.5);
-    // short dark hair on top
-    fillPoly(k, [H_(-0.95, 0.3), H_(-0.95, -0.55), H_(-0.2, -1.2), H_(0.6, -1.15), H_(0.82, -0.78), H_(0.2, -0.62), H_(-0.35, -0.2), H_(-0.55, 0.4)], C.hair, C.rim, 1.2);
-    // brow, calm mouth, eye
-    line(k, [H_(0.35, -0.3), H_(0.95, -0.22)], C.hair, 1.5);
-    line(k, [H_(0.5, 0.62), H_(0.86, 0.6)], C.skinDark, 1.1);
-    const ex = hx + d * hr * 0.62, ey = hy - hr * 0.05;
-    if (!F) {
-      ctx.fillStyle = "#e9edf5"; ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.2, hr * 0.1, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = stunned ? "#ff4040" : "#0f1218"; ctx.beginPath(); ctx.arc(ex + d * hr * 0.06, ey, hr * 0.085, 0, TAU); ctx.fill();
+
+    // Deep black hood exterior
+    fillPoly(k, [
+        H_(-1.4, -0.6), // Back of head
+        H_(-0.8, -1.8), // Top back
+        H_(0.2, -2.0),  // Top center
+        H_(1.2, -1.5),  // Top front
+        H_(1.8, 0.0),   // Front edge of hood
+        H_(1.5, 0.8),   // Lower front
+        H_(0.6, 1.5),   // Chin/jaw area (hidden)
+        H_(-0.8, 1.4),  // Lower back
+        H_(-1.6, 0.5)   // Side
+    ], C.obs2, C.rim, 1.5);
+
+    // Deep interior shadow of the hood opening (behind mask)
+    fillPoly(k, [
+        H_(0.2, -1.0), // Top of opening
+        H_(0.8, -0.5), // Front right of opening
+        H_(0.8, 0.6),  // Lower right of opening
+        H_(0.2, 1.0),  // Bottom of opening
+        H_(-0.4, 0.6), // Lower left of opening
+        H_(-0.4, -0.5) // Front left of opening
+    ], C.obs, C.line, 1.0); // Deeper black for the interior of the hood
+
+    // Matte-black angular mask (covering nose and mouth area)
+ const maskShape = [
+  H_(0, -0.2),
+  H_(0.6, 0.0),
+  H_(0.7, 0.4),
+  H_(0.4, 0.8),
+  H_(0, 0.9),
+  H_(-0.4, 0.8),
+  H_(-0.7, 0.4),
+  H_(-0.6, 0.0)
+];
+fillPoly(k, maskShape, C.obs, C.rim, 1.5);
+
+    if (!F) { // Only draw glowing elements if not flashing
+        // Two narrow golden-yellow glowing eye slits
+        const eyeSlitTopY = -0.5;
+        const eyeSlitBottomY = -0.4;
+        const eyeSlitInnerX = 0.3;
+        const eyeSlitOuterX = 0.6;
+        const eyeGlowWidth = 2.2;
+        const eyeGlowBlur = 8;
+        const eyeGlowAlpha = 0.8 + 0.4 * en;
+
+        // Character's right eye slit (visually to the right if d=1, to the left if d=-1)
+        glowStroke(k, [H_(d * eyeSlitInnerX, eyeSlitTopY), H_(d * eyeSlitOuterX, eyeSlitBottomY)], C.yellowBright, eyeGlowWidth, eyeGlowBlur, eyeGlowAlpha);
+        // Character's left eye slit
+        glowStroke(k, [H_(-d * eyeSlitOuterX, eyeSlitBottomY), H_(-d * eyeSlitInnerX, eyeSlitTopY)], C.yellowBright, eyeGlowWidth, eyeGlowBlur, eyeGlowAlpha);
+
+        // Subtle mechanical breathing vents with orange glow
+        const ventGlowWidth = 1.2;
+        const ventGlowBlur = 4;
+        const ventGlowAlpha = 0.7 + 0.3 * en;
+
+        // Vents on character's right side of the mask
+        glowStroke(k, [H_(d * 0.55, 0.15), H_(d * 0.65, 0.25)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
+        glowStroke(k, [H_(d * 0.35, 0.55), H_(d * 0.45, 0.65)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
+
+        // Vents on character's left side of the mask
+        glowStroke(k, [H_(-d * 0.65, 0.25), H_(-d * 0.55, 0.15)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
+        glowStroke(k, [H_(-d * 0.45, 0.65), H_(-d * 0.35, 0.55)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
     }
-    // mechanical eyepiece: bronze ring + blue lens over the same eye, with an arm to the temple
-    line(k, [[ex - d * hr * 0.2, ey - hr * 0.1], [hx - d * hr * 0.1, hy - hr * 0.5], [hx - d * hr * 0.75, hy - hr * 0.35]], C.bronze, 1.4, 0.95);
-    ctx.beginPath(); ctx.arc(ex, ey, hr * 0.34, 0, TAU);
-    ctx.fillStyle = k.col(C.blueDeep); ctx.fill(); edge(k, C.bronzeHi, 1.5);
-    glow(k, ex, ey, hr * 0.8, 0.35 + 0.25 * en);
-    if (!F) { ctx.fillStyle = stunned ? "#fff" : C.blueHi; ctx.beginPath(); ctx.arc(ex + d * hr * 0.05, ey - hr * 0.04, hr * 0.12, 0, TAU); ctx.fill(); }
-    line(k, [[ex + d * hr * 0.1, ey - hr * 0.3], [ex + d * hr * 0.26, ey - hr * 0.62]], C.bronzeHi, 1.1, 0.9); // small antenna
 
     // ── 6) the arcane rifle (grip in the back hand, handguard on the front hand) ──
     const gB = armBw[2], gF = armFw[2];
@@ -272,7 +324,7 @@
     const Lh = clamp(L1 / rs + 5, 34, 46); // handguard end
     const Lb = Lh + 16; // barrel end
     const mz = R(Lb + 8, 6.8); // muzzle point
-    // energy chamber glow behind the metal
+    // energy chamber glow behind the metal (now yellow/orange)
     const ch = R(8.5, 6.8);
     glow(k, ch[0], ch[1], 15 * rs * (0.7 + 0.5 * en), 0.5 * en + 0.15);
     // stock with bronze butt plate
@@ -281,60 +333,60 @@
     // grip + trigger guard
     fillPoly(k, rp([[-1.6, 2], [3.6, 2], [2, -8], [-3.6, -7]]), C.obs3, C.rim, 1.3);
     line(k, rp([[3.6, 2], [8, 2], [7.4, -1.2], [4.6, -1.4]]), C.steel2, 1.2);
-    // cartridge canister magazine (bronze with a blue ring)
+    // cartridge canister magazine (bronze with a yellow/orange ring)
     fillPoly(k, rp([[8.6, 2], [14, 2], [14, -4.8], [8.6, -4.8]]), C.steel, C.bronze, 1.2);
-    glowStroke(k, rp([[8.8, -1.6], [13.8, -1.6]]), C.blue, 0.9, 4, 0.35 + 0.5 * en);
+    glowStroke(k, rp([[8.8, -1.6], [13.8, -1.6]]), C.yellowLight, 0.9, 4, 0.35 + 0.5 * en); // Yellow ring
     // receiver (blackened steel) with bronze top rail
     fillPoly(k, rp([[-3, 11.4], [16, 11.4], [18, 9.6], [18, 2], [-3, 2]]), C.obs3, C.rim, 1.5);
     line(k, rp([[-3, 11.4], [16, 11.4]]), C.bronzeHi, 1.3, 0.95);
     // engraved ancient pattern: small bronze chevrons + ticks along the lower receiver
     for (let i = 0; i < 4; i++) { const a = -1 + i * 3.6; line(k, rp([[a, 4.2], [a + 1.4, 3.1], [a + 2.8, 4.2]]), C.bronze, 0.8, 0.9); }
     line(k, rp([[15, 3.6], [17, 3.6]]), C.bronze, 0.8, 0.9);
-    // visible energy chamber window
-    fillPoly(k, rp([[3, 9.6], [14, 9.6], [14, 4.4], [3, 4.4]]), C.blueDeep, C.bronzeHi, 1.2);
+    // visible energy chamber window (now yellow/orange)
+    fillPoly(k, rp([[3, 9.6], [14, 9.6], [14, 4.4], [3, 4.4]]), C.obs3, C.bronzeHi, 1.2); // Use obs3 for chamber fill, allows glow to show through.
     if (!F) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const pa = R(3.4, 4.8), pb = R(13.6, 9.2);
       const cg = ctx.createLinearGradient(pa[0], pa[1], pb[0], pb[1]);
-      cg.addColorStop(0, "rgba(63,160,255," + (0.25 + 0.45 * en) + ")");
-      cg.addColorStop(1, "rgba(181,226,255," + (0.3 + 0.5 * en) + ")");
+      cg.addColorStop(0, "rgba(255,140,26," + (0.25 + 0.45 * en) + ")"); // Burnt Orange
+      cg.addColorStop(1, "rgba(255,210,41," + (0.3 + 0.5 * en) + ")");   // Electric Yellow
       ctx.fillStyle = cg;
       pathOf(ctx, rp([[3.4, 9.2], [13.6, 9.2], [13.6, 4.8], [3.4, 4.8]])); ctx.fill();
       ctx.restore();
       for (let i = 0; i < 3; i++) { // coil lines inside the window
         const a = 5.5 + i * 3.2;
-        line(k, rp([[a, 9.2], [a, 4.8]]), C.blueHi, 0.7, 0.35 + 0.3 * en);
+        line(k, rp([[a, 9.2], [a, 4.8]]), C.yellowBright, 0.7, 0.35 + 0.3 * en); // Yellow coils
       }
     }
     // short optic on top
     fillPoly(k, rp([[2, 11.4], [3.6, 13.2], [14, 13.2], [15.6, 11.4]]), C.steel, C.bronze, 1.1);
     fillPoly(k, rp([[3, 13.2], [14, 13.2], [14, 16], [3, 16]]), C.steel2, C.bronzeHi, 1.1);
     const lens = R(14.4, 14.6);
-    dot(k, lens[0], lens[1], 1.5 * rs, C.blue);
-    // handguard with glowing slots
+    // dot(k, lens[0], lens[1], 1.5 * rs, C.yellowLight); // Yellow lens - could add dot if needed, currently not explicitly requested.
+    // handguard with glowing slots (now yellow/orange)
     fillPoly(k, rp([[18, 10.4], [Lh, 10.4], [Lh, 3], [18, 2]]), C.steel, C.rim, 1.4);
     for (let i = 0; i < 3; i++) {
       const a = 22 + i * 5;
-      if (a + 2.4 < Lh) glowStroke(k, rp([[a, 8], [a + 2.4, 8]]), C.blue, 1.2, 4, 0.35 + 0.5 * en);
+      if (a + 2.4 < Lh) glowStroke(k, rp([[a, 8], [a + 2.4, 8]]), C.yellowLight, 1.2, 4, 0.35 + 0.5 * en);
     }
     line(k, rp([[19, 3.6], [Lh - 1, 3.6]]), C.bronze, 0.9, 0.9);
-    // unusual barrel: thick main barrel + thin bronze conduit above it + two floating bronze rings
+    // unusual barrel: thick main barrel + thin bronze conduit above it + two floating bronze rings (now glowing yellow)
     fillPoly(k, rp([[Lh, 8.7], [Lb, 8.7], [Lb, 4.4], [Lh, 4.4]]), C.obs2, C.rim, 1.3);
     fillPoly(k, rp([[Lh, 11], [Lb - 5, 11], [Lb - 5, 9.6], [Lh, 9.6]]), C.bronze, C.bronzeHi, 1);
-    glowStroke(k, rp([[10, 6.7], [Lb, 6.7]]), C.blue, 0.8, 3, 0.25 + 0.35 * en); // energy flowing to the muzzle
+    glowStroke(k, rp([[10, 6.7], [Lb, 6.7]]), C.yellowBright, 0.8, 3, 0.25 + 0.35 * en); // Yellow energy flowing to the muzzle
     for (const a of [Lh + 4, Lh + 10]) {
       fillPoly(k, rp([[a - 1.2, 12.4], [a + 1.2, 12.4], [a + 1.2, 1.6], [a - 1.2, 1.6]]), C.bronzeHi, C.bronze, 1);
-      glowStroke(k, rp([[a, 12.4], [a, 1.6]]), C.blue, 0.6, 3, 0.3 + 0.3 * en);
+      glowStroke(k, rp([[a, 12.4], [a, 1.6]]), C.yellowLight, 0.6, 3, 0.3 + 0.3 * en); // Yellow glow for floating rings
     }
     // forked muzzle brake
     fillPoly(k, rp([[Lb, 10.4], [Lb + 8, 10.8], [Lb + 8, 8], [Lb + 4.4, 6.9], [Lb + 8, 5.8], [Lb + 8, 2.8], [Lb, 3.4]]), C.steel2, C.bronzeHi, 1.2);
-    glow(k, mz[0], mz[1], 5 * rs, 0.35 + 0.4 * en);
-    // a small bead of energy running along the barrel, plus a few drifting motes above the chamber
+    glow(k, mz[0], mz[1], 5 * rs, 0.35 + 0.4 * en); // Muzzle end glow (now yellow/orange)
+    // a small bead of energy running along the barrel, plus a few drifting motes above the chamber (now yellow)
     if (!F) {
       const t = (now * 0.9) % 1, bp = R(lerp(14, Lb, t), 6.7);
       ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.7 * (1 - t);
-      ctx.fillStyle = C.blueHi; ctx.beginPath(); ctx.arc(bp[0], bp[1], 1.1, 0, TAU); ctx.fill();
+      ctx.fillStyle = C.yellowBright; ctx.beginPath(); ctx.arc(bp[0], bp[1], 1.1, 0, TAU); ctx.fill();
       for (let i = 0; i < 3; i++) {
         const u = (now * 0.5 + i * 0.37) % 1, mp = R(4 + i * 4.2, 12 + u * 7);
         ctx.globalAlpha = (1 - u) * 0.65; ctx.beginPath(); ctx.arc(mp[0], mp[1], 0.8, 0, TAU); ctx.fill();
@@ -352,31 +404,31 @@
     glove(gB, Math.atan2(ay, ax));
     line(k, [[gB[0] + ax * aw * 0.4, gB[1] + ay * aw * 0.4], [gB[0] + ax * aw * 0.9 + upx * aw * 0.45, gB[1] + ay * aw * 0.9 + upy * aw * 0.45]], C.obs, 1.4, 0.9); // trigger finger
 
-    // ── 8) muzzle flash: blue-white arcane burst along the barrel ──
+    // ── 8) muzzle flash: yellow-white arcane burst along the barrel ──
     if (muz > 0 && !F) {
       const m = muz / 7, ang = Math.atan2(ay, ax);
       ctx.save();
       ctx.translate(mz[0], mz[1]); ctx.rotate(ang);
       ctx.globalCompositeOperation = "lighter";
-      ctx.shadowColor = C.blue; ctx.shadowBlur = 20;
+      ctx.shadowColor = C.yellowLight; ctx.shadowBlur = 20; // Yellow shadow
       ctx.globalAlpha = m;
-      for (const [r0, r1, c] of [[24 * rs, 5, "rgba(63,160,255,0.85)"], [13 * rs, 3, "rgba(220,240,255,0.95)"]]) {
+      for (const [r0, r1, c] of [[24 * rs, 5, "rgba(255,140,26,0.85)"], [13 * rs, 3, "rgba(255,240,220,0.95)"]]) { // Orange and White-yellow colors
         ctx.fillStyle = c; ctx.beginPath();
         for (let i = 0; i < 14; i++) { const a = (i / 14) * TAU, r = i % 2 ? r1 : r0 * (0.55 + 0.45 * m); ctx.lineTo(Math.cos(a) * r * (a > 1.6 && a < 4.6 ? 0.5 : 1), Math.sin(a) * r * 0.7); }
         ctx.closePath(); ctx.fill();
       }
-      ctx.strokeStyle = C.blueHi; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = C.yellowBright; ctx.lineWidth = 1.4; // Yellow shock ring
       ctx.beginPath(); ctx.arc(8 * rs, 0, 6 + (1 - m) * 14, 0, TAU); ctx.stroke(); // shock ring
       ctx.restore();
     }
-    // brass casing + blue sparks + a little smoke (once per shot)
+    // brass casing + yellow sparks + a little smoke (once per shot)
     if (A.fireFx) {
       A.fireFx = false;
       const sp = k.spawn;
       if (sp) {
         const ej = R(9, 8), wx = A.ox + mz[0], wy = A.oy + mz[1];
-        sp(A.ox + ej[0], A.oy + ej[1] - 2, -d * 1.3, -2.8, C.gold, 26, 2.4);
-        for (let i = 0; i < 4; i++) sp(wx, wy, ax * (2 + Math.random() * 3), ay * 2 + (Math.random() - 0.5) * 2, "#6fc0ff", 8, 2);
+        sp(A.ox + ej[0], A.oy + ej[1] - 2, -d * 1.3, -2.8, C.gold, 26, 2.4); // Brass casing remains gold
+        for (let i = 0; i < 4; i++) sp(wx, wy, ax * (2 + Math.random() * 3), ay * 2 + (Math.random() - 0.5) * 2, "#ffd700", 8, 2); // Yellow sparks
         for (let i = 0; i < 3; i++) sp(wx + ax * 4, wy + ay * 4, ax * 1.4 + (Math.random() - 0.5), ay * 1.4 - 0.5, "#8fa3c0", 22, 3.2);
       }
     }

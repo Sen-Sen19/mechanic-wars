@@ -248,6 +248,18 @@ const pressSkill = { ...IDLE, skillPressed: [true, false, false, false] };
   check("... and the shooter is hit by their own projectile", B.hp < hpB, (hpB - B.hp).toFixed(2));
 }
 {
+  // A lethal non-projectile passive proc must KO the Bulwark, not leave him idle at 0 HP.
+  const { sim, A, B } = duel("fighter", 6);
+  A.hp = 0.5;
+  A.holyDeflectionCooldown = 0;
+  const result = A.takeHit(B, { type: "melee", damage: 100, knockback: 1, stun: 10 }, -1);
+  check("lethal Holy Shield damage clamps HP to zero", A.hp === 0, String(A.hp));
+  check("lethal Holy Shield damage immediately triggers KO", A.state === S.KO, A.state);
+  check("lethal passive hit is reported as lethal", !!result && result.dmg > 0 && A.lastHit.passive === true);
+  sim.step([IDLE, IDLE]);
+  check("the Sim awards the KO on its next check", sim.kills[1] === 1, String(sim.kills[1]));
+}
+{
   // non-projectile: 60% reduction (40% passes), then the internal cooldown lets the next hit through
   const { sim, A, B } = duel("fighter", 6);
   const hp0 = A.hp;

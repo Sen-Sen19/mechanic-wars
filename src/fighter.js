@@ -1249,6 +1249,14 @@
             this.addMana({ manaGain: PD.manaOnProc || 0 });
             this.fxPush({ type: "bulwark", kind: "shield", x: this.x + s.width / 2, y: this.y + s.height * 0.45, radius: 70 });
             this.lastHit = { by: attacker.stats.name, combo: 0, raw: hit.damage, armor: s.armor, dmg: dmg, knockback: 0, stun: 0, lost: 1 - this.hp / s.maxHP, absorbed: true, passive: true };
+            // Damage reduction is not immunity: a lethal passive proc must still KO the Bulwark.
+            if (this.hp <= 0) {
+              this.state = STATE.KO;
+              this.stateTimer = 0;
+              this.hit = null;
+              this.pendingProjectile = null;
+              this.comboQueued = false;
+            }
             return this.lastHit;
           }
         }

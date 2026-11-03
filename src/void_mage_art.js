@@ -1,3 +1,4 @@
+
 // Mechanic Wars - Void Mage art (render only, never touches the sim).
 // A tall, faceless figure half-consumed by a dimensional void: obsidian body, asymmetrical armor
 // with glowing violet cracks, a cloak of living smoke, claw hands, shoulder tentacles and a
@@ -71,14 +72,7 @@
     pts.push(b);
     return pts;
   }
-  const bez = (p0, p1, p2, n) => {
-    const out = [];
-    for (let i = 0; i <= n; i++) {
-      const t = i / n, u = 1 - t;
-      out.push([u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]]);
-    }
-    return out;
-  };
+  // Removed bezier helper function as crown shards are no longer drawn with it.
 
   function draw(k, e) {
     const { ctx, d, now, A, f, M } = k;
@@ -166,7 +160,7 @@
         p = [p[0] + back * Math.cos(ang) * seg - (k.vx * 0.1 * j) / n, p[1] + Math.sin(ang) * seg];
         pts.push(p);
       }
-      taper(k, pts, 5.0 * (0.55 + 0.45 * em), 0.6, C.obs, C.rim, 1.3);
+      taper(k, pts, 5.0 * (0.55 + 0.45 * em), 0.6, C.obs, C.rim, 1.3); // 'obs' for shadow tendrils
       glowStroke(k, pts.slice(1, n - 1), C.elec, 0.8, 5, 0.45);
       if (!F) { ctx.save(); ctx.shadowColor = C.elec; ctx.shadowBlur = 8; ctx.fillStyle = C.hot; ctx.beginPath(); ctx.arc(pts[n - 1][0], pts[n - 1][1], 1.3, 0, TAU); ctx.fill(); ctx.restore(); }
     }
@@ -216,13 +210,20 @@
     claws(armBw, windU * 0.6, false);
     fillPoly(k, [J(armBw[0], -1.2, 1.6), J(armBw[0], -1.9, -2.2), J(armBw[0], 1.9, -3.4), J(armBw[0], 5.9, -5.3), J(armBw[0], 2.5, 0.3)], C.obs, C.rim, 1.4);
 
-    // ── 4) legs: lean obsidian limbs, spiked knees, taloned feet ──
+    // ── 4) legs: lean obsidian limbs, softened knee guards, taloned feet ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
       taper(k, [h, kn], lw * 1.55, lw * 1.1, isBack ? C.obs : C.obs2, C.rim, 1.3);
       taper(k, [kn, ft], lw * 1.1, lw * 0.62, isBack ? C.obs : C.obs2, C.rim, 1.3);
-      fillPoly(k, [[kn[0] - d * lw * 0.2, kn[1] - lw * 0.9], [kn[0] + d * lw * 2.3, kn[1] - lw * 0.05], [kn[0] + d * lw * 0.1, kn[1] + lw * 0.9]], isBack ? C.obs : C.obs2, C.rim, 1.2);
+      // Softened knee guard
+      fillPoly(k, [
+        [kn[0] - d * lw * 0.2, kn[1] - lw * 0.9],
+        [kn[0] + d * lw * 1.5, kn[1] - lw * 0.2], // Softened upper point
+        [kn[0] + d * lw * 1.2, kn[1] + lw * 0.5], // Softened lower point
+        [kn[0] - d * lw * 0.1, kn[1] + lw * 0.9]
+      ], isBack ? C.obs : C.obs2, C.rim, 1.2);
       glowStroke(k, [[kn[0], kn[1] + lw * 0.8], [lerp(kn[0], ft[0], 0.6), lerp(kn[1], ft[1], 0.6)]], C.elec, 0.8, 4, 0.55);
+      // Taloned feet
       fillPoly(k, [[ft[0] - d * lw * 0.55, ft[1] - lw * 0.7], [ft[0] + d * lw * 0.55, ft[1] - lw * 0.5], [ft[0] + d * lw * 3.0, ft[1] + lw * 0.05], [ft[0] + d * lw * 0.3, ft[1] + lw * 0.35], [ft[0] - d * lw * 1.4, ft[1] + lw * 0.15]], C.obs, C.rim, 1.2);
     };
     leg(k.MP(k.legB), true);
@@ -242,8 +243,17 @@
       const c = T(a + Math.sin(now * 1.2 + i) * 1.2, b), r = 1.5 + (i % 2);
       fillPoly(k, [[c[0], c[1] - r * 1.4], [c[0] + r, c[1]], [c[0], c[1] + r * 1.4], [c[0] - r, c[1]]], C.obs2, C.elec, 1);
     }
-    // ribcage with visible ribs
-    const rib = [T(torL * 1.0, -sw * 0.22), T(torL * 1.0, sw * 0.25), T(torL * 0.76, sw * 0.22), T(torL * 0.5, sw * 0.12), T(torL * 0.4, sw * 0.04), T(torL * 0.42, -sw * 0.1), T(torL * 0.6, -sw * 0.14), T(torL * 0.8, -sw * 0.2)];
+    // ribcage with visible ribs (more humanoid, less segmented)
+    const rib = [
+      T(torL * 1.0, -sw * 0.22),
+      T(torL * 1.0, sw * 0.25),
+      T(torL * 0.76, sw * 0.22 + 2), // Slightly extend to soften curve
+      T(torL * 0.5, sw * 0.12 + 1),  // Slightly extend and soften
+      T(torL * 0.4, sw * 0.04),
+      T(torL * 0.42, -sw * 0.1),
+      T(torL * 0.6, -sw * 0.14 - 1), // Soften curve
+      T(torL * 0.8, -sw * 0.2 - 2)   // Soften curve
+    ];
     fillPoly(k, rib, C.obs2, C.rim, 1.5);
     if (!F) {
       ctx.lineCap = "round";
@@ -285,21 +295,22 @@
     } else { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(core[0], core[1], 3, 0, TAU); ctx.fill(); }
     A.core = [A.ox + core[0], A.oy + core[1]];
 
-    // ── 7) neck, head (faceless hollow, two violet eyes), swept crown shards ──
+    // ── 7) neck, head (smooth, elongated humanoid with black void face), floating fragments ──
     taper(k, [T(torL * 1.0, 0), [hcw[0], hcw[1] + hr * 0.5]], 4.2, 3.2, C.obs, C.rim, 1.2);
-    // crown shards swept back (one long, one broken)
-    taper(k, bez([hcw[0] + back * hr * 0.2, hcw[1] - hr * 0.85], [hcw[0] + back * hr * 1.6, hcw[1] - hr * 2.2], [hcw[0] + back * hr * 3.0, hcw[1] - hr * 1.9], 7), hr * 0.62, 0.4, C.obs, C.rim, 1.2);
-    taper(k, bez([hcw[0] + back * hr * 0.55, hcw[1] - hr * 0.55], [hcw[0] + back * hr * 1.7, hcw[1] - hr * 1.2], [hcw[0] + back * hr * 2.1, hcw[1] - hr * 0.5], 5), hr * 0.5, 0.4, C.obs2, C.rim, 1.1);
-    // head shell
-    ctx.beginPath(); ctx.ellipse(hcw[0], hcw[1], hr * 0.92, hr * 1.18, 0.08 * d, 0, TAU);
+
+    // Head shell (smooth, elongated humanoid)
+    ctx.beginPath();
+    ctx.ellipse(hcw[0], hcw[1], hr * 0.85, hr * 1.25, 0.05 * d, 0, TAU); // Adjusted proportions for elongated humanoid
     ctx.fillStyle = k.col(C.obs2); ctx.fill(); edge(k, C.rim, 1.6);
-    // hollow face
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(hcw[0], hcw[1], hr * 0.92, hr * 1.18, 0.08 * d, 0, TAU); ctx.clip();
-    ctx.beginPath(); ctx.ellipse(hcw[0] + d * hr * 0.34, hcw[1] + hr * 0.02, hr * 0.78, hr * 0.98, 0.1 * d, 0, TAU);
+
+    // Completely black facial void (no clipping needed, just fill the 'face' area)
+    // Draw the inner face area, slightly recessed or darker than the head shell
+    ctx.beginPath();
+    ctx.ellipse(hcw[0] + d * hr * 0.1, hcw[1] + hr * 0.1, hr * 0.7, hr * 0.9, 0.08 * d, 0, TAU);
     ctx.fillStyle = k.col(C.void); ctx.fill();
-    ctx.restore();
-    // eyes: two narrow slanted slits, a far one slightly smaller
+    edge(k, C.obs, 0.8); // Subtle edge for the void section
+
+    // Eyes: two narrow slanted slits
     const eyeCol = stunned ? "#ffffff" : C.elec;
     const eye = (x, y, w, h) => {
       ctx.save();
@@ -308,12 +319,41 @@
       ctx.fillStyle = F ? "#fff" : eyeCol;
       ctx.beginPath(); ctx.ellipse(0, 0, w, h, 0, 0, TAU); ctx.fill();
       ctx.shadowBlur = 0; ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.ellipse(0, 0, w * 0.62, h * 0.45, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, w * 0.62, h * 0.45, 0, 0, TAU); ctx.fill(); // inner highlight
       ctx.restore();
     };
-    eye(hcw[0] + d * hr * 0.58, hcw[1] - hr * 0.12, hr * 0.34, hr * 0.1);
-    eye(hcw[0] + d * hr * 0.14, hcw[1] - hr * 0.1, hr * 0.24, hr * 0.085);
-    // wisps of the head dissolving upward
+    eye(hcw[0] + d * hr * 0.48, hcw[1] - hr * 0.18, hr * 0.30, hr * 0.09); // Main eye
+    eye(hcw[0] + d * hr * 0.1, hcw[1] - hr * 0.15, hr * 0.20, hr * 0.075);  // Far eye (slightly smaller)
+
+    // Floating fragments above and behind the head (replaces crown shards)
+    if (!F) {
+      const fragScale = hr * 0.5;
+      const fx = hcw[0], fy = hcw[1] - hr * 1.6; // Base position for fragments
+      const offset = [
+        [back * 0.8, -0.6], [back * 2.0, -0.2], [back * 1.0, 0.4],
+        [back * 0.2, -1.2], [back * 1.4, -1.0]
+      ];
+      const fragmentShapes = [
+        [[0, -1], [1, 0], [0.5, 1], [-0.5, 0.5], [-0.8, -0.2]], // Jagged
+        [[0, -0.8], [0.8, -0.4], [0.4, 0.8], [-0.4, 0.4]],       // Angular
+        [[-0.6, -0.6], [0.6, -0.2], [0.2, 0.6], [-0.4, 0.2]],    // Small shard
+      ];
+
+      for (let i = 0; i < offset.length; i++) {
+        const u = i / offset.length;
+        const sh = fragmentShapes[i % fragmentShapes.length];
+        const pts = sh.map(p => [
+          fx + offset[i][0] * fragScale + p[0] * fragScale * 0.4 + Math.sin(now * 1.8 + i * 1.1) * 1.5,
+          fy + offset[i][1] * fragScale + p[1] * fragScale * 0.4 + Math.cos(now * 1.5 + i * 0.9) * 1
+        ]);
+        fillPoly(k, pts, C.obs, C.rim, 1.0); // Obsidian fragments
+        if (Math.random() < 0.3) { // Occasional glowing crack
+          glowStroke(k, crack(pts[0], pts[Math.floor(pts.length / 2)], i, 0.5), C.elec, 0.7, 3, 0.6);
+        }
+      }
+    }
+
+    // Wisps of the head dissolving upward
     if (!F) {
       ctx.save(); ctx.lineCap = "round";
       for (let w = 0; w < 2; w++) {
