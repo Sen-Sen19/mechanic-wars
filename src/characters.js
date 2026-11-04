@@ -185,58 +185,66 @@
             wraiths: { pursuit: 300, restrain: 240, speed: 4.6, turn: 0.1, catchRadius: 20, legOffset: 8, headOffset: 14, fadeTicks: 14 },
           },
         },
-        // SKILL 2 - Abyssal Transit: he melts into a black pool (`startup` = the melt, still hittable and interruptible), is UNTARGETABLE
-        // once fully dissolved for `hide` ticks, then reforms at a random platform top (`edgeMargin` px from the edges, at least
-        // `minEnemyDist` px from the enemy when possible, `tries` samples). `reform` = ticks to rebuild the body (the first `reformSafe`
-        // are still untargetable). `recovery` after that. Never reappears outside the arena (only platform tops are valid).
+        // SKILL 2 - Singularity: he hurls a miniature black hole (was the charged basic; the hold key is now Void Step). On impact: heavy damage,
+        // and the enemy is dragged `pull.distance` px toward the Mage over `pull.ticks` ticks (speed = max px/tick). A burst skill AND a setup:
+        // the pull puts the target where Spikes / shards / the empowered orb finish it. A miss is punishable (recovery).
         {
-          id: "abyssal_transit", name: "Transit", icon: "TRN", cooldown: 540,
+          id: "singularity", name: "Singularity", icon: "SNG", cooldown: 420,
           attack: {
-            id: "abyssal_transit", type: "melee", isSkill: true, utility: true, pose: 0,
-            damage: 0, startup: 26, active: 1, recovery: 14, knockback: 0, range: 1, advance: 0, manaGain: 0,
-            transit: { hide: 40, reform: 22, reformSafe: 6, edgeMargin: 30, minEnemyDist: 220, tries: 12 },
+            id: "singularity", type: "projectile", isSkill: true, pose: 0,
+            damage: 24, startup: 14, recovery: 26, knockback: 5, launchH: 0.3, launchV: 0, manaGain: 14,
+            projectile: { speed: 9, range: 640, size: 22, style: "arcane", kind: "singularity", pull: { distance: 100, speed: 8, ticks: 14 } },
           },
         },
-        // SKILL 3 - Abyssal Spikes: `count` huge spikes erupt in a circle (radius px, clipped to the platform) after a `warn` tick ground-crack
-        // telegraph, spreading outward (`spread` ticks). The eruption hits each enemy once (eruptDamage, launched up) while the spikes are tall
-        // (`height` px for `eruptTicks`). Then they shrink to `zoneHeight` px and stay for `duration` ticks as a hazard: zoneDamage every
-        // `zoneEvery` ticks to anyone touching them (jump over them!). `dissolve` ticks of fade at the end.
+        // SKILL 3 - Rift Spikes (BURST): after a short cast, `count` huge spikes erupt in a tight cluster (radius px) UNDER THE ENEMY (its position
+        // when the cast completes; the platform below it, within `reach` px of the Mage; too far = they erupt at the edge of his reach) after a
+        // `warn` tick ground-crack telegraph. Each enemy is hit once (eruptDamage, launched up). If the target is SET UP (restrained by the
+        // Wraiths, slowed in Grasp, or just dragged in by a Singularity) the hit deals setupMul x the damage. Then the spikes shrink to `zoneHeight` px and
+        // stay `duration` ticks as a weaker hazard: zoneDamage every `zoneEvery` ticks to anyone touching them. `dissolve` ticks of fade at the end.
         {
           id: "abyssal_spikes", name: "Spikes", icon: "SPK", cooldown: 480,
           attack: {
             id: "abyssal_spikes", type: "melee", isSkill: true, utility: true, pose: 0,
-            damage: 0, startup: 24, active: 2, recovery: 22, knockback: 0, range: 1, advance: 0, manaGain: 0,
-            spikes: { count: 9, radius: 190, width: 26, height: 120, warn: 14, spread: 10, rise: 6, eruptTicks: 14, eruptDamage: 11, knockback: 5, launchH: 0.3, launchV: 1.1, stun: 22, manaGain: 10, zoneHeight: 52, zoneDamage: 2, zoneEvery: 24, duration: 270, dissolve: 24 },
+            damage: 0, startup: 16, active: 2, recovery: 22, knockback: 0, range: 1, advance: 0, manaGain: 0,
+            spikes: { atEnemy: true, reach: 520, count: 5, radius: 80, width: 26, height: 120, warn: 12, spread: 8, rise: 6, eruptTicks: 14, eruptDamage: 20, setupMul: 1.6, knockback: 5, launchH: 0.3, launchV: 1.1, stun: 22, manaGain: 10, zoneHeight: 40, zoneDamage: 1.5, zoneEvery: 24, duration: 150, dissolve: 24 },
           },
         },
-        // SKILL 4 - Abyssal Grasp: a wave of black liquid spreads over the platform around him (radius px, `spread` ticks to full size) and stays
-        // `duration` ticks (300 = 5 s). Enemies standing in it (feet within `zoneHeight` px of the surface) get their speed cut to slowMul
-        // and cannot jump (air jumps included) until they leave the pool. No damage: area control only.
+        // SKILL 4 - Abyssal Grasp (SLOW, then BURST): a wave of black liquid spreads over the platform around him (radius px, `spread` ticks to full
+        // size) for `duration` ticks (120 = 2 s). Enemies standing in it (feet within `zoneHeight` px of the surface) get their speed cut to slowMul and
+        // cannot jump (air jumps included). Then the pool COLLAPSES: for `collapse.warn` ticks it shrinks to `shrink` x its radius and drags everyone
+        // inside toward the centre (pullSpeed px/tick); when it closes, everyone still inside takes `damage` + a stun and is launched up (setup for
+        // Spikes / orb / shards). Leave the pool before it finishes closing to avoid the blast. `linger` = ticks the empty pool takes to fade after.
         {
           id: "abyssal_grasp", name: "Grasp", icon: "GRP", cooldown: 600,
           attack: {
             id: "abyssal_grasp", type: "melee", isSkill: true, utility: true, pose: 0,
             damage: 0, startup: 22, active: 2, recovery: 18, knockback: 0, range: 1, advance: 0, manaGain: 0,
-            grasp: { radius: 230, spread: 22, duration: 300, zoneHeight: 80, slowMul: 0.3, noJump: true },
+            grasp: {
+              radius: 210, spread: 22, duration: 120, zoneHeight: 80, slowMul: 0.3, noJump: true,
+              collapse: { warn: 18, shrink: 0.55, pullSpeed: 3, damage: 18, knockback: 6, launchH: 0.2, launchV: 1.0, stun: 30, manaGain: 12, linger: 12 },
+            },
           },
         },
       ],
 
-      // ULTIMATE - Void Execution: a long visible startup (he can be interrupted). If an enemy is within `range` px a rift opens at ITS position
-      // and a colossal shadow rises (`openTicks`). If the enemy is still inside the grab zone (grabRX px sideways, grabRY px vertically from the
-      // rift) when it finishes opening, it is seized and lifted, impaled `impales` times (impaleDamage each, one per impaleGap ticks), then slammed
-      // (slamDamage + big knockback = ring-out threat at an edge). Moving out of the zone during openTicks makes it a miss (sinkTicks, then
-      // missRecovery). Nobody in range at all = a pure miss with the plain recovery below. Needs a full mana bar.
+      // ULTIMATE - EVENT HORIZON (internal id stays "void_execution"): he levitates and charges for `startup` ticks (60 = 1 s, he can be
+      // interrupted). If an enemy is within `range` px a rift opens at ITS position and a colossal shadow rises (`openTicks`). If the enemy is
+      // still inside the grab zone (grabRX px sideways, grabRY px vertically from the rift) when it finishes opening, it is seized and lifted
+      // (liftTicks), then pierced `impales` times (impaleDamage each, one per impaleGap ticks, so every strike can be read), the entity pulls it
+      // back (`windup` ticks) and slams it down (slamDamage = the biggest hit + big knockback = ring-out threat at an edge). Then it lets go and
+      // dissolves (sinkTicks). Total damage = impales x impaleDamage + slamDamage = 5 x 8 + 40 = 80 before armor (about 66 on a Fighter). The slam knockback is moderate: he is driven into the floor and stays down (slamStun), a ring-out only happens near an edge. Moving out of the zone during openTicks makes
+      // it a miss (sinkTicks, then missRecovery, no damage). Nobody in range at all = a pure miss with the plain recovery below. Needs a full mana bar.
       ultimate: {
-        id: "void_execution", name: "Void Execution", icon: "ULT",
+        id: "void_execution", name: "Event Horizon", icon: "ULT",
         attack: {
           id: "void_execution", type: "melee", isSkill: true, utility: true, pose: 0, superArmor: false,
-          damage: 0, startup: 50, active: 1, recovery: 60, knockback: 0, range: 1, advance: 0, manaGain: 0,
+          damage: 0, startup: 60, active: 1, recovery: 60, knockback: 0, range: 1, advance: 0, manaGain: 0,
           execution: {
-            range: 520, openTicks: 36, grabRX: 80, grabRY: 120, liftSpeed: 5, liftTicks: 18,
-            impales: 4, impaleGap: 9, impaleDamage: 4.5, impaleStun: 14, settle: 10,
-            slamSpeed: 20, slamDamage: 30, slamKnockback: 12, slamLaunchH: 1.4, slamLaunchV: 0.35, slamStun: 40,
-            sinkTicks: 24, endRecovery: 40, missRecovery: 60,
+            range: 520, openTicks: 44, grabRX: 80, grabRY: 120, liftSpeed: 4, liftTicks: 22,
+            impales: 5, impaleGap: 16, impaleDamage: 8, impaleStun: 14, settle: 14,
+            windup: 18, windupRise: 2.2,
+            slamSpeed: 22, slamDamage: 40, slamKnockback: 8, slamLaunchH: 0.9, slamLaunchV: 0.25, slamStun: 40,
+            sinkTicks: 40, endRecovery: 40, missRecovery: 60,
           },
         },
       },
@@ -250,17 +258,17 @@
     knockback: 2.2,
     projectile: { speed: 13, range: 620, size: 10, style: "arcane", kind: "shard" },
 },
-      // CHARGED BASIC - Singularity: keep the attack button held after the tap (holdStart ticks, then `time` ticks = ~1 s). Release when full
-      // to throw a miniature black hole; releasing early (or being hit while charging) cancels it. On impact: heavy damage, and the enemy
-      // is pulled `pull.distance` px toward the Mage over `pull.ticks` ticks (speed = max px/tick). No charging while Void Overload is ready:
-      // the next input fires the orb instead.
-      charge: {
-        holdStart: 14,
-        time: 60,
+      // HOLD KEY - Void Step (no skill slot): TAP the attack button = Void Shard, HOLD it `holdStart` ticks (60 = 1 s, on the ground) = he melts
+      // into a black pool (`startup` = the melt, still hittable and interruptible), is UNTARGETABLE once fully dissolved for `hide` ticks, then
+      // reforms at a random platform top (`edgeMargin` px from the edges, at least `minEnemyDist` px from the enemy when possible, `tries` samples).
+      // `reform` = ticks to rebuild the body (the first `reformSafe` are still untargetable). `cooldown` = ticks before the hold works again
+      // (during it a hold is just a normal tap). Never reappears outside the arena (only platform tops are valid). Release the button to use it again.
+      hold: {
+        holdStart: 14, cooldown: 360,
         attack: {
-          id: "singularity", type: "projectile", isSkill: true, pose: 0,
-          damage: 14, startup: 8, recovery: 24, knockback: 5, launchH: 0.3, launchV: 0, manaGain: 14,
-          projectile: { speed: 9, range: 640, size: 22, style: "arcane", kind: "singularity", pull: { distance: 80, speed: 8, ticks: 14 } },
+          id: "abyssal_transit", name: "Void Step", type: "melee", isSkill: true, utility: true, pose: 0,
+          damage: 0, startup: 20, active: 1, recovery: 12, knockback: 0, range: 1, advance: 0, manaGain: 0,
+          transit: { hide: 40, reform: 22, reformSafe: 6, edgeMargin: 30, minEnemyDist: 220, tries: 12 },
         },
       },
     }),
@@ -285,9 +293,13 @@
           id: "chained_scythe", name: "Scythe", icon: "SCY", cooldown: 480,
           attack: {
             id: "chained_scythe", type: "melee", isSkill: true, markBonus: true, fxShape: "scythe", pose: 4,
-            damage: 7, startup: 10, active: 6, recovery: 24,
+            damage: 7, startup: 10, active: 10, recovery: 22,
             knockback: 0, launchH: 0, launchV: 0, stun: 90, // the pull holds the target; this is only a safety timeout
             range: 340, boxH: 0.55, manaGain: 12,
+            // The hook is a REAL flying head now: it leaves the hand at `speed` px per tick and the hit lands the moment it touches
+            // the enemy (a close enemy is hit sooner). `active` is the flight time (range / speed, rounded up). A miss: the head
+            // reaches `range`, then the chain is reeled back during the recovery.
+            hook: { speed: 36 },
             scythe: {
               pullSpeed: 15, // px per tick the target is dragged
               closeRange: 44, // px gap at which the bomb is attached

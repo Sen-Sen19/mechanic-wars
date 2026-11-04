@@ -337,6 +337,7 @@
         const tcx = t.x + t.stats.width / 2, ocx = owner.x + owner.stats.width / 2;
         const toward = ocx >= tcx ? 1 : -1;
         const room = Math.max(0, Math.abs(ocx - tcx) - (t.stats.width + owner.stats.width) / 2 - 10);
+        t.voidSetup = pr.pull.setup === undefined ? 90 : pr.pull.setup; // dragged in: Rift Spikes hit it harder for a moment
         owner.zones.push({ kind: "pull", cfg: pr.pull, by: owner, target: t, goalX: tcx + toward * Math.min(pr.pull.distance, room), t: 0, life: pr.pull.ticks });
       }
       if (p.hit.slam) owner.beginGravSlam(t, p.hit.slam);
@@ -352,20 +353,32 @@
         if (!p || f.state === MW.STATE.KO) continue;
         const C = req.cfg, cx = f.x + f.stats.width / 2;
         if (req.type === "spikes") {
-          const x0 = Math.max(p.x + 4, cx - C.radius), x1 = Math.min(p.x + p.w - 4, cx + C.radius);
+          // Rift Spikes: centred on the enemy (position locked now), on the platform under it, within reach of the caster
+          let base = p, tx = cx;
+          const foe = f.foe;
+          if (C.atEnemy && foe && foe.state !== MW.STATE.KO) {
+            const fcx = foe.x + foe.stats.width / 2, reach = C.reach || 520;
+            const fp = Math.abs(fcx - cx) <= reach ? this.groundUnder(foe) : null;
+            if (fp) { base = fp; tx = fcx; }
+            else tx = cx + Math.sign(fcx - cx || 1) * reach; // too far: they erupt at the edge of his reach, on his platform
+          }
+          tx = Math.max(base.x + 4, Math.min(base.x + base.w - 4, tx));
+          const x0 = Math.max(base.x + 4, tx - C.radius), x1 = Math.min(base.x + base.w - 4, tx + C.radius);
+          if (x1 - x0 < C.width) continue;
           const spikes = [];
           for (let i = 0; i < C.count; i++) {
             const x = x0 + ((x1 - x0) * (i + 0.5)) / C.count;
             spikes.push({
               x: x, w: C.width, h: C.height * (0.78 + 0.22 * Math.abs(Math.sin(i * 12.9898))),
-              delay: C.warn + Math.floor((Math.abs(x - cx) / Math.max(1, C.radius)) * C.spread),
+              delay: C.warn + Math.floor((Math.abs(x - tx) / Math.max(1, C.radius)) * C.spread),
               lean: ((i * 37) % 7 - 3) * 0.05,
             });
           }
-          f.zones.push({ kind: "spikes", cfg: C, by: f, y: p.y, cx: cx, x0: x0, x1: x1, spikes: spikes, t: 0, life: C.warn + C.spread + C.eruptTicks + C.duration, hit: new Set(), dot: new Map() });
-          f.fxPush({ kind: "spikes", x: cx, y: p.y, x0: x0, x1: x1 });
+          f.zones.push({ kind: "spikes", cfg: C, by: f, y: base.y, cx: tx, x0: x0, x1: x1, spikes: spikes, t: 0, life: C.warn + C.spread + C.eruptTicks + C.duration, hit: new Set(), dot: new Map() });
+          f.fxPush({ kind: "spikes", x: tx, y: base.y, x0: x0, x1: x1 });
         } else if (req.type === "grasp") {
-          f.zones.push({ kind: "grasp", cfg: C, by: f, y: p.y, cx: cx, xMin: p.x, xMax: p.x + p.w, rad: 0, t: 0, life: C.duration, holding: new Set() });
+          const K = C.collapse;
+          f.zones.push({ kind: "grasp", cfg: C, by: f, y: p.y, cx: cx, xMin: p.x, xMax: p.x + p.w, rad: 0, cp: 0, t: 0, life: C.duration + (K ? K.warn + (K.linger || 10) : 0), holding: new Set(), detonated: false });
           f.fxPush({ kind: "grasp", x: cx, y: p.y });
         }
       }
@@ -413,7 +426,8 @@
             if (z.hit.has(o.id)) continue;
             z.hit.add(o.id);
             const dir = o.x + o.stats.width / 2 >= z.cx ? 1 : -1;
-            o.takeHit(f, { id: "abyssal_spikes", isSkill: true, noMark: true, damage: C.eruptDamage, knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun, manaGain: C.manaGain }, dir);
+            const setup = !!(o.root || o.slow || o.voidSetup > 0); // restrained, slowed in Grasp, or just pulled in
+            o.takeHit(f, { id: "abyssal_spikes", isSkill: true, noMark: true, empowered: setup, damage: C.eruptDamage * (setup && C.setupMul ? C.setupMul : 1), knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun, manaGain: C.manaGain }, dir);
             f.onHitLanded({ manaGain: C.manaGain });
             this.emitFx({ type: "void", style: "arcane", kind: "spike_hit", x: o.x + o.stats.width / 2, y: o.y + o.stats.height * 0.8, ownerId: f.id });
           } else if (z.t - (z.dot.get(o.id) === undefined ? -1e9 : z.dot.get(o.id)) >= C.zoneEvery) { // the leftover spikes: a damage tick, no stun
@@ -425,15 +439,32 @@
     }
 
     stepGrasp(f, z, foes) {
-      const C = z.cfg;
-      z.rad = C.radius * Math.min(1, z.t / C.spread);
-      const x0 = Math.max(z.xMin, z.cx - z.rad), x1 = Math.min(z.xMax, z.cx + z.rad);
+      const C = z.cfg, K = C.collapse;
+      const T0 = C.duration; // ticks of plain pool before the collapse starts
+      const cp = K ? Math.max(0, Math.min(1, (z.t - T0) / K.warn)) : 0; // collapse progress 0..1
+      z.cp = cp;
+      z.rad = C.radius * Math.min(1, z.t / C.spread) * (K ? 1 - (1 - (K.shrink === undefined ? 0.55 : K.shrink)) * cp : 1);
       z.holding.clear();
+      if (K && z.t > T0 + K.warn) return; // the pool has closed: no more slow, it just fades
+      const blast = !!K && z.t === T0 + K.warn; // the tick the pool closes
+      const x0 = Math.max(z.xMin, z.cx - z.rad), x1 = Math.min(z.xMax, z.cx + z.rad);
       for (const o of foes) {
         const feet = o.y + o.stats.height, ocx = o.x + o.stats.width / 2;
         if (o.x + o.stats.width < x0 || o.x > x1 || feet < z.y - C.zoneHeight || feet > z.y + 14 || ocx < z.xMin - 20 || ocx > z.xMax + 20) continue;
         o.slow = { left: 1, mul: C.slowMul, noJump: C.noJump !== false };
         z.holding.add(o.id);
+        if (K && cp > 0 && !blast) { // collapsing: everyone inside is dragged toward the centre
+          const dx = z.cx - ocx;
+          if (Math.abs(dx) > 6) o.ctl = { vx: Math.max(-K.pullSpeed, Math.min(K.pullSpeed, dx * 0.35)), vy: o.grounded ? 0 : o.vy * 0.6, left: 2 };
+        }
+        if (blast && !z.detonated) {
+          o.takeHit(f, { id: "abyssal_grasp", isSkill: true, noMark: true, damage: K.damage, knockback: K.knockback, launchH: K.launchH, launchV: K.launchV, stun: K.stun, manaGain: K.manaGain }, ocx >= z.cx ? 1 : -1);
+          f.onHitLanded({ manaGain: K.manaGain });
+        }
+      }
+      if (blast && !z.detonated) {
+        z.detonated = true;
+        this.emitFx({ type: "void", style: "arcane", kind: "grasp_collapse", x: z.cx, y: z.y, ownerId: f.id });
       }
     }
 

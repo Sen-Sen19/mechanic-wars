@@ -74,7 +74,7 @@
     return y1 > t.y && y0 < t.y + t.stats.height;
   }
 
-  // Void Mage skill logic (data comes from characters.js; slots: 0 Wraiths, 1 Transit, 2 Spikes, 3 Grasp). Mutates the intent.
+  // Void Mage skill logic (data comes from characters.js; slots: 0 Wraiths, 1 Singularity, 2 Spikes, 3 Grasp; the hold key / Void Step is not used by bots). Mutates the intent.
   function voidMageSkills(me, real, d, intent, rng) {
     const cd = me.cooldowns;
     const X = me.stats.ultimate && me.stats.ultimate.attack.execution;
@@ -83,8 +83,8 @@
     const press = (i) => { sk[i] = true; any = true; };
     if (X && me.manaReady() && d.gap < X.range * 0.8 && rng() < 0.08) intent.ultPressed = true; // enemy in range: execute
     else if (cd[0] === 0 && d.gap > 120 && d.gap < 420 && !real.root && rng() < 0.03) press(0); // wraiths at mid range
-    else if (cd[1] === 0 && me.hp < me.stats.maxHP * 0.4 && d.gap < 140 && rng() < 0.06) press(1); // transit: escape when hurt and cornered
-    else if (cd[2] === 0 && d.gap < 150 && Math.abs(d.rise) < 40 && me.grounded && rng() < 0.05) press(2); // spikes on a close enemy
+    else if (cd[1] === 0 && d.gap > 90 && d.gap < 460 && rng() < 0.05) press(1); // singularity: pull a mid-range enemy in
+    else if (cd[2] === 0 && d.gap < 420 && Math.abs(d.rise) < 160 && me.grounded && rng() < 0.05) press(2); // rift spikes erupt under the enemy
     else if (cd[3] === 0 && d.gap < 260 && me.grounded && rng() < 0.03) press(3); // grasp: control the floor
     if (any) {
       intent.skillPressed = sk;

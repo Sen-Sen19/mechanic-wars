@@ -26,6 +26,7 @@ try {
     MW.MageFx.tick();
     for (const f of sim.fighters) if (f.stats.id === "mage") { MW.MageFx.drawFighter(ctx, f); calls++; }
     for (const p of sim.projectiles) MW.MageFx.drawBolt(ctx, p);
+    MW.MageFx.lift(m); MW.MageFx.drawBack(ctx, sim, 1); MW.MageFx.drawFront(ctx, sim, 1);
     MW.MageFx.draw(ctx);
   }
 } catch (err) { console.log("FAIL  fx threw: " + err.stack); failures++; }

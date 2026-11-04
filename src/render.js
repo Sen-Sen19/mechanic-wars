@@ -290,6 +290,9 @@
       } else if (ev.id === "iron_guard") {
         addRing(ev.x, ev.y, 14, 84, 18, "#ffd700", 4, 1);
         addShake(2);
+      } else if (ev.id === "death_sentence") { // Wraith ultimate: title card (the dimming, sigils and flashes come from assassin_fx.js)
+        banner = { text: "DEATH SENTENCE", life: 70, maxLife: 70 };
+        addShake(3);
       } else if (ev.id === "meteor_breaker" || ev.id === "meteor_fist") {
         banner = { text: ev.id === "meteor_fist" ? "METEOR FIST" : "METEOR BREAKER", life: 80, maxLife: 80 };
         darkLife = DARK_MAX;
@@ -785,7 +788,7 @@
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
-    if (h.fxStyle || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
+    if (h.fxStyle || h.hook || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
     const s = f.stats;
     const e = f.meleeShape();
     const d = e.dir;
@@ -2148,6 +2151,7 @@
       const shy = shakeMag > 0 ? (Math.random() - 0.5) * 2 * shakeMag : 0;
       ctx.setTransform(1, 0, 0, 1, this.offsetX + shx, this.offsetY + shy);
       drawDarken(ctx, this.offsetX + shx, this.offsetY + shy, width, height); // ultimate: dim the arena
+      if (MW.MageFx && MW.MageFx.drawBack) MW.MageFx.drawBack(ctx, sim, alpha); // Void Mage Event Horizon: dark screen, rift and entity (behind the fighters)
 
       // trails (behind characters)
       drawTrails(ctx);
@@ -2162,6 +2166,7 @@
         ctx.translate((f.px - f.x) * (1 - alpha), (f.py - f.y) * (1 - alpha));
         const jt = MW.BrawlerFx && MW.BrawlerFx.jitter(f); // victim trembles during hit-stop
         if (jt) ctx.translate(jt[0], jt[1]);
+        if (s.id === "mage" && MW.MageFx && MW.MageFx.lift) { const ml = MW.MageFx.lift(f); if (ml > 0.2) ctx.translate(0, -ml); } // Event Horizon: he levitates
 
         // check for hit bursts
         checkHitBurst(f);
@@ -2226,6 +2231,7 @@
       drawParticles(ctx);
       drawSkillFxWorld(ctx);
       if (MW.Bulwark && MW.Bulwark.drawJudgment) for (const f of sim.fighters) if (f.stats.id === "tank" && f.state !== MW.STATE.KO) MW.Bulwark.drawJudgment(ctx, f); // Divine Judgment: holy-light shield, above the fighters
+      if (MW.MageFx && MW.MageFx.drawFront) MW.MageFx.drawFront(ctx, sim, alpha); // Event Horizon: fingers over the victim, piercing spikes
       if (MW.MageFx) MW.MageFx.draw(ctx);
       if (MW.AssassinFx) MW.AssassinFx.draw(ctx);
       if (MW.BrawlerFx) MW.BrawlerFx.draw(ctx);

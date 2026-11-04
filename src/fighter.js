@@ -57,6 +57,8 @@
       this.gunnerBurst = null; // Artillerist Five-Shot Barrage in progress: { hit, left, timer, batch } (the Sim fires it)
       this.momentumIdle = 0; // ticks since the last landed hit
       this.cooldowns = [0, 0, 0, 0]; // skill cooldowns (ticks left)
+      this.holdCd = 0; // Void Mage: ticks until the hold key (Void Step) works again
+      this.voidSetup = 0; // victim of a Singularity pull: ticks Rift Spikes still hit it for the setup bonus
       this.guardEmpowered = false; // after blocking with Iron Guard: next basic punch is stronger
       this.guardEmpowerLeft = 0; // ticks left to use it
       this.guardEmpowerCfg = null;
@@ -180,6 +182,8 @@
       this.gunnerHop = null;
       this.momentumIdle = 0;
       this.cooldowns = [0, 0, 0, 0];
+      this.holdCd = 0;
+      this.voidSetup = 0;
       this.guardEmpowered = false;
       this.guardEmpowerLeft = 0;
       this.counterTarget = null;
@@ -687,7 +691,7 @@
           const dir = v.x + v.stats.width / 2 >= this.x + this.stats.width / 2 ? 1 : -1;
           v.ctl = null;
           this.strikeHit(v, { id: "void_slam", isSkill: true, noMark: true, noOverload: true, empowered: true, damage: C.damage, knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun, manaGain: C.manaGain || 0 }, dir);
-          this.fxPush({ kind: "slam", x: v.x + v.stats.width / 2, y: v.y + v.stats.height, big: false });
+          this.fxPush({ kind: "slam", x: v.x + v.stats.width / 2, y: v.y + v.stats.height, big: false, px0: v.standingOn ? v.standingOn.x : undefined, px1: v.standingOn ? v.standingOn.x + v.standingOn.w : undefined });
           this.gravSlam = null;
         }
       }
@@ -945,7 +949,13 @@
         if (v.ctl) v.ctl = null;
         return;
       }
-      if (v.state === STATE.KO || (X.phase !== "open" && X.phase !== "retreat" && v.invuln > 0)) { stop(C.endRecovery); return; }
+      if ((v.state === STATE.KO || (X.phase !== "open" && X.phase !== "retreat" && v.invuln > 0)) && X.phase !== "sink" && X.phase !== "retreat") {
+        // the victim died (or respawned) mid-execution: no more damage, but the entity still lets go and dissolves properly
+        v.ctl = null;
+        X.phase = X.phase === "open" ? "retreat" : "sink";
+        X.p = 0;
+        this.fxPush({ kind: "release", x: v.x + v.stats.width / 2, y: v.y + v.stats.height * 0.5 });
+      }
       this.state = STATE.ATTACK_ACTIVE;
       this.stateTimer = 3;
       this.vx = 0;
@@ -957,9 +967,11 @@
           X.phase = grabbed ? "lift" : "retreat";
           X.p = 0;
           this.fxPush({ kind: grabbed ? "grab" : "rift_miss", x: X.rx, y: X.ry });
+          if (grabbed) { this.holdVictim(v); v.ctl = { vx: 0, vy: 0, left: 2 }; } // seized this very tick: no one-tick window to act
         }
       } else if (X.phase === "retreat") {
-        if (++X.p >= C.sinkTicks) stop(C.missRecovery);
+        if (++X.p === Math.floor(C.sinkTicks * 0.75)) this.fxPush({ kind: "rift_close", x: X.rx, y: X.ry });
+        if (X.p >= C.sinkTicks) stop(C.missRecovery);
       } else if (X.phase === "lift") {
         this.holdVictim(v);
         v.ctl = { vx: (X.rx - vcx) * 0.25, vy: -C.liftSpeed, left: 2 };
@@ -974,7 +986,11 @@
           this.holdVictim(v);
           this.fxPush({ kind: "impale", x: vcx, y: v.y + v.stats.height * 0.5, n: X.imp });
         }
-        if (X.imp >= C.impales && X.p >= C.impales * C.impaleGap + C.settle) { X.phase = "slam"; X.p = 0; }
+        if (X.imp >= C.impales && X.p >= C.impales * C.impaleGap + C.settle) { X.phase = "windup"; X.p = 0; this.fxPush({ kind: "windup", x: vcx, y: v.y + v.stats.height * 0.5 }); }
+      } else if (X.phase === "windup") { // the entity pulls its arm back and lifts the victim a little: the tell before the finisher
+        this.holdVictim(v);
+        v.ctl = { vx: 0, vy: -(C.windupRise || 0), left: 2 };
+        if (++X.p >= (C.windup || 0)) { X.phase = "slam"; X.p = 0; }
       } else if (X.phase === "slam") {
         this.holdVictim(v);
         v.ctl = { vx: 0, vy: C.slamSpeed, left: 2 };
@@ -985,9 +1001,11 @@
           this.fxPush({ kind: "slam", x: vcx, y: v.y + v.stats.height, big: true });
           X.phase = "sink";
           X.p = 0;
+          this.fxPush({ kind: "release", x: vcx, y: v.y + v.stats.height * 0.5 });
         }
-      } else if (++X.p >= C.sinkTicks) { // sink
-        stop(C.endRecovery);
+      } else { // sink: the entity lets go and dissolves, then the rift collapses
+        if (++X.p === Math.floor(C.sinkTicks * 0.75)) this.fxPush({ kind: "rift_close", x: X.rx, y: X.ry });
+        if (X.p >= C.sinkTicks) stop(C.endRecovery);
       }
     }
 
@@ -1041,10 +1059,20 @@
       return {
         cx: this.facing > 0 ? this.x + s.width : this.x,
         cy: this.y + s.height / 2 - (this.hit.lift || 0),
-        rx: this.hit.range,
+        rx: this.hit.hook ? this.hookReach() : this.hit.range,
         ry: h / 2,
         dir: this.facing,
       };
+    }
+
+    // Assassin Chained Scythe: how far the flying hook head has travelled from the front edge (px). It grows by hook.speed on every
+    // active tick, so the hit shape is only the part of the line the head has actually covered. Also read by assassin_fx.js.
+    hookReach() {
+      const h = this.hit;
+      if (!h || !h.hook) return 0;
+      if (this.state !== STATE.ATTACK_ACTIVE) return this.state === STATE.ATTACK_STARTUP ? 0 : h.range;
+      const elapsed = Math.max(0, (h.active || 1) - this.stateTimer);
+      return Math.min(h.range, h.hook.speed * (elapsed + 1));
     }
 
     // Bounding box of the melee shape (used by bots / debugging; hits use hitsRect).
@@ -1131,6 +1159,15 @@
       }
       this.startSkill(-1, ult);
       return true;
+    }
+
+    // Void Mage hold key (stats.hold): Void Step. Same read-the-press flow as Holy Guard; it starts as an ordinary skill (slot -4).
+    startHold(cfg) {
+      this.guardLock = true; // one per press: release the button to use it again
+      this.tapPending = false;
+      this.holdCd = cfg.cooldown || 0;
+      this.vx = 0;
+      this.startSkill(-4, Object.assign({}, cfg.attack));
     }
 
     // Skill slots 0..3 (touch pad / U I O L). Returns true when the skill started.
@@ -1417,14 +1454,14 @@
 
       // Bulwark (stats.guard): on the ground a press waits to be read. Released within holdStart ticks = a tap (Shield Slam);
       // still held at holdStart = Holy Guard. In the air (or when presses come from a bot with no hold) it is always a tap.
-      const GD = s.guard;
+      const GD = s.guard || s.hold; // Bulwark: Holy Guard / Void Mage: Void Step (tap = basic attack in both)
       if (GD) {
         if (!LOCOMOTION.has(this.state)) this.tapPending = false;
-        else if (this.tapPending && !(wasGrounded && this.attackHeld)) { // let go early (or left the ground): it was a tap
+        else if (this.tapPending && (!(wasGrounded && this.attackHeld) || this.overload)) { // let go early (or left the ground / the orb is ready): it was a tap
           this.tapPending = false;
           this.atkBuf = Math.max(this.atkBuf, 1);
-        } else if (wasGrounded && this.attackHeld && !this.guardLock && !this.overload) {
-          if (this.atkHeldTicks >= GD.holdStart) { this.startGuard(GD); this.atkBuf = 0; }
+        } else if (wasGrounded && this.attackHeld && !this.guardLock && !this.overload && !(s.hold && this.holdCd > 0)) {
+          if (this.atkHeldTicks >= GD.holdStart) { if (s.guard) this.startGuard(GD); else this.startHold(GD); this.atkBuf = 0; }
           else if (this.atkBuf > 0) { this.tapPending = true; this.atkBuf = 0; }
         }
       }
@@ -1460,6 +1497,8 @@
 
       // cooldowns tick down; passive momentum fades while no hit lands
       for (let i = 0; i < 4; i++) if (this.cooldowns[i] > 0) this.cooldowns[i]--;
+      if (this.holdCd > 0) this.holdCd--;
+      if (this.voidSetup > 0) this.voidSetup--;
       if (this.guardEmpowered && --this.guardEmpowerLeft <= 0) this.guardEmpowered = false; // bonus runs out
       const PM = s.passive;
       if (PM && PM.type === "momentum" && this.momentum > 0 && ++this.momentumIdle >= PM.decayDelay) {

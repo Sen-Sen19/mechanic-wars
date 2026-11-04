@@ -41,16 +41,18 @@ for (let i = 0; i < 160; i++) { run(sim, 1); minY = Math.min(minY, e.y); }
 check("orb lifts the enemy into the air", minY < y0 - 60, "rise=" + Math.round(y0 - minY));
 check("orb slam deals heavy damage", hp0 - e.hp > 14, "dmg=" + (hp0 - e.hp).toFixed(1));
 
-// 3. Singularity: hold ~1s then release; pull toward the mage
+// 3. Skill 2 - Singularity (tap skill, was the charged basic): burst damage + pull toward the mage; the hold key no longer charges it
 sim = duel(260);
 m = sim.fighters[0]; e = sim.fighters[1];
-const ex0 = e.x;
-run(sim, 100, I({ attackHeld: true, attackPressed: false }));
-check("charging does not fire early", sim.projectiles.length === 0 || true);
-let fired = false, pullOK = false, sawSing = false;
-for (let i = 0; i < 120; i++) { sim.step([I({}), MW.IDLE_INTENT]); if (sim.projectiles.some((p) => p.kind === "singularity")) sawSing = true; }
-check("released full charge fires a Singularity", sawSing || e.hp < e.stats.maxHP, "hp=" + e.hp.toFixed(1));
+const ex0 = e.x, hpS = e.hp;
+run(sim, 1, I({ skillPressed: SK(1) }));
+let sawSing = false;
+for (let i = 0; i < 140; i++) { sim.step([I({}), MW.IDLE_INTENT]); if (sim.projectiles.some((p) => p.kind === "singularity")) sawSing = true; }
+check("skill 2 fires a Singularity", sawSing);
+check("Singularity deals burst damage (>= 18)", hpS - e.hp >= 18, "dmg=" + (hpS - e.hp).toFixed(1));
 check("Singularity pulled the enemy toward the mage", e.x < ex0 - 20, "moved " + Math.round(ex0 - e.x));
+check("skill 2 goes on cooldown", m.cooldowns[1] > 0);
+check("hold key no longer charges a Singularity", !MW.CHARACTERS.mage.charge);
 
 // 4. Wraiths: restrain both-caught enemy
 sim = duel(200);
@@ -66,22 +68,33 @@ let r2 = 0;
 for (let i = 0; i < 350; i++) { e.invuln = 5; run(sim, 1); if (e.root) r2++; } // an enemy that cannot be caught (untargetable): pursuit just runs out
 check("uncatchable enemy: never restrained, wraiths vanish after the pursuit time", r2 === 0 && !m.wraiths);
 
-// 5. Transit: untargetable while dissolved, lands on a platform inside the arena
+// 5. Hold key - Void Step: a TAP still shoots a shard; a HOLD melts him, untargetable, lands on a platform inside the arena
+const HOLD = (n) => (i) => I({ attackHeld: i < n, attackPressed: i === 0 });
 sim = duel(220);
 m = sim.fighters[0]; e = sim.fighters[1];
-run(sim, 1, I({ skillPressed: SK(1) }));
-let sawUntarget = false, ok = true;
-for (let i = 0; i < 120; i++) {
-  run(sim, 1);
+run(sim, 6, HOLD(3)); run(sim, 60);
+check("tap (short press) still fires the shard, no teleport", sim.projectiles.length + (e.hp < e.stats.maxHP ? 1 : 0) > 0 && !m.transit && m.holdCd === 0);
+sim = duel(220);
+m = sim.fighters[0]; e = sim.fighters[1];
+let sawUntarget = false, ok = true, melted = false;
+for (let i = 0; i < 160; i++) { // press at once, hold 30 ticks, then let go
+  run(sim, 1, I({ attackHeld: i < 30, attackPressed: i === 0 }));
+  if (m.state === MW.STATE.ATTACK_STARTUP && m.hit && m.hit.id === "abyssal_transit") melted = true;
   if (m.untargetable) { sawUntarget = true; ok = ok && m.fade === 0; }
 }
+check("hold starts Void Step (melt) after holdStart", melted);
+check("Void Step cooldown started", m.holdCd > 0);
 const b = sim.arena.blastZone;
 check("transit: untargetable once dissolved", sawUntarget);
 check("transit: reappears inside the arena on a platform", m.x >= b.left && m.x <= b.right && m.grounded && sim.arena.platforms.some((p) => p === m.standingOn), "x=" + Math.round(m.x) + " y=" + Math.round(m.y));
 check("transit: finished and targetable again", !m.transit && !m.untargetable && m.state !== MW.STATE.ATTACK_ACTIVE);
+// holding again while on cooldown does NOT teleport (it is just a basic attack)
+sim = duel(220); m = sim.fighters[0]; e = sim.fighters[1];
+m.holdCd = 200; run(sim, 50, I({ attackHeld: true, attackPressed: true }));
+check("hold on cooldown: no Void Step", !m.transit && !(m.hit && m.hit.id === "abyssal_transit"));
 // projectile passes through while hidden
 sim = duel(150); m = sim.fighters[0]; e = sim.fighters[1];
-run(sim, 40, I({ skillPressed: SK(1) }), I({}));
+run(sim, 40, (i) => I({ attackHeld: true, attackPressed: i === 0 }), I({}));
 check("hidden mage cannot be hit (takeHit refused)", (() => { m.untargetable = true; const h = m.hp; m.takeHit(e, { damage: 50, knockback: 5 }, 1); m.untargetable = false; return m.hp === h; })());
 
 // 6. Spikes: eruption hit + hazard zone, jumpers avoid the eruption
@@ -92,11 +105,20 @@ const hp1 = e.hp; run(sim, 80);
 check("spikes eruption damages a standing enemy", e.hp < hp1 - 8, "dmg=" + (hp1 - e.hp).toFixed(1));
 const zone = m.zones.find((z) => z.kind === "spikes");
 check("spike field persists as a hazard", !!zone);
+check("rift spikes erupt centred on the enemy", !!zone && Math.abs(zone.cx - (e.x + e.stats.width / 2)) < 60, zone ? "dx=" + Math.round(zone.cx - (e.x + e.stats.width / 2)) : "");
 let hpZ = e.hp; e.x = (zone ? zone.cx : 440) + 30; e.y = 560 - e.stats.height; e.vx = e.vy = 0; e.state = MW.STATE.IDLE;
 run(sim, 60);
 check("spike hazard keeps hurting enemies in it", e.hp < hpZ, "dmg=" + (hpZ - e.hp).toFixed(1));
 run(sim, 400);
 check("spikes dissolve after their duration", m.zones.length === 0);
+// 6b. Rift Spikes follow the enemy's position (far away, still hit) and hit harder on a set-up target
+{
+  const dmgOf = (prep) => { const sm = duel(300), mm = sm.fighters[0], ee = sm.fighters[1]; if (prep) prep(ee); const h0 = ee.hp;
+    run(sm, 1, I({ skillPressed: SK(2) })); for (let i = 0; i < 110; i++) { if (prep) prep(ee); run(sm, 1); } return h0 - ee.hp; };
+  const base = dmgOf(null), setup = dmgOf((ee) => { ee.voidSetup = 200; });
+  check("spikes reach an enemy 300px away", base >= 14, "dmg=" + base.toFixed(1));
+  check("set-up target takes much more spike damage", setup >= base * 1.4, "base=" + base.toFixed(1) + " setup=" + setup.toFixed(1));
+}
 
 // 7. Grasp: slow + no jump while inside, free once outside
 sim = duel(100);
@@ -111,6 +133,23 @@ sim = duel(100); m = sim.fighters[0]; e = sim.fighters[1];
 run(sim, 1, I({ skillPressed: SK(3) })); run(sim, 40);
 e.x = 1000; e.y = 100; e.vy = 0; run(sim, 60); // knocked well outside the pool / onto another level
 check("grasp effect ends outside the area", !e.slow);
+// 7b. Grasp collapse: a slowed enemy still inside when the pool closes is hit and stunned; one that left takes nothing
+{
+  const K = MW.CHARACTERS.mage.skills[3].attack.grasp, T = K.duration + K.collapse.warn + K.collapse.linger + 20;
+  sim = duel(60); m = sim.fighters[0]; e = sim.fighters[1];
+  run(sim, 1, I({ skillPressed: SK(3) })); const hpG = e.hp; let stunned = false, ctrlPulled = false;
+  const ex1 = e.x;
+  for (let i = 0; i < T + 40; i++) { run(sim, 1); if (e.state === MW.STATE.HITSTUN) stunned = true; }
+  check("grasp collapse damages an enemy still inside", hpG - e.hp >= K.collapse.damage * 0.6, "dmg=" + (hpG - e.hp).toFixed(1));
+  check("grasp collapse stuns it", stunned);
+  check("grasp pool is gone after the collapse", m.zones.every((z) => z.kind !== "grasp") && !e.slow);
+  sim = duel(60); m = sim.fighters[0]; e = sim.fighters[1];
+  run(sim, 1, I({ skillPressed: SK(3) })); const hpE = e.hp;
+  for (let i = 0; i < 30; i++) run(sim, 1);
+  e.x = 1000; e.y = 100; e.vx = e.vy = 0; // escaped the pool before it closed
+  for (let i = 0; i < T + 40; i++) run(sim, 1);
+  check("an enemy that left the pool takes no collapse damage", e.hp >= hpE - 0.01 || e.hp === e.stats.maxHP, "dmg=" + (hpE - e.hp).toFixed(1));
+}
 
 // 8. Ultimate: hits an enemy that stays; misses one that leaves the zone
 sim = duel(200);
@@ -120,7 +159,7 @@ const hpU = e.hp; run(sim, 400);
 check("Void Execution deals massive damage to a standing enemy", hpU - e.hp > 35, "dmg=" + (hpU - e.hp).toFixed(1));
 sim = duel(200); m = sim.fighters[0]; e = sim.fighters[1]; m.mana = 100;
 run(sim, 1, I({ ultPressed: true }));
-run(sim, 50); // startup done, rift open
+run(sim, 62); // startup done, rift open
 const hpV = e.hp;
 run(sim, 40, I({}), I({ right: true }));
 run(sim, 300);
