@@ -1,4 +1,6 @@
-// Mechanic Wars - Bulwark art (render only, never touches the sim).
+// Mechanic Wars - Paladin art (file name stays bulwark_art.js; render only, never touches the sim).
+// 2026-11-05 redesign: gold plate, ivory cloth, white-gold holy glow, a halo over the helm and a holy cross on the shield.
+// (The older notes below still describe the shapes; only the colors and a few emblems changed.)
 // A colossal armored guardian, a walking fortress: layered black-steel plate, a huge asymmetrical
 // shoulder plate on the shield side, a massive defensive gauntlet on the other arm, a closed great helm
 // with a crenellated (castle wall) crown and a narrow glowing eye slit, and an enormous tower shield
@@ -12,14 +14,16 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
 
-  // Palette: obsidian black, gunmetal gray, weathered silver, antique gold, steel-blue / pale-gold energy.
+  // Palette: holy gold. Names are kept from the old black-steel version so the drawing code below still works:
+  // obs* = deep bronze shadow, gun* = gold plate, silver* = bright rim light, gold* = trim, blue* = idle holy glow.
   const C = {
-    line: "#050608", obs: "#0a0b0f", obs2: "#14161d", obs3: "#1e222b",
-    gun: "#363e4e", gun2: "#4e586b", gun3: "#667186",
-    silver: "#a9b2c2", silverDim: "#79849a",
-    gold: "#a9873f", goldHi: "#dcbf6e",
-    blue: "#7fb2dd", blueHi: "#cfe6fa", paleGold: "#f4dd9e",
-    rim: "#454f63",
+    line: "#2a1a05", obs: "#5a3d12", obs2: "#7a5518", obs3: "#9a7224",
+    gun: "#c9a032", gun2: "#e2bd4a", gun3: "#f2d46e",
+    silver: "#fff1b8", silverDim: "#c9a74a",
+    gold: "#d9a92a", goldHi: "#fff0a6",
+    blue: "#fff4c2", blueHi: "#ffffff", paleGold: "#fffbe0",
+    ivory: "#fbf3dc", ivory2: "#efe3bd", cream: "#e8d79c",
+    rim: "#8a6a22",
   };
 
   // ── tiny drawing helpers ───────────────────────────────────────────
@@ -96,7 +100,7 @@
   }
   // battle damage: a short light scratch
   function scratch(k, x, y, ang, len, alpha) {
-    line(k, [[x, y], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], C.silver, 0.8, alpha === undefined ? 0.4 : alpha);
+    line(k, [[x, y], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], C.obs, 0.8, alpha === undefined ? 0.4 : alpha);
   }
   // battle damage: a dent (dark pit with a light lower rim)
   function dent(k, x, y, r) {
@@ -105,7 +109,7 @@
     ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.7, 0.4, 0, TAU);
     ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fill();
     ctx.beginPath(); ctx.ellipse(x, y + r * 0.25, r, r * 0.6, 0.4, 0.2, Math.PI - 0.2);
-    ctx.strokeStyle = "rgba(200,210,230,0.3)"; ctx.lineWidth = 0.8; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,244,190,0.35)"; ctx.lineWidth = 0.8; ctx.stroke();
   }
 
   function draw(k, e) {
@@ -117,7 +121,7 @@
     // energy level: faint at rest, bright while super armor is on or a hit is absorbed
     const en = clamp(0.28 + 0.1 * pulse + (armorOn ? 0.55 : 0) + (spark ? 0.5 : 0) + (strike ? 0.2 : 0), 0, 1);
     const eCol = armorOn || spark ? C.paleGold : C.blue;
-    const eRgb = armorOn || spark ? "244,221,158" : "127,178,221";
+    const eRgb = armorOn || spark ? "255,250,215" : "255,236,150";
 
     // torso frame: T(a, b) = a along the spine (0 = hip, torL = shoulders), b toward the front
     let ux = shW[0] - hipW[0], uy = shW[1] - hipW[1];
@@ -208,8 +212,8 @@
     // ── 3) hips: pelvis block, tabard strip, hanging tassets, heavy belt ──
     const sway = Math.sin(now * 2.2) * 1.2 - clamp(k.vx, -6, 6) * 0.4;
     fillPoly(k, [T(torL * 0.3, -hw * 0.62), T(torL * 0.3, hw * 0.58), T(-legL * 0.2, hw * 0.52), T(-legL * 0.2, -hw * 0.56)], C.obs2, C.rim, 1.4);
-    // dark cloth tabard with gold trim hanging from the belt
-    fillPoly(k, [T(2, hw * 0.28), T(2, -hw * 0.26), [hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.72], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.74]], C.obs, C.rim, 1.3);
+    // ivory cloth tabard with gold trim hanging from the belt
+    fillPoly(k, [T(2, hw * 0.28), T(2, -hw * 0.26), [hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.72], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.74]], C.ivory2, C.silverDim, 1.3);
     line(k, [[hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.72], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.74]], C.gold, 1.6, 0.95);
     // tassets: three overlapping plates, front and back
     for (let i = 2; i >= 0; i--) {
@@ -249,15 +253,25 @@
     scratch(k, ...T(torL * 0.7, sw * 0.3), 1.9, 6, 0.4);
     scratch(k, ...T(torL * 0.45, sw * 0.2), 0.3, 6, 0.35);
 
-    // ── 5) gorget + closed great helm with a crenellated crown and a narrow glowing eye slit ──
+    // ── 5) gorget + closed great helm with a halo, a crest fin and a narrow glowing eye slit ──
     fillPoly(k, [T(torL * 0.96, -sw * 0.32), T(torL + hr * 0.8, -sw * 0.28), T(torL + hr * 0.9, sw * 0.24), T(torL * 0.94, sw * 0.32)], C.gun, C.silver, 1.5);
     line(k, [T(torL + hr * 0.6, -sw * 0.26), T(torL + hr * 0.7, sw * 0.22)], C.goldHi, 1.2, 0.9);
     const hx = hcw[0], hy = hcw[1], hrx = hr * 1.28;
     const Hp = (a, b) => [hx + d * hrx * a, hy + hrx * b]; // helm-space point (a forward, b down)
-    // crenellated crown: three square merlons on a flat top
-    for (const a of [-0.62, 0.0, 0.62]) {
-      fillPoly(k, [Hp(a - 0.2, -0.95), Hp(a - 0.2, -1.42), Hp(a + 0.2, -1.42), Hp(a + 0.2, -0.95)], C.gun2, C.silver, 1.3);
+    // halo: a thin glowing gold ring floating above the helm, with a soft light behind it
+    if (!F) {
+      const hy0 = hy - hrx * 1.75, pul = 0.75 + 0.25 * Math.sin(now * 3);
+      glow(k, hx, hy0, hrx * 1.9, (0.16 + 0.2 * en) * pul, eRgb);
+      ctx.save();
+      ctx.shadowColor = C.paleGold; ctx.shadowBlur = 10 + 8 * en;
+      ctx.strokeStyle = C.goldHi; ctx.lineWidth = Math.max(1.8, hrx * 0.13); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.ellipse(hx, hy0, hrx * 1.0, hrx * 0.32, 0, 0, TAU); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(0.7, hrx * 0.04);
+      ctx.beginPath(); ctx.ellipse(hx, hy0, hrx * 1.0, hrx * 0.32, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+      ctx.restore();
     }
+    // small gold crest fin on top of the helm
+    fillPoly(k, [Hp(-0.55, -1.0), Hp(-0.1, -1.55), Hp(0.5, -1.0)], C.gun3, C.silverDim, 1.3);
     // helm shell
     fillPoly(k, [Hp(-1.08, 0.95), Hp(-1.12, -0.4), Hp(-0.85, -1.05), Hp(0.85, -1.05), Hp(1.12, -0.35), Hp(1.18, 0.35), Hp(0.92, 0.78), Hp(0.55, 1.12), Hp(-0.4, 1.16)], C.gun, C.silver, 1.9);
     // brow overhang + dark eye channel
@@ -307,19 +321,19 @@
     if (armorOn || spark) glow(k, xc, top + sH * 0.5, sH * 0.8, spark ? 0.4 : 0.28, "244,221,158");
     // thickness: a darker, slightly offset slab behind the face
     fillPoly(k, shield(-d * 4.5, 3.5, 1), C.obs, C.rim, 1.6);
-    // face: blackened steel with a thick silver rim
+    // face: gold with a bright rim
     const face = shield(0, 0, 1);
-    fillPoly(k, face, C.obs3, C.silver, 3.2);
+    fillPoly(k, face, C.gun, C.silver, 3.2);
     // inner raised panel + gold inlay line
     const panel = shield(0, 0, 0.84);
-    fillPoly(k, panel, C.obs2, C.gun3, 1.6);
+    fillPoly(k, panel, C.cream, C.gun3, 1.6);
     pathOf(ctx, shield(0, 0, 0.9)); edge(k, C.gold, 1.2);
     // corner bolts
     for (const p of [face[0], face[3], face[4], face[8]]) {
       const q = [lerp(p[0], xc, 0.12), lerp(p[1], top + sH * 0.5, 0.06)];
       ctx.beginPath(); ctx.arc(q[0], q[1], 1.6, 0, TAU); ctx.fillStyle = k.col(C.silverDim); ctx.fill(); edge(k, C.line, 1);
     }
-    const ecx = xc, ecy = top + sH * 0.4, er = sW * 0.27;
+    const ecx = xc, ecy = top + sH * 0.5, er = sW * 0.27; // a bit lower than before so the big shoulder plate does not hide the cross
     // ancient defensive engravings: gold dashes along both sides and the top
     if (!F) {
       ctx.save(); ctx.globalAlpha = 0.65; ctx.strokeStyle = C.goldHi; ctx.lineWidth = 1; ctx.lineCap = "round";
@@ -333,36 +347,33 @@
       ctx.restore();
     }
     // energy channels: from the emblem to the four sides, brighter when defense is active
-    const ch = (pts) => glowStroke(k, pts, eCol, 1.3, 6, 0.22 + 0.7 * en);
+    const chCol = armorOn || spark ? "#ffa800" : "#c48a10";
+    const ch = (pts) => glowStroke(k, pts, chCol, 1.3, 6, 0.35 + 0.6 * en);
     ch([[ecx, ecy - er], [ecx, top + sH * 0.1]]);
     ch([[ecx - d * er, ecy], [x0 + d * sW * 0.14, ecy]]);
     ch([[ecx + d * er, ecy], [x1 - d * sW * 0.14, ecy]]);
     ch([[ecx, ecy + er], [ecx, ecy + er + sH * 0.12], [ecx - d * sW * 0.2, ecy + er + sH * 0.2]]);
     ch([[ecx, ecy + er + sH * 0.12], [ecx + d * sW * 0.2, ecy + er + sH * 0.2]]);
-    // emblem: gold ring + fortress gate (arch with a portcullis) + keystone
+    // emblem: gold ring + holy cross (a tall cross with flared ends) + a small sunburst
     ctx.beginPath(); ctx.arc(ecx, ecy, er, 0, TAU);
-    ctx.fillStyle = k.col(C.obs); ctx.fill(); edge(k, C.goldHi, 2.4);
+    ctx.fillStyle = k.col(C.ivory); ctx.fill(); edge(k, C.gold, 2.4);
     ctx.beginPath(); ctx.arc(ecx, ecy, er * 0.82, 0, TAU); edge(k, C.gold, 1);
     {
-      const r = er * 0.62;
-      ctx.beginPath();
-      ctx.moveTo(ecx - r * 0.62, ecy + r * 0.78);
-      ctx.lineTo(ecx - r * 0.62, ecy - r * 0.1);
-      ctx.arc(ecx, ecy - r * 0.1, r * 0.62, Math.PI, 0);
-      ctx.lineTo(ecx + r * 0.62, ecy + r * 0.78);
-      ctx.closePath();
+      const r = er * 0.7, t = r * 0.26; // r = arm length, t = half thickness
+      const cross = [[-t, -r], [t, -r], [t, -t], [r * 0.8, -t], [r * 0.8, t], [t, t], [t, r], [-t, r], [-t, t], [-r * 0.8, t], [-r * 0.8, -t], [-t, -t]].map((q) => [ecx + q[0], ecy + q[1] - r * 0.08]);
+      pathOf(ctx, cross);
       ctx.fillStyle = F ? "#fff" : (armorOn || spark ? C.paleGold : C.gold);
-      ctx.fill();
-      if (!F) {
-        // portcullis bars inside the gate
-        ctx.strokeStyle = C.obs; ctx.lineWidth = 1;
-        for (const q of [-0.3, 0, 0.3]) { ctx.beginPath(); ctx.moveTo(ecx + q * r, ecy - r * 0.6); ctx.lineTo(ecx + q * r, ecy + r * 0.78); ctx.stroke(); }
-        for (const q of [-0.2, 0.25]) { ctx.beginPath(); ctx.moveTo(ecx - r * 0.62, ecy + q * r); ctx.lineTo(ecx + r * 0.62, ecy + q * r); ctx.stroke(); }
+      ctx.fill(); edge(k, C.obs, 0.9);
+      if (!F) { // rays between the cross arms
+        ctx.save(); ctx.strokeStyle = C.gold; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.lineCap = "round";
+        for (let i = 0; i < 4; i++) {
+          const an = Math.PI / 4 + i * (Math.PI / 2), c0 = Math.cos(an), s0 = Math.sin(an);
+          ctx.beginPath(); ctx.moveTo(ecx + c0 * er * 0.3, ecy + s0 * er * 0.3); ctx.lineTo(ecx + c0 * er * 0.7, ecy + s0 * er * 0.7); ctx.stroke();
+        }
+        ctx.restore();
       }
-      // keystone above the arch
-      fillPoly(k, [[ecx - r * 0.2, ecy - r * 0.78], [ecx + r * 0.2, ecy - r * 0.78], [ecx + r * 0.14, ecy - r * 1.05], [ecx - r * 0.14, ecy - r * 1.05]], C.goldHi, C.line, 0.8);
     }
-    glow(k, ecx, ecy, er * 1.9, 0.12 + 0.35 * en * (armorOn || spark ? 1 : 0.5), eRgb);
+    glow(k, ecx, ecy, er * 1.7, 0.03 + 0.12 * en * (armorOn || spark ? 1 : 0.3), "255,200,60");
     // battle damage: dents, scratches, a deep gouge
     dent(k, x0 + d * sW * 0.28, top + sH * 0.72, 3);
     dent(k, x1 - d * sW * 0.24, top + sH * 0.22, 2.4);

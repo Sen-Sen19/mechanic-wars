@@ -56,7 +56,7 @@
     // Positions of every tappable thing, in canvas pixels.
     layout() {
       const n = this.roster.length;
-      const cw = 260, ch = 200, gap = 20;
+      const gap = 16, ch = 200, cw = Math.min(260, Math.floor((this.W - 40 - (n - 1) * gap) / n)); // shrinks a little when the roster grows
       const x0 = (this.W - (n * cw + (n - 1) * gap)) / 2;
       const rowY = [135, 390];
       const cards = rowY.map((y) => this.roster.map((_, i) => ({ x: x0 + i * (cw + gap), y, w: cw, h: ch })));
@@ -157,13 +157,20 @@
         MW.Renderer.drawLook(ctx, fake);
       }
 
+      // text shrinks with the card so a bigger roster still fits (8 cards = 181 px wide)
+      const sc = Math.min(1, r.w / 215);
       ctx.textAlign = "center";
       ctx.fillStyle = selected ? "#ffffff" : "#cfd6e6";
-      ctx.font = "bold 22px monospace";
-      ctx.fillText(c.name.toUpperCase(), r.x + r.w / 2, r.y + 138);
+      ctx.font = "bold " + Math.round(22 * sc) + "px monospace";
+      ctx.fillText(c.name.toUpperCase(), r.x + r.w / 2, r.y + 130);
+      if (c.title) {
+        ctx.fillStyle = c.color;
+        ctx.font = "italic " + Math.max(10, Math.round(13 * sc)) + "px monospace";
+        ctx.fillText(c.title, r.x + r.w / 2, r.y + 155);
+      }
       ctx.fillStyle = "#8b94ab";
-      ctx.font = "15px monospace";
-      ctx.fillText("HP " + c.maxHP + "  ARM " + c.armor + "  SPD " + c.runSpeed, r.x + r.w / 2, r.y + 168);
+      ctx.font = Math.round(15 * sc) + "px monospace";
+      ctx.fillText("HP " + c.maxHP + "  ARM " + c.armor + "  SPD " + c.runSpeed, r.x + r.w / 2, r.y + 174);
       ctx.textAlign = "right";
       ctx.font = "13px monospace";
       ctx.fillText(c.attack.type === "projectile" ? "RANGED" : "MELEE", r.x + r.w - 8, r.y + 8);
@@ -235,7 +242,7 @@
 
       ctx.fillStyle = "#8b94ab";
       ctx.font = "18px monospace";
-      ctx.fillText("tap a card  |  keys: A/D change, W/S switch row, ENTER start, 1-5 you, 6-0 opponent", W / 2, H - 40);
+      ctx.fillText("tap a card  |  keys: A/D change, W/S switch row, ENTER start, 1-8 you, SHIFT+1-8 opponent", W / 2, H - 40);
     }
   }
 

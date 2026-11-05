@@ -47,8 +47,8 @@
           const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
           if (m) {
             const d = Number(m[1]);
-            if (d >= 1 && d <= 5) this.pickQueued = { slot: 0, index: d - 1 };
-            else this.pickQueued = { slot: 1, index: d === 0 ? 4 : d - 6 };
+            // 1-8 pick YOUR fighter, SHIFT + 1-8 picks the opponent's (the roster has eight now)
+            if (d >= 1 && d <= 8) this.pickQueued = { slot: e.shiftKey ? 1 : 0, index: d - 1 };
           }
         }
         this.down.add(e.code);

@@ -20,7 +20,8 @@
     // launchV big), which sets up follow-ups and punishes jumpers. Low reach is the trade-off.
     fighter: define({
       id: "fighter",
-      name: "Vanguard",
+      name: "Titan", // was "Vanguard"
+      title: "The Fist of Ruin", // shown under the name on the select card
       color: "#c98a3a", // dark bronze: select card, chips, HUD
       look: "gauntlet",
       hitFx: "brawler", // sim sends "strike" events for every landed punch (visual only, see brawler_fx.js)
@@ -145,7 +146,8 @@
     // Art: void_mage_art.js (body) + mage_fx.js (all effects). Logic: fighter.js ("VOID MAGE" block) and sim.js (zones, projectile riders).
     mage: define({
       id: "mage",
-      name: "Void Mage",
+      name: "Umbra", // was "Void Mage"
+      title: "The Abyssal Sovereign",
       color: "#b44bff",
       look: "hat",
       width: 34,
@@ -278,7 +280,8 @@
     // (art in character_art.js, effects in assassin_fx.js). Stats unchanged by the redesign.
     assassin: define({
       id: "assassin",
-      name: "Wraith", // class name shown on the select card (was "Assassin")
+      name: "Noctis", // shown on the select card (was "Wraith", before that "Assassin")
+      title: "The Phantom Executioner",
       epithet: "Bloodlust", // the character's own name
       color: "#e01a3c", // blood red: slash arcs, select card, chips
       look: "fangs",
@@ -437,7 +440,8 @@
     // (internal id stays "hitter" so saved references and tools keep working)
     hitter: define({
       id: "hitter",
-      name: "Artillerist", // was "Gunner"
+      name: "Caliber", // was "Artillerist", before that "Gunner"
+      title: "The Walking Arsenal",
       color: "#3fa0ff", // arcane blue: select card, chips, HUD
       look: "gun",
       width: 36,
@@ -505,8 +509,9 @@
     // HOLD the attack button = Holy Guard (see `guard` below).
     tank: define({
       id: "tank",
-      name: "Bulwark",
-      color: "#a9b2c2", // weathered silver: select card, chips, HUD
+      name: "Paladin", // was "Aegis", before that "Bulwark"
+      title: "The Divine Champion",
+      color: "#f2c94c", // holy gold: select card, chips, HUD
       look: "shield",
       width: 60,
       height: 92,
@@ -654,7 +659,117 @@
         },
       },
     }),
+
+    // FROZEN MONARCH (internal id "monarch"): the Sovereign of Ice. Tallest fighter, graceful and armored in cold silver.
+    // TRIAL ENTRY: looks only for now (frozen_monarch_art.js). No skills, passive or ultimate yet: every slot is empty,
+    // so he fights with one basic attack: a ranged Frost Shard (he is a caster, not a brawler).
+    // All numbers are a first guess to feel him out in the arena; tune after a few matches. Hit box = width x height below.
+    monarch: define({
+      id: "monarch",
+      name: "Frozen Monarch",
+      title: "The Sovereign of Ice",
+      color: "#a8e4ff", // ice blue: select card, chips, HUD
+      look: "monarch",
+      width: 56,
+      height: 100, // the crown adds about 12 px on top (drawn, not part of the hit box)
+      maxHP: 380,
+      armor: 30,
+      weight: 115,
+      runSpeed: 4.6,
+      jumpStrength: 12.6,
+      airJumpStrength: 11.4,
+      // BASIC ATTACK - FROST SHARD: he raises one hand and sends a spinning shard of ice straight ahead. Mid speed, long reach,
+      // a slow-ish recovery between casts. Chills nothing yet (no skills): just damage and a small push.
+      attack: {
+        type: "projectile",
+        damage: 7, startup: 12, recovery: 30, knockback: 3,
+        projectile: { speed: 11, range: 600, size: 16, style: "frost", kind: "shard" },
+      },
+    }),
+
+    // MARIONETTIST (internal id "marionettist"): the Twisted Performer. A hybrid mid-range controller: HE stays back and works
+    // the strings, his PUPPET does the fighting. The puppet lives beside him and is the thing that actually hits.
+    // BASIC ATTACK - PUPPET STRINGS (4-hit combo, keep tapping attack): 1 Puppet Jab, 2 Cross Strike, 3 Jointed Kick (spinning),
+    // 4 String Slam (hauled up on the strings, then driven down). The hit shape is a normal melee shape, but with a long reach
+    // (range) because it is the puppet's reach, not his; he never advances. Art + puppet animation: marionettist_art.js.
+    // `puppet: true` tells render.js to draw the puppet's strike instead of the generic swing arc.
+    // No skills / ultimate / passive yet (all slots empty). Numbers are a first guess to feel him out.
+    marionettist: define({
+      id: "marionettist",
+      name: "Marionettist",
+      title: "The Twisted Performer",
+      color: "#7955A8", // royal violet: select card, chips, HUD
+      look: "marionettist",
+      width: 40,
+      height: 82,
+      maxHP: 250,
+      armor: 10,
+      weight: 90,
+      runSpeed: 5.0,
+      jumpStrength: 12.8,
+      airJumpStrength: 11.5,
+      attack: {
+        type: "melee", puppet: true, damage: 4, startup: 10, active: 4, recovery: 8, knockback: 1.6, range: 140, advance: 0,
+        puppetRange: { min: 70, max: 260 }, // SMART REACH: the puppet goes as far as the enemy is, between min and max px from him (range below is only the fallback) boxH: 0.75, stun: 14,
+        chain: [
+          {},                                                                                                  // 1 Puppet Jab: quick and straight
+          { startup: 8, damage: 5, knockback: 2.2 },                                                           // 2 Cross Strike: the other arm
+          { startup: 11, damage: 6, active: 5, recovery: 12, knockback: 3.2, boxH: 0.9 },          // 3 Jointed Kick: spinning, a little wider
+          { startup: 15, damage: 10, active: 5, recovery: 28, knockback: 8, launchH: 0.5, launchV: 0.8, boxH: 1.0, stun: 28 }, // 4 String Slam: heavy finisher
+        ],
+      },
+    }),
+
+    // FULMINAR (internal id "fulminar"): the Stormforged. A lean, fast storm warrior (looks: fulminar_art.js, design doc "Fulminar - The Stormforged").
+    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so she fights with one basic attack:
+    // a quick 3-hit melee chain (keep tapping attack): 1 Jab, 2 Cross, 3 Spinning Hook (the finisher: a short shove, no launch).
+    // Fast and light, like a faster Titan with less reach; the numbers are a first guess to feel her out in the arena. Hit box = width x height below.
+    fulminar: define({
+      id: "fulminar",
+      name: "Fulminar",
+      title: "The Stormforged",
+      color: "#43DFFF", // electric cyan: select card, chips, HUD
+      look: "fulminar",
+      width: 36,
+      height: 72,
+      maxHP: 260,
+      armor: 12,
+      weight: 88,
+      runSpeed: 5.7,
+      jumpStrength: 13,
+      airJumpStrength: 11.8,
+      attack: {
+        type: "melee", damage: 4, startup: 4, active: 3, recovery: 4, knockback: 2, range: 50, advance: 3, fxShape: "jab",
+        chain: [
+          {},                                                                                                       // 1 Jab: lead hand, quick
+          { startup: 3, damage: 5, knockback: 2.4, fxShape: "hook" },                                               // 2 Cross: the rear hand drives through
+          { startup: 6, damage: 8, active: 5, recovery: 18, knockback: 6, range: 56, launchH: 0.9, launchV: 0.35, boxH: 0.9, fxShape: "hook", stun: 22 }, // 3 Spinning Hook: finisher
+        ],
+      },
+    }),
+
+    // MOCHI (internal id "mochi"): the Sleepy Dreamer. A petite, cozy woman who always looks like she just woke up
+    // (looks: mochi_art.js, design doc "Mochi - The Sleepy Dreamer"; hit box 36 x 68 from the document).
+    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so she fights with one
+    // placeholder basic attack, a lazy Sleepy Swat (a short, slow-ish sleeve swing). Short and light, so she is easy to launch.
+    // Every number below is a first guess to feel her out in the arena; tune after a few matches.
+    mochi: define({
+      id: "mochi",
+      name: "Mochi",
+      title: "The Sleepy Dreamer",
+      color: "#C9B6E8", // pale lavender: select card, chips, HUD
+      look: "mochi",
+      width: 36,
+      height: 68, // the ahoge and bunny ears are drawn outside the hit box
+      maxHP: 230,
+      armor: 6,
+      weight: 78,
+      runSpeed: 4.8,
+      jumpStrength: 12.8,
+      airJumpStrength: 11.6,
+      attack: { type: "melee", damage: 4, startup: 9, active: 3, recovery: 14, knockback: 2.2, range: 46, advance: 0 },
+    }),
   };
 
-  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank"];
+  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi"];
 })(globalThis);

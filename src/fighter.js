@@ -230,6 +230,20 @@
       this.hitTargets = new Set();
       this.swingHit = false;
       if (this.heldDir) this.facing = this.heldDir;
+      // Marionettist: the puppet reaches only as far as the enemy is (between puppetRange.min and .max). Decided at the start of every
+      // hit of the combo, so a retreating enemy gets a longer reach on the next hit. puppetReach = how far out the puppet is drawn.
+      const PR = this.hit.puppet && this.hit.puppetRange;
+      if (PR) {
+        const f = this.foe, w = this.stats.width;
+        let gap = 0;
+        if (f && f.state !== STATE.KO) {
+          const front = this.facing > 0 ? this.x + w : this.x;
+          const near = this.facing > 0 ? f.x : f.x + f.stats.width;
+          gap = (near - front) * this.facing; // < 0: the enemy is behind him
+        }
+        const range = Math.max(PR.min, Math.min(PR.max, gap + (PR.pad === undefined ? 26 : PR.pad)));
+        this.hit = Object.assign({}, this.hit, { range, puppetReach: Math.max(36, range - 24) });
+      }
     }
 
     endAttack() {

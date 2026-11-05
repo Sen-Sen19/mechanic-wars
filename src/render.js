@@ -662,7 +662,7 @@
       ctx.beginPath(); ctx.arc(ox, oy, 12 + 46 * (1 - prog), 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
       if (Math.random() < 0.6) spawnParticle(ox + (Math.random() - 0.5) * 50, oy + (Math.random() - 0.5) * 50, 0, 0, col, 10, 2);
-    } else if (f.state === S.ATTACK_STARTUP) {
+    } else if (f.state === S.ATTACK_STARTUP && !f.hit.puppet) { // (Marionettist: the puppet's own wind-up is the tell)
       // wind-up glow on the attacking hand
       const glowX = cx + f.facing * (s.width * 0.5 + 8);
       const [r, g, b] = hexToRgb(s.color);
@@ -788,7 +788,7 @@
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
-    if (h.fxStyle || h.hook || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
+    if (h.puppet || h.fxStyle || h.hook || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
     const s = f.stats;
     const e = f.meleeShape();
     const d = e.dir;
@@ -988,6 +988,25 @@
     if (Math.random() < 0.5) spawnParticle(p.x - p.dir * 10, p.y + (Math.random() - 0.5) * 3, -p.dir * 0.4, (Math.random() - 0.5) * 0.6, "#ffcf5a", 8, 1.6);
   }
 
+  // Frozen Monarch's Frost Shard: a spinning ice crystal with a cold glow and a fading streak of frost behind it.
+  function drawFrostShard(ctx, p) {
+    const L = p.size * 2.6, x0 = p.x - p.dir * L, r = p.size / 2;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = safeLinearGrad(ctx, x0, p.y, p.x, p.y, [[0, rgba("#7be6ff", 0)], [1, rgba("#a8e4ff", 0.7)]]);
+    ctx.lineWidth = r * 0.9;
+    ctx.beginPath(); ctx.moveTo(x0, p.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.translate(p.x, p.y); ctx.rotate(p.traveled * 0.06 * p.dir);
+    ctx.shadowColor = "#7be6ff"; ctx.shadowBlur = 16;
+    ctx.fillStyle = "#a8e4ff"; ctx.strokeStyle = "#e6fbff"; ctx.lineWidth = 1.4; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(r * 1.5, 0); ctx.lineTo(0, -r * 0.62); ctx.lineTo(-r * 1.1, 0); ctx.lineTo(0, r * 0.62); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath(); ctx.moveTo(r * 1.1, 0); ctx.lineTo(0, -r * 0.22); ctx.lineTo(-r * 0.6, 0); ctx.lineTo(0, r * 0.22); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    if (Math.random() < 0.6) spawnParticle(p.x - p.dir * 8, p.y + (Math.random() - 0.5) * r, -p.dir * 0.5, (Math.random() - 0.3) * 0.8, Math.random() < 0.5 ? "#e6fbff" : "#a8e4ff", 14, 1.8);
+  }
+
   function drawProjectile(ctx, p, alpha) {
     ctx.save();
     ctx.translate((p.px - p.x) * (1 - alpha), (p.py - p.y) * (1 - alpha));
@@ -1001,6 +1020,7 @@
       ctx.restore();
       return;
     }
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "frost") { drawFrostShard(ctx, p); ctx.restore(); return; }
     const r = p.size / 2;
     const [cr, cg, cb] = hexToRgb(p.color);
 
@@ -2226,6 +2246,9 @@
         if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawFighter(ctx, f);
         ctx.restore();
       }
+
+      // Marionettist's puppet + strings: drawn over BOTH fighters, so the puppet is never hidden behind the enemy it is hitting
+      if (MW.Marionettist) for (const f of sim.fighters) if (f.stats.id === "marionettist" && !(f.invuln > 0 && Math.floor(sim.tick / 4) % 2 === 0)) MW.Marionettist.drawPuppet(ctx, f, artFx);
 
       // particles (between characters and projectiles for depth)
       drawParticles(ctx);

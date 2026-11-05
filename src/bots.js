@@ -31,7 +31,7 @@
   function reachOf(stats) {
     const a = stats.attack;
     if (a.type === "projectile") return a.projectile.range;
-    let r = a.range;
+    let r = a.puppetRange ? a.puppetRange.max : a.range; // Marionettist: the puppet's longest reach
     if (a.chain) for (const c of a.chain) if (c.range && c.range > r) r = c.range;
     return r;
   }
@@ -39,6 +39,7 @@
   // How far the bot can be (edge to edge) and still start a swing that connects.
   function startReach(stats, factor = 1) {
     const a = stats.attack;
+    if (a.puppetRange) return a.puppetRange.max * 0.85 * factor; // Marionettist: pokes from far away
     return a.type === "projectile" ? a.projectile.range * 0.9 * factor : a.range * factor;
   }
 
