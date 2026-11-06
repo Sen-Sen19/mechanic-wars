@@ -333,11 +333,23 @@
 
     // ── 9) the head is drawn LAST so the front pauldron never hides the face ──
     // ── ASTRAL FACE: midnight-violet skin dusted with stars, nebula cheeks, dark cosmic markings,
-    //    pupil-less pale-lavender eyes, flat calm mouth. Features are placed in head units (hr) with
+    //    one round glowing pupil-less eye with a light trail, NO nose, NO mouth. Features are placed in head units (hr) with
     //    HP(u, v): u = forward (the way he faces), v = down. ──
     const hx = hcw[0], hy = hcw[1], rx = hr * 0.85, ry = hr * 1.25;
     const HP = (u, v) => [hx + d * u * hr, hy + v * hr];
-    const shellPath = () => { ctx.beginPath(); ctx.ellipse(hx, hy, rx, ry, 0.05 * d, 0, TAU); };
+    // side-profile head: sloped brow, flat face plane, tapered chin, smooth swept-back skull (no nose, no mouth)
+    const shellPath = () => {
+      const P = HP; let a, b, c;
+      ctx.beginPath();
+      a = P(0.15, -1.25); ctx.moveTo(a[0], a[1]);
+      a = P(0.55, -1.2); b = P(0.88, -0.85); c = P(0.9, -0.4); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      a = P(0.92, -0.05); b = P(0.86, 0.25); c = P(0.74, 0.5); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      a = P(0.62, 0.8); b = P(0.4, 1.1); c = P(0.08, 1.2); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      a = P(-0.3, 1.25); b = P(-0.7, 0.9); c = P(-0.82, 0.4); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      a = P(-0.95, -0.2); b = P(-0.85, -0.9); c = P(-0.35, -1.2); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      a = P(-0.15, -1.25); b = P(0.0, -1.26); c = P(0.15, -1.25); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      ctx.closePath();
+    };
     const lw1 = (m) => Math.max(0.5, hr * m); // line width that never vanishes at game scale
     const DARK = "#05020c", LAV = "#d9ccff";
 
@@ -345,21 +357,13 @@
     shellPath();
     if (F) ctx.fillStyle = "#ffffff";
     else {
-      const sg = ctx.createLinearGradient(hx, hy - ry, hx, hy + ry);
-      sg.addColorStop(0, "#32206e"); sg.addColorStop(0.5, "#1d1144"); sg.addColorStop(1, "#0e0823");
+      const fa = HP(1.0, -0.5), fb = HP(-0.9, 0.9); // light comes from the front-top, shade falls to the back-bottom
+      const sg = ctx.createLinearGradient(fa[0], fa[1], fb[0], fb[1]);
+      sg.addColorStop(0, "#3a2680"); sg.addColorStop(0.45, "#1f1248"); sg.addColorStop(1, "#0a0619");
       ctx.fillStyle = sg;
     }
     ctx.fill();
     edge(k, "#5a37b8", 1.6);
-
-    // small straight nose ridge breaking the profile (calm, sharp)
-    {
-      const n0 = HP(0.74, -0.02), n1 = HP(1.0, 0.36), n2 = HP(0.72, 0.42);
-      ctx.beginPath(); ctx.moveTo(n0[0], n0[1]); ctx.lineTo(n1[0], n1[1]); ctx.lineTo(n2[0], n2[1]); ctx.closePath();
-      ctx.fillStyle = F ? "#ffffff" : "#1f1248"; ctx.fill();
-      ctx.beginPath(); ctx.moveTo(n0[0], n0[1]); ctx.lineTo(n1[0], n1[1]); ctx.lineTo(n2[0], n2[1]);
-      ctx.lineJoin = "round"; ctx.lineWidth = 1.1; ctx.strokeStyle = F ? "#fff" : "#5a37b8"; ctx.stroke();
-    }
 
     if (!F) {
       ctx.save();
@@ -408,7 +412,6 @@
         ctx.lineWidth = lw1(0.07); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); // falling streak
       };
       surround(0.5, -0.18, -1, 0.9);
-      surround(0.08, -0.15, 1, 0.62);
       // faint lavender glints along the markings
       ctx.globalAlpha = 0.55 + 0.15 * Math.sin(now * 2); ctx.strokeStyle = "#a98bff"; ctx.lineWidth = lw1(0.03);
       ctx.beginPath(); ctx.moveTo(fc[0], fc[1] - hr * 0.3); ctx.lineTo(fc[0] + hr * 0.08, fc[1]); ctx.lineTo(fc[0], fc[1] + hr * 0.3); ctx.lineTo(fc[0] - hr * 0.08, fc[1]); ctx.closePath(); ctx.stroke();
@@ -436,42 +439,69 @@
       ctx.restore();
     }
 
-    // mouth: one flat, expressionless line with a faint cold highlight under it
-    {
-      const m0 = HP(0.12, 0.64), m1 = HP(0.66, 0.6);
-      ctx.lineCap = "round";
-      ctx.strokeStyle = F ? "#fff" : DARK; ctx.lineWidth = lw1(0.07);
-      ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
-      if (!F) {
-        ctx.globalAlpha = 0.22; ctx.strokeStyle = "#cdb8ff"; ctx.lineWidth = lw1(0.03);
-        ctx.beginPath(); ctx.moveTo(m0[0], m0[1] + hr * 0.07); ctx.lineTo(m1[0], m1[1] + hr * 0.07); ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    // Eyes: pale-lavender light, NO pupil. Flat heavy upper lid, outer corner raised (stern, unblinking).
+    // Eyes: round, pupil-less orbs of pure light inside a thin halo ring (a godlike entity). No lids, never blinks.
     const eyeLight = stunned ? "#ffffff" : LAV;
-    const eye = (u, v, w, h, inn) => {
-      const I = HP(u + inn * w, v + h * 0.2), O = HP(u - inn * w * 1.12, v - h * 0.5);
-      const top = HP(u, v - h * 0.72), bot = HP(u, v + h * 1.5), c = HP(u, v);
+    const eye = (u, v, r, squash) => {
+      const c = HP(u, v), R = Math.max(1.2, r * hr), rxE = R * squash;
+      const pulseE = 0.5 + 0.5 * Math.sin(now * 2.4 + u * 3);
       ctx.save();
-      ctx.beginPath(); ctx.moveTo(I[0], I[1]); ctx.quadraticCurveTo(top[0], top[1], O[0], O[1]); ctx.quadraticCurveTo(bot[0], bot[1], I[0], I[1]); ctx.closePath();
       if (!F) {
-        ctx.shadowColor = stunned ? "#ffffff" : "#c9b2ff"; ctx.shadowBlur = 9 + 6 * power;
-        const eg = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], w * hr * 1.1);
-        eg.addColorStop(0, "#ffffff"); eg.addColorStop(0.55, eyeLight); eg.addColorStop(1, "#a78bf0");
+        // soft divine glow behind the orb
+        ctx.globalCompositeOperation = "lighter";
+        const gl = ctx.createRadialGradient(c[0], c[1], R * 0.6, c[0], c[1], R * 2.6);
+        gl.addColorStop(0, "rgba(200,175,255," + (0.45 + 0.2 * pulseE) + ")"); gl.addColorStop(1, "rgba(120,80,255,0)");
+        ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(c[0], c[1], R * 2.6, 0, TAU); ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
+        // the orb itself
+        ctx.shadowColor = stunned ? "#ffffff" : "#c9b2ff"; ctx.shadowBlur = 10 + 6 * power;
+        const eg = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], R);
+        eg.addColorStop(0, "#ffffff"); eg.addColorStop(0.6, eyeLight); eg.addColorStop(1, "#a78bf0");
         ctx.fillStyle = eg;
       } else ctx.fillStyle = "#ffffff";
-      ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c[0], c[1], rxE, R, 0, 0, TAU); ctx.fill();
       ctx.shadowBlur = 0;
-      if (!F) { // heavy lid shadow along the top edge
-        ctx.beginPath(); ctx.moveTo(I[0], I[1]); ctx.quadraticCurveTo(top[0], top[1], O[0], O[1]);
-        ctx.strokeStyle = DARK; ctx.lineWidth = lw1(0.075); ctx.lineCap = "round"; ctx.stroke();
+      if (!F) { // thin halo ring that breathes, plus a faint second ring
+        ctx.strokeStyle = "#e6dcff"; ctx.lineWidth = Math.max(0.5, R * 0.14);
+        ctx.globalAlpha = 0.55 + 0.35 * pulseE;
+        ctx.beginPath(); ctx.ellipse(c[0], c[1], rxE * 1.55, R * 1.55, 0, 0, TAU); ctx.stroke();
+        ctx.globalAlpha = 0.18 + 0.15 * pulseE; ctx.lineWidth = Math.max(0.4, R * 0.08);
+        ctx.beginPath(); ctx.ellipse(c[0], c[1], rxE * (2.0 + 0.15 * pulseE), R * (2.0 + 0.15 * pulseE), 0, 0, TAU); ctx.stroke();
+        ctx.globalAlpha = 1;
       }
       ctx.restore();
     };
-    eye(0.5, -0.16, 0.3, 0.27, -1); // near eye
-    eye(0.09, -0.13, 0.21, 0.22, 1); // far eye (turned away, a little smaller)
+    eye(0.52, -0.16, 0.28, 0.9); // the one eye (side view)
+
+    // Eye trail: light streams backward from the eye like a comet tail, longer when he moves fast
+    if (!F) {
+      const c = HP(0.52, -0.16), R = Math.max(1.2, 0.28 * hr);
+      const speed = Math.min(1, Math.abs(k.vx || 0) / 6);
+      const L = hr * (3.4 + 1.8 * speed + 0.8 * power);
+      const ribbon = (yOff, wMul, phase, alpha, col) => {
+        const N = 14, top = [], bot = [];
+        for (let i = 0; i <= N; i++) {
+          const t = i / N;
+          const x = c[0] + back * L * t;
+          const y = c[1] + yOff * R + Math.sin(now * 5 + t * 6 + phase) * R * 0.45 * t - t * R * 0.5;
+          const w = R * wMul * (1 - t) * (1 - t * 0.3);
+          top.push([x, y - w]); bot.push([x, y + w]);
+        }
+        const g = ctx.createLinearGradient(c[0], c[1], c[0] + back * L, c[1]);
+        g.addColorStop(0, "rgba(255,255,255," + alpha + ")"); g.addColorStop(0.35, col); g.addColorStop(1, "rgba(120,80,255,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.moveTo(top[0][0], top[0][1]);
+        for (let i = 1; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+        for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+        ctx.closePath(); ctx.fill();
+      };
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ribbon(0, 1.15, 0, 0.55, "rgba(170,130,255,0.45)");   // wide violet glow
+      ribbon(0, 0.55, 1.3, 0.9, "rgba(235,225,255,0.55)");   // bright core
+      ribbon(-0.9, 0.22, 2.1, 0.6, "rgba(200,170,255,0.4)"); // thin streamer above
+      ribbon(0.9, 0.22, 3.4, 0.6, "rgba(200,170,255,0.4)");  // thin streamer below
+      ctx.restore();
+    }
 
     // Floating fragments above and behind the head (replaces crown shards)
     if (!F) {

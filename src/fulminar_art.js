@@ -1,4 +1,6 @@
 // Mechanic Wars - Fulminar art (render only, never touches the sim).
+// Redesigned from the Stormforged sprite sheet: bigger white crystal armor, glowing cyan eyes with a lightning crack on the cheek,
+// a fanned ice-white ponytail, black pants with glowing lightning cracks, big diamond knee guards and long tattered storm-coat tails.
 // A lean, athletic storm warrior: silver and electric-blue lightweight armor with lightning-shaped edges, a dark navy
 // combat suit, asymmetrical shoulder guards (the near one larger), a glowing core in the chest, a short asymmetrical
 // waist mantle (no cape), and a long silver-white high ponytail with electric-blue tips and a lightning-bolt clip.
@@ -22,7 +24,8 @@
     silver: "#BFCFE0", silverSh: "#8798b0", frost: "#EAF5FF", // armor highlight / bright armor
     cyan: "#43DFFF", core: "#D8FAFF", violet: "#826DDB",     // electricity / lightning core / accent
     hair: "#E5EDF7", hair2: "#c3d0e2", hairSh: "#9aa9c2",
-    skin: "#e6dadd", skinSh: "#b3a4b0", // light natural complexion, cool-leaning shadow (must read against the white hair)
+    ink: "#0a1020", ink2: "#101a31", crystal: "#F2F8FF", gem: "#3fa9ff", // black combat pants, white crystal armor, blue gem
+    skin: "#ecd8d9", skinSh: "#b3a4b0", // light natural complexion, cool-leaning shadow (must read against the white hair)
   };
 
   // ── tiny drawing helpers ───────────────────────────────────────────
@@ -174,6 +177,8 @@
     }
     A.fHurt = stunned;
 
+    if (!F) glow(k, T(torL * 0.4, 0)[0], T(torL * 0.4, 0)[1], H * 0.62, 0.05 + 0.08 * en, "67,223,255"); // faint storm aura behind her
+
     // ── 1) ponytail: high tie, rises, then streams back; electric-blue tips ──
     {
       const base = Hp(-0.9, -0.95);
@@ -185,20 +190,25 @@
                     base[1] + rest[i][1] * u * lenK + pony.y[i] * lenK + spread * 1.2 * u]);
         }
         const sm = spline(pts, 5);
-        const n = sm.length, cut = Math.floor(n * 0.64);
+        const n = sm.length, cut = Math.floor(n * 0.5);
         taper(k, sm, w0 * u, 1 * u, col, C.hairSh, 0.8);
         // electric-blue tips: the last third of the strand
         const tip = sm.slice(cut);
         taper(k, tip, lerp(w0 * u, 1 * u, cut / (n - 1)) * 0.96, 1 * u, tipCol, C.hairSh, 0.6);
         return sm;
       };
-      strand(1.6, 6.4, C.hairSh, C.storm, 0.88);
-      strand(-0.9, 7.2, C.hair2, C.electric, 1.0);
-      const top = strand(0, 8, C.hair, C.cyan, 1.08);
+      strand(3.2, 6, C.hairSh, C.storm, 0.8);
+      strand(1.6, 7.4, C.hair2, C.electric, 0.96);
+      strand(-1.8, 7.8, C.hair2, C.electric, 1.12);
+      const top = strand(0, 10, C.hair, C.cyan, 1.24);
       if (!F) { // an occasional electric-blue glint running down the tail
         const gl = (now * 0.9 + 0.3) % 1.9;
         if (gl < 1) { const p = top[Math.floor(gl * (top.length - 1))]; glow(k, p[0], p[1], 5 * u, 0.5 * Math.sin(gl * Math.PI), "67,223,255"); }
         line(k, top.slice(2, Math.floor(top.length * 0.6)), C.frost, 0.9, 0.6);
+        if (hash(tb * 0.53) > 0.55) { // a lightning arc snapping off the ponytail
+          const q = top[Math.floor(top.length * 0.7)];
+          glowStroke(k, bolt(q, [q[0] - d * 11 * u, q[1] - (4 + 8 * hash(tb + 1)) * u], 3, 2.2 * u, tb * 3), C.cyan, 0.9, 5, 0.6);
+        }
       }
     }
 
@@ -223,28 +233,36 @@
       glowStroke(k, fa, C.cyan, 0.9, 4, 0.22 + 0.6 * en);
       // fingerless glove: dark knuckle plate, bare fingers
       const Gp = (t, q) => [wr[0] + (tx * t + qx * q) * u, wr[1] + (ty * t + qy * q) * u];
-      fillPoly(k, [Gp(-1, -3), Gp(3.6, -3.4), Gp(4.2, 3.4), Gp(-1, 3)], C.shadow, C.line, 1);
+      fillPoly(k, [Gp(-1, -3), Gp(3.6, -3.4), Gp(4.2, 3.4), Gp(-1, 3)], C.ink, C.line, 1);
       line(k, [Gp(3, -3.2), Gp(3, 3.2)], C.electric, 1, 0.9);
       fillPoly(k, [Gp(3.4, -3), Gp(8.2, -2.4), Gp(9.4, -0.2), Gp(8.2, 2.2), Gp(3.4, 3)], C.skin, C.line, 0.9);
       for (const t of [5.2, 6.8]) line(k, [Gp(t, -2.6), Gp(t, 2.6)], C.skinSh, 0.7, 0.8);
       fillPoly(k, [Gp(1.2, 2.8), Gp(4.8, 4.6), Gp(6.2, 3.9), Gp(3.2, 2.2)], C.skin, C.line, 0.7); // thumb
       return Gp(8.4, 0);
     };
-    // lightning-bolt shoulder guard: two sharp spikes zigzag across the top; s scales it (near one bigger, far one small)
+    // crystal shoulder guard: a dark-blue base plate under a white dome and a fan of ice-shard spikes; s scales it (near one bigger, far one small)
     const pauldron = (sP, s) => {
-      const pts = [J(sP, -3 * s, -6 * s), J(sP, 3 * s, -8.5 * s), J(sP, 8 * s, -6.5 * s), J(sP, 4.6 * s, -2.4 * s), J(sP, 9 * s, 2.6 * s), J(sP, 5 * s, 4.2 * s), J(sP, -0.5 * s, 6.5 * s), J(sP, -3.5 * s, 3 * s)];
-      fillPoly(k, [J(sP, -6.4 * s, -5 * s), J(sP, -1 * s, -7.4 * s), J(sP, 0.6 * s, 0), J(sP, -5.6 * s, 4.4 * s)], C.storm, C.line, 1); // lower plate
-      fillPoly(k, pts, C.electric, C.line, 1.1);
-      fillPoly(k, [pts[1], pts[2], pts[3], J(sP, 2.5 * s, -3 * s)], C.silver, C.line, 0.7); // bright facet on the first spike
-      line(k, [pts[1], pts[2], pts[3], pts[4], pts[5]], C.cyan, 0.9, 0.55 + 0.4 * en); // thin cyan edge line
+      fillPoly(k, [J(sP, -7 * s, -6 * s), J(sP, -1 * s, -8 * s), J(sP, 1 * s, 0), J(sP, -6.4 * s, 5 * s)], C.storm, C.line, 1); // lower plate
+      const shard = (a0, b0, a1, b1, ta, tb2, col) => {
+        const t = J(sP, ta * s, tb2 * s);
+        fillPoly(k, [J(sP, a0 * s, b0 * s), t, J(sP, a1 * s, b1 * s)], col, C.line, 0.9);
+        line(k, [J(sP, a0 * s, b0 * s), t], C.frost, 0.7, 0.85);
+      };
+      shard(-3, -7, 5, -8, 13, -13, C.silver);   // big shard sweeping up and back
+      shard(-4, 3, -1, 7, -9, 11, C.silverSh);   // small outward shard
+      shard(2, 2, 6, 7, 12, 10, C.silver);       // forward shard
+      shard(1, -4, 6, 3, 16, -1, C.crystal);     // tallest centre shard
+      fillPoly(k, [J(sP, -5 * s, -6 * s), J(sP, 2 * s, -7.6 * s), J(sP, 8 * s, -3 * s), J(sP, 7 * s, 4 * s), J(sP, 0, 6.4 * s), J(sP, -4.4 * s, 3 * s)], C.crystal, C.line, 1.1); // white dome
+      line(k, [J(sP, -2 * s, -5.4 * s), J(sP, 4 * s, -2 * s), J(sP, 3 * s, 3.4 * s)], C.electric, 0.9, 0.9);
+      line(k, [J(sP, 8 * s, -3 * s), J(sP, 7 * s, 4 * s)], C.cyan, 0.8, 0.5 + 0.4 * en);
     };
     arm(armBw, false);
-    pauldron(armBw[0], 0.44);
+    pauldron(armBw[0], 0.5);
 
     // ── 3) back leg, then the short asymmetrical waist mantle ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
-      const trou = isBack ? C.shadow : C.shadow2;
+      const trou = isBack ? C.ink : C.ink2; // black pants
       taper(k, [h, kn], 10.6 * u, 7.4 * u, trou, C.line, 1.1);
       taper(k, [kn, ft], 7.4 * u, 5.2 * u, trou, C.line, 1.1);
       // one sleek outer thigh plate (fitted, not a stack of stripes)
@@ -258,32 +276,59 @@
       line(k, [mix(h, kn, 0.64), mix(h, kn, 0.9)], C.electric, 2.2, 0.8);
       const br = mix(h, kn, 0.5);
       glowStroke(k, [mix(h, kn, 0.18), br, [br[0] + d * 2 * u, br[1] + 3 * u]], C.cyan, 0.8, 3, 0.18 + 0.45 * en);
+      // glowing lightning cracks running down the black pants
+      glowStroke(k, bolt(mix(h, kn, 0.1), mix(h, kn, 0.98), 5, 2.2 * u, isBack ? 11 : 23), C.cyan, 0.9, 4, 0.3 + 0.6 * en);
+      glowStroke(k, bolt(mix(kn, ft, 0.55), mix(kn, ft, 1.0), 3, 1.8 * u, isBack ? 37 : 53), C.cyan, 0.8, 3, 0.25 + 0.5 * en);
       // boot: flexible, reinforced toe, angular silver edge
       const bt = mix(kn, ft, 0.5);
-      taper(k, [bt, ft], 5.6 * u, 5.4 * u, C.shadow, C.line, 1.1);
+      taper(k, [bt, ft], 5.6 * u, 5.4 * u, C.ink, C.line, 1.1);
       fillPoly(k, [
         [ft[0] - d * 4.4 * u, ft[1] - 6 * u], [ft[0] + d * 4 * u, ft[1] - 6 * u], [ft[0] + d * 4.6 * u, ft[1] - 2.6 * u],
         [ft[0] + d * 13.6 * u, ft[1] - 0.4 * u], [ft[0] + d * 12.6 * u, ft[1] + 1.2 * u], [ft[0] - d * 5 * u, ft[1] + 1.2 * u],
-      ], C.shadow, C.line, 1.1);
-      fillPoly(k, [[ft[0] + d * 6.5 * u, ft[1] - 2.2 * u], [ft[0] + d * 13.6 * u, ft[1] - 0.4 * u], [ft[0] + d * 12.6 * u, ft[1] + 1.2 * u], [ft[0] + d * 6 * u, ft[1] + 1.2 * u]], isBack ? C.silverSh : C.silver, C.line, 0.8); // reinforced toe cap
+      ], isBack ? C.silverSh : C.silver, C.line, 1.1); // white boot
+      fillPoly(k, [[ft[0] + d * 6.5 * u, ft[1] - 2.2 * u], [ft[0] + d * 13.6 * u, ft[1] - 0.4 * u], [ft[0] + d * 12.6 * u, ft[1] + 1.2 * u], [ft[0] + d * 6 * u, ft[1] + 1.2 * u]], C.storm, C.line, 0.8); // navy toe cap
       line(k, [[ft[0] - d * 5 * u, ft[1] + 0.6 * u], [ft[0] + d * 12 * u, ft[1] + 0.6 * u]], C.electric, 0.9, 0.7);
       // silver shin armor: sharp, angular
       const s0 = mix(kn, ft, 0.12), s1 = mix(kn, ft, 0.56);
-      fillPoly(k, [[s0[0] - d * 3 * u, s0[1]], [s0[0] + d * 3 * u, s0[1] + 1 * u], [s1[0] + d * 2.6 * u, s1[1] - 2 * u], [s1[0] + d * 0.8 * u, s1[1] + 3 * u], [s1[0] - d * 2.4 * u, s1[1] - 1 * u]], isBack ? C.silverSh : C.silver, C.line, 1);
-      line(k, [[s0[0] + d * 0.4 * u, s0[1] + 1.5 * u], [s1[0] + d * 0.6 * u, s1[1] - 1 * u]], C.frost, 0.9, 0.7);
-      // lightweight knee guard: a small angular wedge
-      fillPoly(k, [[kn[0] - d * 3.6 * u, kn[1] - 3.6 * u], [kn[0] + d * 1.2 * u, kn[1] - 5.4 * u], [kn[0] + d * 6.8 * u, kn[1] - 0.6 * u], [kn[0] + d * 2.6 * u, kn[1] + 3.8 * u], [kn[0] - d * 3 * u, kn[1] + 3 * u]], isBack ? C.silverSh : C.silver, C.line, 1);
-      line(k, [[kn[0] - d * 2 * u, kn[1] - 2.6 * u], [kn[0] + d * 1.4 * u, kn[1] - 3.8 * u], [kn[0] + d * 4.6 * u, kn[1] - 0.8 * u]], C.cyan, 0.8, 0.5 + 0.35 * en);
+      const s2 = mix(kn, ft, 0.66);
+      fillPoly(k, [[s0[0] - d * 4.2 * u, s0[1]], [s0[0] + d * 4.4 * u, s0[1] + 1 * u], [s2[0] + d * 3.8 * u, s2[1] - 1 * u], [s2[0] + d * 0.6 * u, s2[1] + 4 * u], [s2[0] - d * 3.8 * u, s2[1] - 1 * u]], isBack ? C.silverSh : C.crystal, C.line, 1);
+      line(k, [[s0[0] + d * 0.4 * u, s0[1] + 1.5 * u], [s2[0] + d * 0.6 * u, s2[1] - 1 * u]], C.frost, 0.9, 0.7);
+      // big white crystal knee guard (a faceted diamond)
+      const kd = [[kn[0] - d * 0.4 * u, kn[1] - 7.4 * u], [kn[0] + d * 6.4 * u, kn[1] - 0.4 * u], [kn[0] + d * 0.6 * u, kn[1] + 7.2 * u], [kn[0] - d * 5.8 * u, kn[1] - 0.2 * u]];
+      fillPoly(k, kd, isBack ? C.silverSh : C.crystal, C.line, 1.1);
+      fillPoly(k, [kd[0], kd[1], [kn[0] + d * 0.3 * u, kn[1] - 0.2 * u]], isBack ? C.silver : C.frost, C.line, 0.6);
+      fillPoly(k, [kd[3], kd[2], [kn[0] + d * 0.3 * u, kn[1] - 0.2 * u]], isBack ? C.silverSh : C.silver, C.line, 0.6);
+      line(k, [kd[0], [kn[0] + d * 0.3 * u, kn[1] - 0.2 * u], kd[2]], C.electric, 0.7, 0.8);
     };
     leg(k.MP(k.legB), true);
 
-    // waist mantle: short, zigzag hem like a bolt, hangs behind one hip only (never a long cape)
+    // long tattered storm-coat tails: three ragged panels fall from the waist behind the legs and stream back when she moves
     {
-      const m = [T(8, -hw * 0.5), T(8, hw * 0.04), T(-5, hw * 0.0), T(-9, -hw * 0.28), T(-15, -hw * 0.42), T(-9, -hw * 0.66)];
-      m[2][0] += sway * 0.6; m[3][0] += sway; m[4][0] += sway * 1.5; m[5][0] += sway * 1.1;
-      fillPoly(k, m, C.storm, C.line, 1.2);
-      line(k, [m[1], m[2], m[3], m[4], m[5]], C.cyan, 0.9, 0.3 + 0.4 * en);
-      line(k, [mix(m[0], m[5], 0.4), mix(m[1], m[3], 0.6)], C.electric, 1, 0.7);
+      const tail = (a0, b0, len, wTop, lag) => {
+        const base = T(a0, b0), mid = [];
+        for (let i = 0; i <= 4; i++) {
+          const t = i / 4, r = Math.max(i - 1, 0);
+          mid.push([base[0] - d * (1.5 + 6 * t * t) * u * len + (i ? pony.x[r] * lag : 0) + sway * t * 1.1, base[1] + t * 44 * u * len + (i ? pony.y[r] * lag * 0.5 : 0)]);
+        }
+        const L = [], R = [];
+        for (let i = 0; i <= 4; i++) {
+          const a = mid[Math.max(i - 1, 0)], b = mid[Math.min(i + 1, 4)];
+          let tx = b[0] - a[0], ty = b[1] - a[1]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+          const w = lerp(wTop, 5, Math.pow(i / 4, 1.3)) * u * 0.5 * (i % 2 ? 0.72 : 1.12); // alternating width = a ragged edge
+          L.push([mid[i][0] - ty * w, mid[i][1] + tx * w]);
+          R.push([mid[i][0] + ty * w, mid[i][1] - tx * w]);
+        }
+        const tip = [mid[4][0] - d * 2 * u, mid[4][1] + 7 * u * len];
+        const poly = L.concat([tip], R.reverse());
+        let fill = C.storm;
+        if (!F) { const gr = ctx.createLinearGradient(base[0], base[1], tip[0], tip[1]); gr.addColorStop(0, C.shadow); gr.addColorStop(0.55, C.storm); gr.addColorStop(1, C.electric); fill = gr; }
+        fillPoly(k, poly, fill, C.line, 1.1);
+        line(k, [L[1], L[2], L[3], L[4], tip], C.cyan, 0.9, 0.35 + 0.45 * en);
+        glowStroke(k, mid.slice(1), C.cyan, 0.7, 3, 0.2 + 0.4 * en);
+      };
+      tail(7, -hw * 0.62, 0.92, 22, 1.0);
+      tail(7, hw * 0.34, 0.8, 20, 0.85);
+      tail(8, -hw * 0.18, 1.08, 26, 1.15);
     }
 
     // ── 4) suit and torso: fitted dark navy combat suit ──
@@ -297,7 +342,7 @@
     fillPoly(k, [T(torL * 0.06, -hw * 0.5), T(torL * 0.3, -hw * 0.32), T(torL * 0.3, hw * 0.26), T(torL * 0.06, hw * 0.46)], C.silver, C.line, 1.1);
     line(k, [T(torL * 0.29, -hw * 0.28), T(torL * 0.29, hw * 0.22)], C.frost, 0.8, 0.8);
     // silver upper plate with a sharp lower edge pointing at the core
-    fillPoly(k, [T(torL * 0.56, -sw * 0.3), T(torL * 0.98, -sw * 0.32), T(torL * 1.02, sw * 0.28), T(torL * 0.9, sw * 0.4), T(torL * 0.74, sw * 0.4), T(torL * 0.62, sw * 0.12)], C.silver, C.line, 1.4); // bust line
+    fillPoly(k, [T(torL * 0.56, -sw * 0.3), T(torL * 0.98, -sw * 0.32), T(torL * 1.02, sw * 0.28), T(torL * 0.9, sw * 0.4), T(torL * 0.74, sw * 0.4), T(torL * 0.62, sw * 0.12)], C.crystal, C.line, 1.4); // bust line
     line(k, [T(torL * 0.98, -sw * 0.28), T(torL * 1.0, sw * 0.26)], C.frost, 1, 0.85);
     // lightning engravings from the core (very faint) + glowing lines of electricity
     const cc = T(torL * 0.62, sw * 0.0);
@@ -311,7 +356,8 @@
     glowStroke(k, [T(torL * 0.96, -sw * 0.2), T(torL * 0.9, -sw * 0.14), T(torL * 0.95, -sw * 0.1)], C.cyan, 0.7, 3, 0.2 + 0.5 * en);
     // the core: small bright diamond, soft cyan-white pulse
     {
-      const ch = 4 * u, cw2 = 2.8 * u;
+      const ch = 5.6 * u, cw2 = 3.8 * u;
+      fillPoly(k, [J(cc, ch * 1.35, 0), J(cc, 0, cw2 * 1.4), J(cc, -ch * 1.35, 0), J(cc, 0, -cw2 * 1.4)], C.crystal, C.line, 1.1); // white crystal setting
       const dia = [J(cc, ch, 0), J(cc, 0, cw2), J(cc, -ch, 0), J(cc, 0, -cw2)];
       pathOf(ctx, dia);
       ctx.fillStyle = k.col(C.cyan); ctx.fill(); edge(k, C.line, 1);
@@ -321,12 +367,17 @@
       }
     }
 
-    // ── 6) belt with a lightning insignia, hip armor ──
-    fillPoly(k, [T(8, -hw * 0.52), T(8, hw * 0.5), T(1, hw * 0.5), T(1, -hw * 0.52)], C.silverSh, C.line, 1.2);
+    // tall dark collar standing behind the neck, spiked and edged in cyan
+    fillPoly(k, [T(torL * 0.9, -sw * 0.44), T(torL * 1.2, -sw * 0.36), T(torL * 1.1, -sw * 0.04), T(torL * 0.96, sw * 0.16)], C.shadow, C.line, 1.1);
+    line(k, [T(torL * 0.92, -sw * 0.4), T(torL * 1.18, -sw * 0.34)], C.cyan, 0.8, 0.5 + 0.4 * en);
+
+    // ── 6) belt with a crystal buckle, hip armor ──
+    fillPoly(k, [T(8, -hw * 0.52), T(8, hw * 0.5), T(1, hw * 0.5), T(1, -hw * 0.52)], C.silver, C.line, 1.2);
     line(k, [T(7.4, -hw * 0.48), T(7.4, hw * 0.46)], C.silver, 0.9, 0.8);
     {
       const bk = T(4.5, hw * 0.04);
-      fillPoly(k, [J(bk, 3, 0.6), J(bk, 0.2, 1.6), J(bk, 0.6, -0.2), J(bk, -3, -0.8), J(bk, -0.4, -1.8), J(bk, -0.6, 0)], C.cyan, C.line, 0.6); // tiny bolt
+      fillPoly(k, [J(bk, 4.6, 0), J(bk, 0, 3.4), J(bk, -4.6, 0), J(bk, 0, -3.4)], C.crystal, C.line, 0.9); // diamond buckle
+      fillPoly(k, [J(bk, 2.6, 0), J(bk, 0, 1.9), J(bk, -2.6, 0), J(bk, 0, -1.9)], C.gem, C.line, 0.5);
     }
     // short front hip plate (angular, not a tasset skirt)
     fillPoly(k, [T(7, hw * 0.1), T(7, hw * 0.6), T(-2, hw * 0.7), T(-7, hw * 0.4)], C.silver, C.line, 1);
@@ -338,7 +389,7 @@
     const hand = arm(armFw, true);
 
     // ── 7b) front (larger) shoulder guard, over the top of the arm ──
-    pauldron(armFw[0], 0.66);
+    pauldron(armFw[0], 0.8);
     // shoulder marking: a few small electric lines
     glowStroke(k, [J(armFw[0], 8 * u * 0.3, 8 * u * 0.2), J(armFw[0], 3.4 * u, 3.2 * u), J(armFw[0], 2.4 * u, 5 * u), J(armFw[0], 6.4 * u, 7 * u)].map((p) => p), C.cyan, 0.7, 3, 0.15 + 0.45 * en);
 
@@ -346,26 +397,30 @@
     {
       fillPoly(k, [Hp(-0.3, 0.4), Hp(0.5, 0.5), Hp(0.56, 1.6), Hp(-0.4, 1.55)], C.skinSh, C.line, 1); // neck
       // face: defined cheekbone, sharp jaw
-      const face = [Hp(-0.35, -0.95), Hp(0.55, -1.02), Hp(0.95, -0.7), Hp(1.0, -0.42), Hp(1.04, -0.18), Hp(1.26, 0.2), Hp(1.02, 0.28), Hp(1.04, 0.42), Hp(0.98, 0.52), Hp(0.98, 0.66), Hp(0.84, 0.94), Hp(0.5, 1.08), Hp(-0.1, 0.98), Hp(-0.55, 0.55), Hp(-0.65, -0.3)];
+      const face = [Hp(-0.35, -0.95), Hp(0.55, -1.02), Hp(0.95, -0.7), Hp(1.0, -0.42), Hp(1.04, -0.18)]
+        .concat(spline([Hp(1.04, -0.18), Hp(1.24, 0.2), Hp(1.03, 0.3), Hp(1.06, 0.42), Hp(1.03, 0.54), Hp(1.04, 0.62), Hp(0.95, 0.72), Hp(0.93, 0.83), Hp(0.84, 0.94), Hp(0.62, 0.99), Hp(0.28, 0.93), Hp(-0.2, 0.78)], 4).slice(1))
+        .concat([Hp(-0.55, 0.45), Hp(-0.65, -0.3)]); // slim jaw, small soft rounded chin, smoothed
       fillPoly(k, face, C.skin, C.line, 1.3);
       if (!F) {
         ctx.save(); ctx.globalAlpha = 0.45; // cool shadow under the cheekbone and along the jaw
-        pathOf(ctx, [Hp(0.1, 0.1), Hp(0.78, 0.28), Hp(0.86, 0.8), Hp(0.5, 1.04), Hp(-0.1, 0.95)]);
+        pathOf(ctx, [Hp(0.1, 0.1), Hp(0.66, 0.3), Hp(0.7, 0.8), Hp(0.5, 1.0), Hp(-0.1, 0.88)]);
         ctx.fillStyle = C.skinSh; ctx.fill();
         ctx.restore();
-        fillPoly(k, [Hp(0.8, 0.5), Hp(0.98, 0.46), Hp(1.02, 0.5), Hp(0.96, 0.62), Hp(0.82, 0.6)], "#c25a78", "#7a3348", 0.7); // full lips
-        line(k, [Hp(0.8, 0.54), Hp(1.0, 0.5)], "#7a3348", 0.8, 0.9);
-        line(k, [Hp(0.9, 0.5), Hp(0.98, 0.49)], "#f2b8c8", 0.8, 0.7); // gloss
+        ctx.save(); ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.ellipse(Hp(0.55, 0.32)[0], Hp(0.55, 0.32)[1], hrx * 0.3, hrx * 0.17, 0, 0, TAU); ctx.fillStyle = "#e58aa0"; ctx.fill(); ctx.restore(); // soft blush
+        fillPoly(k, spline([Hp(0.86, 0.5), Hp(1.0, 0.45), Hp(1.07, 0.5), Hp(1.02, 0.6), Hp(0.86, 0.6)], 3), "#cf6585", "#7a3348", 0.6); // full lips
+        line(k, [Hp(0.84, 0.56), Hp(0.96, 0.57), Hp(1.07, 0.49)], "#7a3348", 0.9, 0.95); // smirk
+        line(k, [Hp(0.92, 0.5), Hp(1.02, 0.47)], "#f2b8c8", 0.8, 0.7); // gloss
         line(k, [Hp(0.32, -0.5), Hp(0.98, -0.42)], "#6f7f9a", 1.5, 0.95);               // brow, slightly lowered: challenging, not angry
       }
-      // eye: bright electric blue, subtle white glow
+      // eye: fully glowing electric blue, white-hot core
       {
+        if (!F) glow(k, lerp(Hp(0.55, -0.2)[0], Hp(0.98, -0.24)[0], 0.5), Hp(0.76, -0.22)[1], hrx * 2.1, 0.3 + 0.35 * en, "67,223,255"); // brighter halo around the eye
         const a0 = Hp(0.55, -0.2), a1 = Hp(0.98, -0.24);
         const wide = stunned ? 1.5 : 1;
         if (!F) {
           ctx.save();
-          ctx.shadowColor = C.cyan; ctx.shadowBlur = 6 + 7 * en;
-          ctx.strokeStyle = stunned ? "#ffffff" : C.cyan; ctx.lineWidth = Math.max(2.2, hrx * 0.24) * wide; ctx.lineCap = "round";
+          ctx.shadowColor = C.cyan; ctx.shadowBlur = 9 + 9 * en;
+          ctx.strokeStyle = stunned ? "#ffffff" : C.cyan; ctx.lineWidth = Math.max(3.2, hrx * 0.4) * wide; ctx.lineCap = "round";
           ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke();
           ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(0.8, hrx * 0.06);
           ctx.beginPath(); ctx.moveTo(a0[0] + d * 1, a0[1]); ctx.lineTo(a1[0] - d * 0.5, a1[1]); ctx.stroke();
@@ -375,10 +430,11 @@
         }
       }
       // lashes + liner sweeping out past the eye
-      line(k, [Hp(0.5, -0.3), Hp(0.8, -0.38), Hp(1.0, -0.34)], C.line, 1.5, 1);
-      line(k, [Hp(0.5, -0.3), Hp(0.36, -0.4)], C.line, 1.3, 1);
+      line(k, [Hp(0.5, -0.36), Hp(0.8, -0.44), Hp(1.0, -0.4)], C.line, 1.1, 1);
+      line(k, [Hp(0.5, -0.36), Hp(0.36, -0.46)], C.line, 1.0, 1);
       // small lightning marking beside the eye, running back toward the temple
-      glowStroke(k, [Hp(0.52, -0.02), Hp(0.38, 0.1), Hp(0.46, 0.14), Hp(0.2, 0.3)], C.cyan, 0.9, 3, 0.3 + 0.55 * en);
+      glowStroke(k, [Hp(0.78, -0.02), Hp(0.68, 0.1), Hp(0.76, 0.18), Hp(0.62, 0.36), Hp(0.7, 0.44)], C.cyan, 1, 4, 0.5 + 0.5 * en); // lightning crack down the cheek
+      glowStroke(k, [Hp(0.68, 0.1), Hp(0.52, 0.14), Hp(0.46, 0.24)], C.cyan, 0.7, 3, 0.35 + 0.5 * en);
       // hair cap: swept back and pulled up into the ponytail
       fillPoly(k, [Hp(1.0, -0.72), Hp(0.7, -1.14), Hp(0.1, -1.24), Hp(-0.6, -1.1), Hp(-1.0, -0.8), Hp(-1.0, -0.2), Hp(-0.75, 0.3), Hp(-0.5, 0.2), Hp(-0.35, -0.2), Hp(0.1, -0.52), Hp(0.55, -0.7)], C.hair, C.hairSh, 1.2);
       line(k, [Hp(1.0, -0.72), Hp(0.55, -0.7), Hp(0.1, -0.52), Hp(-0.35, -0.2), Hp(-0.5, 0.2)], C.hairSh, 1.4, 0.9); // hairline shadow
@@ -390,8 +446,32 @@
       taper(k, [Hp(0.2, -1.1), Hp(0.9, -0.95), Hp(1.04, -0.5)], 3.4 * u, 0.8 * u, C.hair, C.hairSh, 0.7, 4); // side-swept fringe
       // hair tie + lightning-bolt clip at the base of the ponytail
       const tie = Hp(-0.9, -0.95);
-      fillPoly(k, [[tie[0] + d * 1 * u, tie[1] - 3.4 * u], [tie[0] - d * 2.6 * u, tie[1] - 1 * u], [tie[0] - d * 0.6 * u, tie[1] + 0.2 * u], [tie[0] - d * 3.4 * u, tie[1] + 3.6 * u], [tie[0] + d * 1.6 * u, tie[1] + 0.6 * u], [tie[0] - d * 0.2 * u, tie[1] - 0.4 * u]], C.silver, C.line, 0.8);
+      fillPoly(k, [[tie[0], tie[1] - 4.2 * u], [tie[0] + 3.6 * u, tie[1]], [tie[0], tie[1] + 4.2 * u], [tie[0] - 3.6 * u, tie[1]]], C.ink, C.silver, 1); // dark square clip
+      fillPoly(k, [[tie[0], tie[1] - 2 * u], [tie[0] + 1.7 * u, tie[1]], [tie[0], tie[1] + 2 * u], [tie[0] - 1.7 * u, tie[1]]], C.cyan, C.core, 0.5); // blue gem
       if (!F) glow(k, tie[0], tie[1], 5 * u, 0.12 + 0.2 * en, "67,223,255");
+    }
+
+    // glowing eye lightning: electric behavior, not cloth. Two or three jagged bolts snap back from the eye, re-rolling their shape,
+    // length and angle ~22 times a second, flickering off now and then, with little forks and the odd spark. No smooth sway.
+    if (!F) {
+      const e0 = Hp(0.62, -0.22), run = clamp(Math.abs(k.vx || 0) / 6, 0, 1), tk = Math.floor(now * 22);
+      const base = (24 + 10 * run + 8 * en + (stunned ? 6 : 0)) * u;
+      const nb = 2 + (hash(tk * 0.7) > 0.5 ? 1 : 0);
+      for (let bi = 0; bi < nb; bi++) {
+        if (hash(tk * 3.1 + bi * 5.7) < 0.14) continue; // flicker gap
+        const len = base * (0.5 + 0.65 * hash(tk * 1.9 + bi * 2.3));
+        const ang = (hash(tk * 2.7 + bi * 9.1) - 0.5) * 1.0;
+        const dx = -d * Math.cos(ang), dy = Math.sin(ang);
+        const pts = bolt(e0, [e0[0] + dx * len, e0[1] + dy * len], 5 + bi, 2.6 * u, tk * 7 + bi * 13);
+        glowStroke(k, pts, "#2aa8ff", 2.2, 9, 0.55 + 0.35 * en); // wide blue body (readable over the white hair)
+        glowStroke(k, pts, C.cyan, 1.2, 6, 0.9);
+        glowStroke(k, pts, C.core, 0.6, 3, 1);
+        if (hash(tk * 4.3 + bi) > 0.45) { // a short fork off the middle of the bolt
+          const m = pts[2];
+          glowStroke(k, bolt(m, [m[0] + dx * len * 0.35, m[1] + (hash(tk + bi * 3) - 0.2) * 9 * u], 3, 1.5 * u, tk * 5 + bi), C.cyan, 0.8, 5, 0.8);
+        }
+      }
+      if (k.spawn && !stunned && Math.random() < 0.22) k.spawn(A.ox + e0[0], A.oy + e0[1], -d * (1 + Math.random() * 2), (Math.random() - 0.5) * 1.6, Math.random() < 0.5 ? "#D8FAFF" : "#43DFFF", 10, 1.8);
     }
 
     // ── 10) electricity: faint idle crackle, hot hand on a wind-up / strike, sparks drifting off her ──
@@ -404,7 +484,7 @@
         if (strike && k.spawn && Math.random() < 0.8) k.spawn(A.ox + hand[0], A.oy + hand[1], (Math.random() - 0.4) * 3 * d, (Math.random() - 0.5) * 2.4, Math.random() < 0.5 ? "#D8FAFF" : "#43DFFF", 12, 2.2);
       }
       // idle: now and then a tiny arc snaps along an arm or off a shoulder
-      if (hash(tb * 0.37) > 0.82 && !stunned) {
+      if (hash(tb * 0.37) > 0.7 && !stunned) {
         const o = hash(tb) > 0.5 ? armFw[1] : armBw[1];
         glowStroke(k, bolt(o, [o[0] + (hash(tb + 3) - 0.5) * 16 * u, o[1] + (hash(tb + 5) - 0.7) * 14 * u], 3, 2.4 * u, tb * 2), C.cyan, 0.9, 5, 0.55);
       }

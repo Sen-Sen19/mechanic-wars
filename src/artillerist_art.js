@@ -1,4 +1,3 @@
-
 // Mechanic Wars - Artillerist art (render only, never touches the sim).
 // An elite arcane weapons specialist: obsidian split-tail combat coat, gunmetal shoulder and forearm
 // armor with aged bronze trim, a cartridge bandolier, a mechanical eyepiece, a holstered sidearm and a
@@ -260,56 +259,44 @@
         H_(-1.6, 0.5)   // Side
     ], C.obs2, C.rim, 1.5);
 
-    // Deep interior shadow of the hood opening (behind mask)
+    // Face is in SIDE VIEW: the hood opens toward the way he faces (d), so he looks down his sights
+    // instead of at the camera. a = forward, b = down, in head radii.
+    // Deep interior shadow of the hood opening (pushed to the front of the hood)
     fillPoly(k, [
-        H_(0.2, -1.0), // Top of opening
-        H_(0.8, -0.5), // Front right of opening
-        H_(0.8, 0.6),  // Lower right of opening
-        H_(0.2, 1.0),  // Bottom of opening
-        H_(-0.4, 0.6), // Lower left of opening
-        H_(-0.4, -0.5) // Front left of opening
-    ], C.obs, C.line, 1.0); // Deeper black for the interior of the hood
+        H_(0.4, -0.95),
+        H_(1.25, -0.6),
+        H_(1.5, 0.2),
+        H_(1.25, 0.95),
+        H_(0.5, 1.05),
+        H_(0.25, 0.1)
+    ], C.obs, C.line, 1.0);
 
-    // Matte-black angular mask (covering nose and mouth area)
- const maskShape = [
-  H_(0, -0.2),
-  H_(0.6, 0.0),
-  H_(0.7, 0.4),
-  H_(0.4, 0.8),
-  H_(0, 0.9),
-  H_(-0.4, 0.8),
-  H_(-0.7, 0.4),
-  H_(-0.6, 0.0)
-];
-fillPoly(k, maskShape, C.obs, C.rim, 1.5);
+    // Matte-black angular mask: a beaked, swept-forward profile covering nose and mouth
+    fillPoly(k, [
+        H_(0.5, -0.2),
+        H_(1.3, -0.12),
+        H_(1.7, 0.3),
+        H_(1.3, 0.85),
+        H_(0.6, 0.95),
+        H_(0.35, 0.45)
+    ], C.obs, C.rim, 1.5);
+    // brow plate above the eye (heavy, slanted down toward the front = focused, not staring)
+    line(k, [H_(0.45, -0.72), H_(1.4, -0.46)], C.line, 1.8, 1);
+    // bronze trim along the mask
+    if (!F) line(k, [H_(0.55, 0.08), H_(1.55, 0.26)], C.bronzeHi, 0.8, 0.7);
 
     if (!F) { // Only draw glowing elements if not flashing
-        // Two narrow golden-yellow glowing eye slits
-        const eyeSlitTopY = -0.5;
-        const eyeSlitBottomY = -0.4;
-        const eyeSlitInnerX = 0.3;
-        const eyeSlitOuterX = 0.6;
-        const eyeGlowWidth = 2.2;
         const eyeGlowBlur = 8;
         const eyeGlowAlpha = 0.8 + 0.4 * en;
+        // near eye: one long narrow slit, angled down toward the front
+        glowStroke(k, [H_(0.7, -0.6), H_(1.32, -0.38)], C.yellowBright, 2.2, eyeGlowBlur, eyeGlowAlpha);
+        // far eye: only a short dim sliver peeking past the edge of the mask
+        glowStroke(k, [H_(1.42, -0.42), H_(1.58, -0.34)], C.yellowBright, 1.3, 5, eyeGlowAlpha * 0.6);
 
-        // Character's right eye slit (visually to the right if d=1, to the left if d=-1)
-        glowStroke(k, [H_(d * eyeSlitInnerX, eyeSlitTopY), H_(d * eyeSlitOuterX, eyeSlitBottomY)], C.yellowBright, eyeGlowWidth, eyeGlowBlur, eyeGlowAlpha);
-        // Character's left eye slit
-        glowStroke(k, [H_(-d * eyeSlitOuterX, eyeSlitBottomY), H_(-d * eyeSlitInnerX, eyeSlitTopY)], C.yellowBright, eyeGlowWidth, eyeGlowBlur, eyeGlowAlpha);
-
-        // Subtle mechanical breathing vents with orange glow
-        const ventGlowWidth = 1.2;
-        const ventGlowBlur = 4;
+        // mechanical breathing vents on the side of the mask
         const ventGlowAlpha = 0.7 + 0.3 * en;
-
-        // Vents on character's right side of the mask
-        glowStroke(k, [H_(d * 0.55, 0.15), H_(d * 0.65, 0.25)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
-        glowStroke(k, [H_(d * 0.35, 0.55), H_(d * 0.45, 0.65)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
-
-        // Vents on character's left side of the mask
-        glowStroke(k, [H_(-d * 0.65, 0.25), H_(-d * 0.55, 0.15)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
-        glowStroke(k, [H_(-d * 0.45, 0.65), H_(-d * 0.35, 0.55)], C.orange, ventGlowWidth, ventGlowBlur, ventGlowAlpha);
+        glowStroke(k, [H_(0.72, 0.3), H_(0.98, 0.38)], C.orange, 1.2, 4, ventGlowAlpha);
+        glowStroke(k, [H_(0.78, 0.55), H_(1.02, 0.63)], C.orange, 1.2, 4, ventGlowAlpha);
     }
 
     // ── 6) the arcane rifle (grip in the back hand, handguard on the front hand) ──

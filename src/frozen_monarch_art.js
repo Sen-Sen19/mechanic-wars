@@ -18,8 +18,8 @@
     mid: "#0f1d40", mid2: "#17306a", royal: "#1d3a7a", royalHi: "#2c56a8", boot: "#0b1533",
     sd: "#7d8aa3", sv: "#b9c4d6", sv2: "#e4ecf7", frost: "#f4faff",
     ice: "#a8e4ff", iceDeep: "#5fb6f0", glow: "#7be6ff", core: "#e6fbff", winter: "#2f9cff",
-    skin: "#dfe7f1", skinSh: "#a9b6c9",
-    hair: "#e8eef7", hair2: "#cdd8e8", hairSh: "#aab7cc",
+    skin: "#f3f6fb", skinSh: "#a9b5cc",
+    hair: "#16203e", hair2: "#0d1530", hairSh: "#3d5a9c", hairHi: "#6f9be0",
     fur: "#dfe9f5", furSh: "#a9b9cf",
   };
 
@@ -433,75 +433,138 @@
       }
     }
 
-    // ── 9) head: neck, pale face with glowing eye, swept-back hair, crown of ice ──
-    {
-      // neck
-      fillPoly(k, [Hp(-0.3, 0.4), Hp(0.5, 0.5), Hp(0.6, 1.6), Hp(-0.45, 1.55)], C.skinSh, C.line, 1);
-      // face
-      const face = [Hp(-0.35, -0.95), Hp(0.55, -1.02), Hp(0.95, -0.7), Hp(1.0, -0.42), Hp(1.04, -0.18), Hp(1.3, 0.2), Hp(1.04, 0.28), Hp(1.04, 0.42), Hp(1.0, 0.52), Hp(1.02, 0.66), Hp(0.92, 0.94), Hp(0.55, 1.06), Hp(-0.1, 0.98), Hp(-0.55, 0.55), Hp(-0.65, -0.3)];
-      fillPoly(k, face, C.skin, C.line, 1.3);
-      if (!F) {
-        // cool shadow under the cheekbone and along the jaw, a flat firm mouth, a low straight brow
-        ctx.save(); ctx.globalAlpha = 0.5;
-        pathOf(ctx, [Hp(0.1, 0.1), Hp(0.8, 0.3), Hp(0.9, 0.8), Hp(0.5, 1.02), Hp(-0.1, 0.95)]);
-        ctx.fillStyle = C.skinSh; ctx.fill();
-        ctx.restore();
-        line(k, [Hp(0.78, 0.5), Hp(1.0, 0.5)], "#6e7d96", 1.1, 0.9);   // mouth
-        line(k, [Hp(0.72, 0.62), Hp(0.82, 0.78)], "#8794ab", 0.7, 0.5);  // faint line beside the mouth
-        line(k, [Hp(0.4, -0.46), Hp(1.0, -0.34)], "#8a97ad", 1.7, 0.95);  // brow
-        line(k, [Hp(0.35, -0.62), Hp(0.15, -0.5), Hp(0.3, -0.38)], C.ice, 0.7, 0.55); // faint frost lines at the temple
-      }
-      // eye: no pupil, a bright iris with a white-cyan core
-      {
-        const a0 = Hp(0.55, -0.18), a1 = Hp(0.98, -0.2);
-        const wide = stunned ? 1.5 : 1;
+    // ── 9) head: drawn last (over the shoulder guard) so the face is never hidden ──
+    // Built like the best faces in the roster: bright face framed by dark hair for contrast, two bold glowing eyes,
+    // a stern flat mouth, and the ice crown standing out against the dark hair.
+    const drawHead = () => {
+      const S = (pts, n) => spline(pts, n || 4);
+      const style = (MW.FrozenMonarch && MW.FrozenMonarch.style) || "king";
+      const king = style === "king";
+      const silver = style === "void" || king; // dark face -> silver hair for contrast
+      const hairC = silver ? "#e4ecf7" : C.hair, hair2C = silver ? "#aebcd6" : C.hair2, hairHiC = silver ? "#ffffff" : C.hairHi;
+      // slim neck
+      fillPoly(k, [Hp(-0.2, 0.55), Hp(0.5, 0.6), Hp(0.55, 1.45), Hp(-0.3, 1.4)], C.skinSh, C.line, 1);
+      if (!F) glow(k, Hp(0.1, -1.1)[0], Hp(0.1, -1.1)[1], hrx * 1.8, 0.12 + 0.12 * en, "168,228,255"); // behind everything
+      // hair mass behind the head, streaming back in pointed locks
+      pathOf(ctx, S([Hp(0.5, -1.05), Hp(-0.1, -1.3), Hp(-0.8, -1.1), Hp(-1.3, -0.6), Hp(-1.8, -0.05), Hp(-2.3, 0.5), Hp(-1.7, 0.55), Hp(-2.0, 1.1), Hp(-1.3, 0.85), Hp(-1.3, 1.4), Hp(-0.8, 0.95), Hp(-0.4, 0.7), Hp(0.1, 0.0)], 2));
+      ctx.fillStyle = k.col(hair2C); ctx.fill(); edge(k, C.line, 1.3);
+      // face (same proportions as the Marionettist's: broad brow, long straight nose, firm chin)
+      const face = [Hp(-0.4, -0.95), Hp(0.5, -1.0), Hp(0.95, -0.66), Hp(1.02, -0.36), Hp(1.04, -0.1), Hp(1.22, 0.24), Hp(1.04, 0.32), Hp(1.04, 0.5), Hp(1.0, 0.7), Hp(0.96, 0.88), Hp(0.76, 1.08), Hp(0.36, 1.02), Hp(-0.08, 0.86), Hp(-0.45, 0.5), Hp(-0.65, -0.3)];
+      if (style === "void") {
+        // Umbra-style: a dark, faceless oval of deep night-blue with a cold rim light along the profile
+        fillPoly(k, face, "#0a1226", C.line, 1.3);
         if (!F) {
-          ctx.save();
-          ctx.shadowColor = C.glow; ctx.shadowBlur = 7 + 7 * en;
-          ctx.strokeStyle = stunned ? "#ffffff" : C.glow; ctx.lineWidth = Math.max(1.8, hrx * 0.17) * wide; ctx.lineCap = "round";
-          ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke();
-          ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(0.8, hrx * 0.06);
-          ctx.beginPath(); ctx.moveTo(a0[0] + d * 1, a0[1]); ctx.lineTo(a1[0] - d * 0.5, a1[1]); ctx.stroke();
+          const gx = Hp(0.55, 0.1);
+          glow(k, gx[0], gx[1], hrx * 1.2, 0.18 + 0.1 * en, "60,150,255");
+          line(k, [Hp(0.95, -0.66), Hp(1.02, -0.36), Hp(1.04, -0.1), Hp(1.22, 0.24), Hp(1.04, 0.32), Hp(1.04, 0.5), Hp(1.0, 0.7), Hp(0.96, 0.88), Hp(0.76, 1.08)], C.ice, 1, 0.8);
+          line(k, [Hp(0.7, 0.72), Hp(1.0, 0.68)], C.glow, 0.9, 0.35 + 0.4 * en); // faint glowing mouth line
+        }
+      } else if (style === "helm") {
+        // Caliber-style: a closed ice-steel helm with a dark visor slit
+        const helm = S([Hp(-0.7, -0.3), Hp(-0.5, -0.95), Hp(0.1, -1.18), Hp(0.7, -1.0), Hp(1.04, -0.62), Hp(1.1, -0.1), Hp(1.12, 0.55), Hp(1.0, 0.95), Hp(0.72, 1.2), Hp(0.2, 1.08), Hp(-0.25, 0.9), Hp(-0.62, 0.5)], 3);
+        pathOf(ctx, helm); ctx.fillStyle = k.col(C.sv); ctx.fill(); edge(k, C.line, 1.4);
+        if (!F) {
+          ctx.save(); ctx.globalAlpha = 0.6; // shaded back half of the helm
+          pathOf(ctx, S([Hp(-0.7, -0.3), Hp(-0.5, -0.95), Hp(0.1, -1.18), Hp(0.2, 0.0), Hp(0.2, 1.08), Hp(-0.25, 0.9), Hp(-0.62, 0.5)], 3)); ctx.fillStyle = C.sd; ctx.fill();
           ctx.restore();
-        } else {
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke();
+          line(k, [Hp(0.4, -1.1), Hp(0.9, -0.9), Hp(1.05, -0.5)], C.sv2, 1.3, 0.9);       // top highlight
+          line(k, [Hp(0.72, -0.9), Hp(0.78, -0.4)], C.ice, 1, 0.8);                      // brow ridge trim
+          line(k, [Hp(0.9, 0.2), Hp(0.95, 0.9), Hp(0.72, 1.12)], C.sv2, 1, 0.7);         // cheek guard edge
+        }
+        fillPoly(k, [Hp(0.25, -0.4), Hp(1.12, -0.36), Hp(1.14, 0.1), Hp(0.3, 0.12)], "#050a18", C.line, 1);   // visor slit
+      } else {
+      fillPoly(k, face, king ? "#8fa6c6" : C.skin, C.line, 1.3);
+      }
+      if (!F && (style === "face" || king)) {
+        ctx.save(); ctx.globalAlpha = 0.5;
+        pathOf(ctx, [Hp(-0.45, 0.2), Hp(0.1, 0.5), Hp(0.6, 0.86), Hp(0.7, 1.02), Hp(0.34, 0.96), Hp(-0.06, 0.82)]);
+        ctx.fillStyle = king ? "#5f7596" : C.skinSh; ctx.fill();
+        ctx.restore();
+        line(k, [Hp(1.04, -0.05), Hp(1.2, 0.24)], C.frost, 1, 0.8);                  // nose bridge light
+        line(k, [Hp(0.68, 0.7), Hp(1.0, 0.64)], "#4b5876", 1.3, 0.95);                // flat, firm mouth
+        if (king) {
+          // age lines: forehead, between the brows, beside the nose
+          line(k, [Hp(0.3, -0.8), Hp(0.62, -0.84), Hp(0.9, -0.76)], "#6d83a6", 0.8, 0.7);
+          line(k, [Hp(0.4, -0.7), Hp(0.7, -0.72)], "#8ea0bb", 0.7, 0.55);
+          line(k, [Hp(0.66, 0.2), Hp(0.58, 0.46), Hp(0.7, 0.62)], "#8ea0bb", 0.8, 0.7);
+          // frost cracks creeping over the temple and cheekbone, glowing faintly
+          const cg = 0.45 + 0.4 * en;
+          glowStroke(k, [Hp(0.12, -0.6), Hp(0.28, -0.42), Hp(0.2, -0.28), Hp(0.34, -0.14)], C.glow, 0.9, 4, cg);
+          glowStroke(k, [Hp(0.28, -0.42), Hp(0.46, -0.46)], C.glow, 0.7, 3, cg * 0.8);
+          glowStroke(k, [Hp(0.62, 0.16), Hp(0.5, 0.24), Hp(0.54, 0.3)], C.glow, 0.9, 4, cg);
+          glowStroke(k, [Hp(0.5, 0.24), Hp(0.34, 0.2)], C.glow, 0.7, 3, cg * 0.8);
+        }
+        
+      }
+      // eye: ONE round, pupil-less glowing orb in a dark hollow socket under a heavy lowered brow (stern, ancient).
+      // The far eye is gone on purpose: the Monarch has a single eye.
+      {
+        const wide = stunned ? 1.35 : 1;
+        for (const [c0, r0, br] of [[Hp(0.78, -0.1), 0.2, 1]]) {
+          const r = r0 * hrx * wide;
+          if (F) { ctx.beginPath(); ctx.arc(c0[0], c0[1], r, 0, TAU); ctx.fillStyle = "#fff"; ctx.fill(); continue; }
+          if (king) { // sunken socket
+            ctx.beginPath(); ctx.ellipse(c0[0], c0[1] + 0.02 * hrx, r * 1.55, r * 1.35, 0, 0, TAU);
+            ctx.fillStyle = "rgba(34,48,76,0.8)"; ctx.fill();
+          }
+          glow(k, c0[0], c0[1], r * 3.2, (0.35 + 0.3 * en) * br, "40,150,255");
+          ctx.save();
+          ctx.shadowColor = "#2f9cff"; ctx.shadowBlur = (8 + 8 * en) * br;
+          ctx.beginPath(); ctx.arc(c0[0], c0[1], r, 0, TAU);
+          ctx.fillStyle = stunned ? "#ffffff" : (br < 1 ? "#3a9be6" : "#4cc3ff"); ctx.fill();
+          ctx.restore();
+          ctx.beginPath(); ctx.arc(c0[0], c0[1], r * 0.55, 0, TAU);
+          ctx.fillStyle = stunned ? "#ffffff" : (br < 1 ? "#a8d8f6" : "#e6fbff"); ctx.fill();
+        }
+        if (!F && king) {
+          // heavy silver brows, low and angled down toward the nose, dark-outlined
+          for (const [pts, w] of [[[Hp(0.38, -0.56), Hp(0.78, -0.4), Hp(1.1, -0.24)], 3.6]]) {
+            line(k, S(pts, 4), C.line, w * 0.55 + 1.4, 1);
+            line(k, S(pts, 4), "#f2f7fd", w * 0.55, 1);
+          }
+        } else if (!F && style === "face") {
+          line(k, [Hp(0.4, -0.52), Hp(0.7, -0.54), Hp(1.04, -0.38)], C.hair, 1.4, 0.98);
         }
       }
-      // swept-back hair over the top and back of the head, front lock beside the cheek
-      fillPoly(k, [Hp(1.0, -0.72), Hp(0.7, -1.14), Hp(0.1, -1.22), Hp(-0.6, -1.06), Hp(-1.08, -0.4), Hp(-1.3, 0.5), Hp(-0.95, 1.0), Hp(-0.55, 0.45), Hp(-0.35, -0.2), Hp(0.1, -0.52), Hp(0.55, -0.7)], C.hair, C.hairSh, 1.2);
-      for (const [x0, y0, x1, y1] of [[0.85, -0.8, -0.7, -0.7], [0.6, -1.0, -0.9, -0.1], [0.2, -1.1, -1.0, 0.4]]) line(k, [Hp(x0, y0), Hp((x0 + x1) / 2, (y0 + y1) / 2 - 0.12), Hp(x1, y1)], C.frost, 0.9, 0.8);
-      taper(k, [Hp(0.3, -0.45), Hp(0.32, 0.2), Hp(0.05, 0.95)], 3.2 * u, 1 * u, C.hair2, C.hairSh, 0.8, 4);
-      // a little hair spilling over the fur on the back of the shoulder
-      taper(k, [Hp(-1.1, 0.3), Hp(-1.3, 1.4), T(torL * 0.72, -sw * 0.4)], 6.5 * u, 2 * u, C.hair, C.hairSh, 0.8, 5);
-
-      // crown: thin silver circlet low on the brow, with five grown spikes of ice
-      const bandB = (a) => (a < -0.2 ? lerp(-0.62, -0.84, (a + 0.95) / 0.75) : a < 0.55 ? lerp(-0.84, -0.86, (a + 0.2) / 0.75) : lerp(-0.86, -0.66, (a - 0.55) / 0.45));
-      const spikes = [[-0.72, 0.55, 0.26, -0.15], [-0.3, 0.85, 0.28, -0.05], [0.15, 1.1, 0.32, 0.05], [0.6, 0.8, 0.27, 0.38], [0.93, 0.48, 0.2, 0.3]];
-      if (!F) glow(k, Hp(0.1, -1.1)[0], Hp(0.1, -1.1)[1], hrx * 1.7, 0.1 + 0.12 * en, "168,228,255");
+      if (king) {
+        // great silver beard: rises from the sideburns to under the nose and covers the whole lower half of the face
+        const beard = S([Hp(-0.5, -0.05), Hp(-0.2, 0.2), Hp(0.3, 0.3), Hp(0.8, 0.34), Hp(1.08, 0.4), Hp(1.1, 0.8), Hp(0.98, 1.2), Hp(0.82, 1.55), Hp(0.62, 1.4), Hp(0.38, 1.3), Hp(0.1, 1.18), Hp(-0.2, 1.0), Hp(-0.5, 0.6)], 3);
+        pathOf(ctx, beard); ctx.fillStyle = k.col("#eef4fb"); ctx.fill(); edge(k, C.line, 1.4);
+        if (!F) {
+          for (const [x0, y0, x1, y1] of [[1.0, 0.5, 0.9, 1.3], [0.78, 0.46, 0.66, 1.36], [0.54, 0.42, 0.4, 1.2], [0.3, 0.38, 0.14, 1.05], [0.04, 0.3, -0.16, 0.85]]) {
+            line(k, S([Hp(x0, y0), Hp((x0 + x1) / 2 - 0.04, (y0 + y1) / 2), Hp(x1, y1)], 4), "#8ea0bb", 0.9, 0.85);
+          }
+          line(k, [Hp(0.6, 0.55), Hp(1.04, 0.5)], "#8ea0bb", 0.8, 0.6);
+        }
+      }
+      if (style !== "helm") {
+      // hair front: swept back from a high hairline, a couple of loose locks over the brow, ice-blue sheen
+      fillPoly(k, [Hp(1.0, -0.78), Hp(0.62, -1.18), Hp(0.0, -1.3), Hp(-0.72, -1.1), Hp(-1.18, -0.4), Hp(-1.26, 0.3), Hp(-0.92, 0.76), Hp(-0.6, 0.3), Hp(-0.42, -0.2), Hp(0.0, -0.58), Hp(0.5, -0.8)], hairC, C.line, 1.2);
+      if (!F) {
+        for (const [x0, y0, x1, y1] of [[0.9, -0.84, -0.7, -0.7], [0.55, -1.08, -0.9, -0.2], [0.1, -1.18, -1.05, 0.4]]) line(k, S([Hp(x0, y0), Hp((x0 + x1) / 2, (y0 + y1) / 2 - 0.1), Hp(x1, y1)], 4), silver ? "#7f93b8" : C.hairHi, 0.9, 0.85);
+        taper(k, [Hp(0.8, -0.95), Hp(0.96, -0.7), Hp(0.9, -0.4)], 1.8 * u, 0.5 * u, hairC, C.line, 0.5, 3);
+        taper(k, [Hp(0.5, -1.0), Hp(0.66, -0.72), Hp(0.6, -0.52)], 1.5 * u, 0.4 * u, hairC, C.line, 0.5, 3);
+      }
+      }
+      // crown: silver circlet low on the brow with sharp spikes of ice
+      const bandB = (a) => (a < -0.2 ? lerp(-0.35, -0.9, (a + 0.9) / 0.7) : a < 0.5 ? lerp(-0.9, -0.92, (a + 0.2) / 0.7) : lerp(-0.92, -0.78, (a - 0.5) / 0.4));
+      const spikes = [[-0.62, 0.5, 0.2, -0.12], [-0.24, 0.8, 0.23, -0.04], [0.14, 1.02, 0.26, 0.04], [0.5, 0.78, 0.22, 0.3], [0.8, 0.46, 0.17, 0.25]];
+      taper(k, [Hp(-0.9, bandB(-0.9)), Hp(-0.2, bandB(-0.2)), Hp(0.5, bandB(0.5)), Hp(0.9, bandB(0.9))], 2.6 * u, 2.6 * u, C.sv, C.line, 1, 4);
       for (const [a, ht, wd, lean] of spikes) {
         const b = bandB(a);
         const tip = Hp(a + lean * 0.5, b - ht);
-        const poly = [Hp(a - wd, b + 0.04), Hp(a - wd * 0.5 + lean * 0.15, b - ht * 0.52), tip, Hp(a + wd * 0.4 + lean * 0.2, b - ht * 0.4), Hp(a + wd, b + 0.04)];
-        fillPoly(k, poly, C.ice, C.core, 0.9);
-        if (!F) {
-          pathOf(ctx, [Hp(a - wd * 0.1, b), Hp(a + lean * 0.15, b - ht * 0.55), tip]);
-          ctx.fillStyle = "rgba(230,251,255,0.8)"; ctx.fill();
-          line(k, [Hp(a - wd * 0.55, b - ht * 0.2), tip], C.frost, 0.8, 0.9);
-        }
+        fillPoly(k, [Hp(a - wd, b + 0.04), Hp(a - wd * 0.4 + lean * 0.15, b - ht * 0.55), tip, Hp(a + wd * 0.4 + lean * 0.2, b - ht * 0.4), Hp(a + wd, b + 0.04)], C.ice, C.core, 0.9);
+        if (!F) line(k, [Hp(a - wd * 0.5, b - ht * 0.2), tip], C.frost, 0.8, 0.9);
       }
-      for (const a of [-0.5, -0.05, 0.4, 0.78]) { // tiny shards at the base
-        const b = bandB(a);
-        fillPoly(k, [Hp(a - 0.08, b), Hp(a + 0.04, b - 0.3), Hp(a + 0.14, b)], C.ice, C.core, 0.5);
-      }
-      taper(k, [Hp(-0.95, bandB(-0.95)), Hp(-0.2, bandB(-0.2)), Hp(0.55, bandB(0.55)), Hp(1.0, bandB(1.0))], 3.2 * u, 3.2 * u, C.sv, C.line, 1, 4);
-      line(k, [Hp(-0.6, bandB(-0.6)), Hp(0.5, bandB(0.5))], C.ice, 0.9, 0.9);
-    }
+      line(k, [Hp(-0.6, bandB(-0.6)), Hp(0.5, bandB(0.5))], C.ice, 0.8, 0.9);
+    };
 
     // ── 10) front arm and gauntlet ──
     const hand = arm(armFw, true);
 
     // ── 11) front shoulder guard (over the top of the arm) ──
     pauldron(armFw[0], 0.95, 1);
+    drawHead();
 
     // ── 12) light and little extras: a wind-up / strike glow on the hand, frost drifting off it, snow near the hem ──
     if (!F) {

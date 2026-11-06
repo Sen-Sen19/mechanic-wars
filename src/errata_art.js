@@ -1,9 +1,8 @@
-
 // Mechanic Wars - Errata art (render only, never touches the sim).
 // Errata - The Broken Entity
 //
 // NORMAL FORM:
-// Tall, slender man with messy split black-and-white hair, heterochromatic
+// Tall, slender young man (angular jaw, heavy straight brows, short messy split black-and-white hair), heterochromatic
 // eyes, a subtle smirk, an asymmetrical black-and-ivory gothic coat,
 // crimson stitching, dark trousers, and black boots.
 //
@@ -808,32 +807,19 @@
         );
       };
 
-      lock(-0.7, -0.3, -0.9, 1.5, 4.6, C.hairBlk2, 0.3);
-      lock(-0.9, -0.5, -0.6, 1.7, 4.4, C.hair2, 1.2);
-      lock(-0.5, -0.4, -0.8, 1.2, 3.8, C.hairBlk, 2.1);
-      lock(-1.0, -0.2, -0.4, 1.6, 4.0, C.hair, 2.9);
+      lock(-0.7, -0.3, -0.55, 0.85, 4.6, C.hairBlk2, 0.3);
+      lock(-0.9, -0.5, -0.4, 0.9, 4.4, C.hair2, 1.2);
+      lock(-0.5, -0.4, -0.5, 0.65, 3.8, C.hairBlk, 2.1);
+      lock(-1.0, -0.2, -0.25, 0.8, 4.0, C.hair, 2.9);
     }
 
     // ── FACE ────────────────────────────────────────────────────────
 
     {
-      const face = [
-        Hp(-0.35, -0.95),
-        Hp(0.55, -1.02),
-        Hp(0.95, -0.7),
-        Hp(1.0, -0.42),
-        Hp(1.04, -0.18),
-        Hp(1.26, 0.2),
-        Hp(1.02, 0.3),
-        Hp(1.04, 0.42),
-        Hp(0.98, 0.54),
-        Hp(0.96, 0.7),
-        Hp(0.8, 1.0),
-        Hp(0.5, 1.12),
-        Hp(0.0, 1.0),
-        Hp(-0.55, 0.55),
-        Hp(-0.6, -0.3),
-      ];
+      // Unsettlingly beautiful: clean, fine-boned profile with a defined (not heavy) jaw and chin.
+      const face = [Hp(-0.35, -0.95), Hp(0.55, -1.02), Hp(0.95, -0.7), Hp(1.0, -0.42), Hp(1.04, -0.18)]
+        .concat(spline([Hp(1.04, -0.18), Hp(1.26, 0.2), Hp(1.02, 0.3), Hp(1.05, 0.42), Hp(1.0, 0.56), Hp(1.02, 0.76), Hp(0.94, 0.98), Hp(0.62, 1.12), Hp(0.2, 1.06), Hp(-0.3, 0.84)], 4).slice(1))
+        .concat([Hp(-0.6, 0.4), Hp(-0.6, -0.3)]);
 
       fillPoly(k, face, C.skin, C.line, 1.3);
 
@@ -856,22 +842,15 @@
         ctx.fill();
         ctx.restore();
 
-        // Subtle smirk.
-        line(
-          k,
-          [Hp(0.8, 0.56), Hp(0.9, 0.58), Hp(0.99, 0.5)],
-          C.lip,
-          1.3,
-          1
-        );
+        // Thin, flat mouth with the faintest smirk at the corner (no colored lips).
+        // Crooked smirk: the line sags flat, then the corner snaps up too high (a human smile, slightly wrong), with a faint cheek crease.
+        line(k, [Hp(0.74, 0.68), Hp(0.88, 0.69), Hp(0.97, 0.63), Hp(1.04, 0.52)], "#6a4a54", 1.1, 1);
+        line(k, [Hp(0.8, 0.72), Hp(0.92, 0.73)], "#b48a96", 0.9, 0.7);   // soft lower lip
+        line(k, [Hp(0.9, 0.5), Hp(0.8, 0.56)], C.skinSh, 0.8, 0.6);      // cheek crease from the lifted corner
 
-        line(
-          k,
-          [Hp(0.99, 0.5), Hp(1.02, 0.43)],
-          C.lip,
-          1.1,
-          1
-        );
+        // Jaw line and cheekbone shadow (angular, not soft).
+        line(k, [Hp(0.0, 0.72), Hp(0.28, 1.0), Hp(0.62, 1.12)], C.skinSh, 1.0, 0.7);
+        line(k, [Hp(0.4, 0.14), Hp(0.7, 0.36), Hp(0.9, 0.38)], C.skinSh, 0.9, 0.7);
 
         line(
           k,
@@ -881,13 +860,6 @@
           0.8
         );
 
-        line(
-          k,
-          [Hp(0.9, 0.42), Hp(1.04, 0.36)],
-          "#8c5560",
-          0.7,
-          0.5
-        );
 
         // Nose.
         line(
@@ -900,10 +872,10 @@
       }
 
       // Heterochromatic eyes.
-      const eye = (a, b, w, iris, glowOn) => {
+      const eye = (a, b, w, iris, glowOn, kind) => {
         const p0 = Hp(a, b);
         const p1 = Hp(a + w, b - 0.04);
-        const top = Hp(a + w * 0.5, b - 0.16);
+        const top = Hp(a + w * 0.5, b - 0.19);
         const bot = Hp(a + w * 0.5, b + 0.1);
 
         pathOf(ctx, [p0, top, p1, bot]);
@@ -914,13 +886,13 @@
         edge(k, C.line, 0.8);
 
         if (!F) {
-          const ic = Hp(a + w * 0.62, b - 0.03);
+          const ic = Hp(a + w * 0.62 + (kind === "pin" ? 0.05 : 0), b - 0.03); // the grey iris sits slightly too far forward
 
           ctx.save();
 
           if (glowOn) {
             ctx.shadowColor = C.eyeRed;
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = 9;
           }
 
           ctx.fillStyle = iris;
@@ -939,16 +911,19 @@
 
           ctx.restore();
 
+          // Unnatural pupils: the red eye has a thin vertical slit, the grey eye a pinprick inside a dark ring.
           ctx.fillStyle = C.line;
           ctx.beginPath();
-          ctx.arc(
-            ic[0] + d * 0.2,
-            ic[1],
-            Math.max(0.45, hrx * 0.05),
-            0,
-            TAU
-          );
+          if (kind === "slit") ctx.ellipse(ic[0] + d * 0.1, ic[1], Math.max(0.3, hrx * 0.03), Math.max(1.3, hrx * 0.19), 0, 0, TAU);
+          else ctx.arc(ic[0] + d * 0.2, ic[1], Math.max(0.28, hrx * 0.028), 0, TAU);
           ctx.fill();
+          if (kind === "pin") {
+            ctx.strokeStyle = "#6f7384";
+            ctx.lineWidth = 0.4;
+            ctx.beginPath();
+            ctx.ellipse(ic[0], ic[1], Math.max(0.9, hrx * 0.11), Math.max(1.2, hrx * 0.17), 0, 0, TAU);
+            ctx.stroke();
+          }
 
           ctx.fillStyle = "#fff";
           ctx.beginPath();
@@ -959,10 +934,10 @@
         return top;
       };
 
-      // Dark, tired eye shadows.
+      // Faint eye shadows.
       if (!F) {
         ctx.save();
-        ctx.globalAlpha = 0.75;
+        ctx.globalAlpha = 0.5;
 
         pathOf(
           ctx,
@@ -993,41 +968,72 @@
         ctx.restore();
       }
 
-      eye(0.74, -0.22, 0.26, C.eyeGray, false);
-      eye(0.34, -0.22, 0.32, C.eyeRed, true);
+      eye(0.68, -0.22, 0.25, C.eyeGray, false, "pin");
+      eye(0.34, -0.22, 0.32, C.eyeRed, true, "slit");
 
       // Eyelids and eyebrows.
       line(
         k,
-        [Hp(0.32, -0.3), Hp(0.5, -0.4), Hp(0.68, -0.34)],
+        [Hp(0.32, -0.3), Hp(0.5, -0.36), Hp(0.68, -0.32)],
         C.line,
-        1.4,
+        1.1,
         1
       );
 
       line(
         k,
-        [Hp(0.74, -0.3), Hp(0.98, -0.36)],
+        [Hp(0.68, -0.29), Hp(0.93, -0.33)],
         C.line,
-        1.2,
+        1.0,
         1
       );
 
       line(
         k,
-        [Hp(0.22, -0.54), Hp(0.5, -0.72), Hp(0.7, -0.62)],
+        [Hp(0.2, -0.54), Hp(0.5, -0.64), Hp(0.72, -0.57)],
         C.hairBlk,
-        1.5,
+        2.0,
         1
       );
 
       line(
         k,
-        [Hp(0.78, -0.56), Hp(1.0, -0.52)],
+        [Hp(0.78, -0.57), Hp(1.02, -0.52)],
         C.hairBlk,
-        1.3,
+        1.8,
         1
       );
+
+      // Rendering error: faint horizontal scan bands slip across the face now and then, and a few pixel fragments flicker by the red eye.
+      // The face itself never changes expression: only the picture of it is slightly wrong.
+      if (!F) {
+        const tb = Math.floor(now * 9);
+        ctx.save();
+        pathOf(ctx, face);
+        ctx.clip();
+        for (let i = 0; i < 2; i++) {
+          if (hash(tb * 1.7 + i * 4.1) < 0.35) continue;
+          const yy = Hp(0, -0.55 + 1.5 * hash(tb * 2.3 + i * 7.7))[1];
+          const x0 = Hp(0, 0)[0] - 40, hh = Math.max(0.6, hrx * 0.07);
+          ctx.globalAlpha = 0.18;
+          ctx.fillStyle = i ? "#2de2ff" : "#ff2d6a";
+          ctx.fillRect(x0, yy, 80, hh);
+          ctx.globalAlpha = 0.12;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(x0, yy + hh, 80, hh * 0.6);
+        }
+        ctx.restore();
+        if (hash(tb * 0.9 + 3) > 0.6) {
+          const e = Hp(0.34, -0.22);
+          ctx.save();
+          ctx.globalAlpha = 0.85;
+          for (let j = 0; j < 2; j++) {
+            ctx.fillStyle = j ? "#2de2ff" : "#ff2d6a";
+            ctx.fillRect(e[0] + (hash(tb + j * 3.3) - 0.5) * hrx * 1.2, e[1] + (hash(tb * 2 + j) - 0.2) * hrx * 0.5, Math.max(1, hrx * 0.14), Math.max(0.6, hrx * 0.05));
+          }
+          ctx.restore();
+        }
+      }
     }
 
     // ── SPLIT BLACK-AND-WHITE GOTHIC HAIR ────────────────────────────
@@ -1161,7 +1167,7 @@
         [
           Hp(-0.9, -0.45),
           Hp(-0.82, 0.05),
-          flut(Hp(-0.68, 0.72), 0.12, 0.7),
+          flut(Hp(-0.76, 0.36), 0.12, 0.7),
         ],
         3.8 * u,
         0.8 * u,
@@ -1177,7 +1183,7 @@
         [
           Hp(0.05, -0.65),
           Hp(0.0, -0.05),
-          flut(Hp(0.12, 0.65), 0.12, 1.5),
+          flut(Hp(0.1, 0.28), 0.12, 1.5),
         ],
         3.0 * u,
         0.7 * u,

@@ -294,49 +294,61 @@
     {
       fillPoly(k, [Hp(-0.3, 0.55), Hp(0.5, 0.6), Hp(0.55, 1.5), Hp(-0.4, 1.45)], C.skinSh, C.line, 1);
       const face = [Hp(-0.4, -0.95), Hp(0.5, -1.0), Hp(0.95, -0.66), Hp(1.02, -0.36), Hp(1.04, -0.1), Hp(1.22, 0.24), Hp(1.04, 0.32), Hp(1.04, 0.5), Hp(1.0, 0.7), Hp(0.82, 0.98), Hp(0.45, 1.08), Hp(-0.1, 0.98), Hp(-0.55, 0.55), Hp(-0.65, -0.3)];
-      fillPoly(k, face, C.skin, C.line, 1.2);
+      // creepy porcelain-white face (no mask): chalk white, faint lilac shading under the brow and cheek
+      fillPoly(k, face, F ? C.skin : "#f7f4f9", C.line, 1.2);
       if (!F) {
-        // the subtle unsettling smile: a thin line curling up at the corner
-        line(k, [Hp(0.62, 0.66), Hp(0.82, 0.76), Hp(0.98, 0.62)], C.ash, 1, 0.95);
-        line(k, [Hp(0.95, 0.6), Hp(1.02, 0.52)], C.ash, 0.8, 0.8);
-        line(k, [Hp(0.2, 0.72), Hp(0.55, 0.9)], C.skinSh, 0.8, 0.5); // jaw shadow
-      }
-      // the ivory porcelain half-mask: covers the brow and cheek on the front half of his face, exaggerated brow and cheek
-      const mask = [Hp(0.02, -0.92), Hp(0.62, -1.0), Hp(1.0, -0.76), Hp(1.1, -0.42), Hp(1.14, -0.05), Hp(1.28, 0.24), Hp(1.04, 0.44), Hp(0.7, 0.5), Hp(0.34, 0.34), Hp(0.1, 0.0), Hp(-0.08, -0.5)];
-      fillPoly(k, mask, C.ivory, C.line, 1.2);
-      if (!F) {
-        // shading on the mask + ash shadow under the exaggerated brow
-        ctx.save(); ctx.globalAlpha = 0.45;
-        pathOf(ctx, [Hp(0.1, 0.05), Hp(0.5, 0.4), Hp(1.0, 0.4), Hp(1.1, 0.0), Hp(0.5, 0.08)]);
-        ctx.fillStyle = C.ash; ctx.fill();
+        ctx.save(); ctx.globalAlpha = 0.5;
+        pathOf(ctx, [Hp(-0.5, 0.2), Hp(0.1, 0.55), Hp(0.6, 0.95), Hp(0.1, 1.04), Hp(-0.3, 0.8)]);
+        ctx.fillStyle = C.skinSh; ctx.fill();
         ctx.restore();
-        line(k, [Hp(0.28, -0.82), Hp(0.8, -0.74), Hp(1.08, -0.5)], C.ash, 1.1, 0.9); // brow ridge
-        // delicate silver engraving: a scroll on the cheek and a dot on the brow
-        line(k, spline([Hp(0.3, 0.12), Hp(0.55, 0.3), Hp(0.85, 0.28), Hp(1.0, 0.12)], 4), C.silver, 0.7, 0.95);
-        dot(k, Hp(0.52, -0.62), 0.5 * u + 0.2, C.silver, null);
-        // cracks reaching out from the eye
-        line(k, [Hp(0.42, -0.18), Hp(0.2, -0.3), Hp(0.1, -0.55)], C.ash, 0.7, 0.9);
-        line(k, [Hp(0.62, 0.0), Hp(0.5, 0.18), Hp(0.55, 0.3)], C.ash, 0.6, 0.8);
-        // small metal flourish on the chin edge of the mask, faint violet glow in its ornaments
-        fillPoly(k, [Hp(1.2, 0.2), Hp(1.42, 0.34), Hp(1.2, 0.4)], C.silver, C.line, 0.6);
-        glow(k, Hp(0.52, -0.62)[0], Hp(0.52, -0.62)[1], 4 * u, 0.12 * en, "121,85,168");
+        line(k, [Hp(0.3, -0.62), Hp(0.62, -0.7), Hp(1.0, -0.56)], C.skinSh, 0.9, 0.8); // faint brow shadow
+        // thin, raised, too-pleased brows
+        line(k, [Hp(0.5, -0.56), Hp(0.74, -0.68), Hp(0.98, -0.52)], C.hair, 0.9, 0.95);
+        line(k, [Hp(-0.02, -0.52), Hp(0.2, -0.62), Hp(0.4, -0.5)], C.hair, 0.8, 0.9);
+        // hollow shadows under the eyes
+        line(k, [Hp(0.5, 0.02), Hp(0.72, 0.1), Hp(0.94, 0.0)], C.skinSh, 0.9, 0.85);
+        line(k, [Hp(-0.04, 0.0), Hp(0.14, 0.08), Hp(0.32, 0.0)], C.skinSh, 0.8, 0.8);
       }
-      // eye: one visible, faintly glowing lavender; the other side is hidden by the mask
+      // eyes: wide, hollow black doll eyes with a tiny lavender pinprick of light (no friendly pupil)
       {
-        const eye = Hp(0.78, -0.22), wide = stunned ? 1.5 : 1;
-        if (!F) {
-          glow(k, eye[0], eye[1], 8 * u * wide, 0.35 + 0.35 * en, "197,165,255");
-          ctx.save();
-          ctx.shadowColor = C.glow; ctx.shadowBlur = 4 + 4 * en;
-          ctx.fillStyle = stunned ? "#fff" : C.glow;
-          ctx.beginPath(); ctx.ellipse(eye[0], eye[1], Math.max(1.1, hrx * 0.17) * wide, Math.max(0.8, hrx * 0.09) * wide, tiltA, 0, TAU); ctx.fill();
-          ctx.restore();
-        } else {
-          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(eye[0], eye[1], 1.6, 0, TAU); ctx.fill();
+        const eyes = [[Hp(0.72, -0.24), 1], [Hp(0.17, -0.22), 0.78]], wide = stunned ? 1.35 : 1;
+        for (const [e, sz] of eyes) {
+          ctx.beginPath();
+          ctx.ellipse(e[0], e[1], Math.max(1.3, hrx * 0.2) * sz * wide, Math.max(1.7, hrx * 0.28) * sz * wide, tiltA, 0, TAU);
+          ctx.fillStyle = F ? "#ffffff" : "#07040c"; ctx.fill();
+          if (!F) {
+            glow(k, e[0], e[1], 6 * u * sz, 0.22 + 0.25 * en, "197,165,255");
+            ctx.fillStyle = stunned ? "#ffffff" : C.glow;
+            ctx.beginPath(); ctx.arc(e[0] + d * 0.3 * u, e[1] - 0.2 * u, Math.max(0.5, hrx * 0.045) * sz, 0, TAU); ctx.fill();
+          }
         }
       }
-      // mask strap under the hair
-      line(k, [Hp(0.04, -0.4), Hp(-0.6, -0.5)], C.line, 1, 0.9);
+      // the stitched, impossibly wide grin: a dark crescent running from the front corner almost to the ear,
+      // crossed by black thread stitches, with little cut-lines at both corners
+      {
+        const mp = (t) => { // quadratic curve: front corner -> low middle -> back corner
+          const x0 = 0.98, y0 = 0.5, cx = 0.42, cy = 1.02, x1 = -0.28, y1 = 0.26, w0 = (1 - t) * (1 - t), w1 = 2 * t * (1 - t), w2 = t * t;
+          return [w0 * x0 + w1 * cx + w2 * x1, w0 * y0 + w1 * cy + w2 * y1];
+        };
+        const top = [], low = [];
+        for (let i = 0; i <= 14; i++) {
+          const t = i / 14, p = mp(t), th = 0.03 + 0.1 * Math.sin(Math.PI * t); // thin slit, opening a little in the middle
+          top.push(Hp(p[0], p[1] - 0.02)); low.unshift(Hp(p[0] + 0.02 * (1 - t), p[1] + th));
+        }
+        fillPoly(k, top.concat(low), F ? "#ffffff" : "#12081a", C.line, 0.9);
+        if (!F) {
+          // thread stitches across the grin (spaced out so the mouth stays readable)
+          for (let i = 1; i < 14; i += 2) {
+            const p = mp(i / 14), lean = 0.05 * (i % 4 === 1 ? 1 : -1);
+            line(k, [Hp(p[0] + lean, p[1] - 0.12), Hp(p[0] - lean, p[1] + 0.22)], "#0a0610", 0.75, 1);
+          }
+          // cut corners at both ends
+          const e0 = mp(0), e1 = mp(1);
+          line(k, [Hp(e0[0], e0[1]), Hp(e0[0] + 0.12, e0[1] - 0.22)], "#0a0610", 0.9, 0.95);
+          line(k, [Hp(e1[0], e1[1]), Hp(e1[0] - 0.1, e1[1] - 0.2)], "#0a0610", 0.9, 0.95);
+          line(k, [Hp(e0[0] - 0.05, e0[1] + 0.12), Hp(e0[0] + 0.1, e0[1] - 0.04)], "#0a0610", 0.8, 0.9);
+        }
+      }
       // swept-back, slightly messy black-violet hair with a few loose strands over the forehead
       fillPoly(k, [Hp(1.0, -0.78), Hp(0.62, -1.18), Hp(0.0, -1.3), Hp(-0.72, -1.1), Hp(-1.18, -0.4), Hp(-1.26, 0.3), Hp(-0.92, 0.76), Hp(-0.6, 0.3), Hp(-0.42, -0.2), Hp(0.0, -0.58), Hp(0.5, -0.8)], C.hair, C.line, 1.1);
       if (!F) {
