@@ -48,6 +48,7 @@
     step(intents) {
       for (const f of this.fighters) {
         f.foe = this.fighters.find((o) => o !== f) || null; // opponent reference (Phantom Decoy chases it)
+        f.others = this.fighters.filter((o) => o !== f); // everyone else (Errata Chain Exception)
         f.rand = this.rng;
       }
       for (let i = 0; i < this.fighters.length; i++) {
@@ -173,6 +174,15 @@
           }
         }
         f.pendingProjectile = null;
+      }
+      for (const f of this.fighters) { // Errata Phantom Input: a ghost fires a projectile skill from where it stands
+        for (const gs of f.ghostShots) {
+          const proxy = { id: f.id, x: gs.x, y: gs.y, facing: gs.facing, stats: f.stats, gunnerStacks: 0 };
+          const p = new MW.Projectile(proxy, gs.hit);
+          this.projectiles.push(p);
+          this.emit("fire", p);
+        }
+        f.ghostShots.length = 0;
       }
       for (const f of this.fighters) this.stepGunnerBurst(f);
     }

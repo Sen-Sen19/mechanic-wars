@@ -185,6 +185,7 @@
   const STRIKE_SHAKE = { hook: 1.5, upper: 4, power: 7, rush: 4, rising: 0, meteor: 0, slam: 2 }; // rising / meteor shake in their own impact code
   function onSkillEvent(ev) {
     if (!ev) return;
+    if (ev.type === "errata") { errataEvent(ev); return; } // Errata passive one-shots
     if (ev.type === "bulwark") { // Bulwark: Holy Deflection / Taunt / Restoration / Divine Judgment one-shots
       const R = ev.radius || 100;
       if (ev.kind === "judgment_warn") {
@@ -578,6 +579,35 @@
   // Pips under the floating HP bar: one per momentum point; they blaze when full.
   function drawMomentumPips(ctx, f, y) {
     const P = f.stats.passive;
+    if (P && P.type === "errata") { // Error stacks: crimson pips with a cyan offset copy; they glitch and blaze when full
+      const r = 4, gap = 11, x0 = f.x + f.stats.width / 2 - ((P.max - 1) * gap) / 2;
+      const full = f.errataFull();
+      const pulse = full ? 0.7 + 0.3 * Math.sin(Date.now() * 0.02) : 1;
+      for (let i = 0; i < P.max; i++) {
+        const on = i < f.errors, jit = full && Math.random() < 0.25 ? (Math.random() - 0.5) * 4 : 0;
+        const px = x0 + i * gap + jit;
+        if (on) { ctx.beginPath(); ctx.arc(px + 1.8, y, r, 0, Math.PI * 2); ctx.fillStyle = rgba(ERR_CY, 0.7); ctx.fill(); }
+        ctx.beginPath(); ctx.arc(px, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = on ? ERR : "rgba(20,24,40,0.75)";
+        ctx.globalAlpha = on ? pulse : 1;
+        if (on && full) { ctx.shadowColor = ERR; ctx.shadowBlur = 10; }
+        ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        ctx.strokeStyle = on ? "rgba(255,255,255,0.8)" : "rgba(255,49,90,0.45)"; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      const H = f.stats.hold; // hold key (Unstable Rendering): stored teleport charges, the next one fills up while it recharges
+      if (H && H.charges) {
+        const bw = 12, bh = 4, bg = 4, bx0 = f.x + f.stats.width / 2 - ((H.charges * bw + (H.charges - 1) * bg) / 2), by = y + 9;
+        const fill = f.holdRecharge > 0 ? 1 - f.holdRecharge / H.rechargeTime : 0;
+        for (let i = 0; i < H.charges; i++) {
+          const x = bx0 + i * (bw + bg), on = i < f.holdCharges;
+          ctx.fillStyle = "rgba(20,24,40,0.75)"; ctx.fillRect(x, by, bw, bh);
+          if (on) { ctx.fillStyle = ERR_CY; ctx.fillRect(x, by, bw, bh); ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(x, by, bw, 1); }
+          else if (i === f.holdCharges) { ctx.fillStyle = rgba(ERR_CY, 0.55); ctx.fillRect(x, by, bw * fill, bh); }
+          ctx.strokeStyle = on ? "rgba(255,255,255,0.8)" : "rgba(0,229,255,0.35)"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, by + 0.5, bw - 1, bh - 1);
+        }
+      }
+      return;
+    }
     if (P && P.type === "bulletevolution") {
       const r = 3.1, gap = 7.5, x0 = f.x + f.stats.width / 2 - ((P.max - 1) * gap) / 2;
       const colors = P.tierColors || ["#e8eef8", "#ffe04a", "#ff8b24", "#f02d45", "#21162e"];
@@ -610,6 +640,217 @@
       ctx.strokeStyle = on ? "rgba(255,255,255,0.8)" : "rgba(255,154,60,0.45)";
       ctx.lineWidth = 1.3;
       ctx.stroke();
+    }
+  }
+
+  // ─── Error Accumulation (Errata passive) ───────────────────────
+  const ERR = "#FF315A", ERR_CY = "#00E5FF";
+
+  // Glow behind the body while all Error stacks are full: the next skill will be corrupted.
+  function drawErrataAura(ctx, f) {
+    if (!f.errataFull || !f.errataFull() || f.state === MW.STATE.KO) return;
+    const s = f.stats, t = Date.now();
+    const pulse = 0.65 + 0.35 * Math.sin(t * 0.02);
+    const jx = (Math.random() < 0.18 ? (Math.random() - 0.5) * 8 : 0);
+    const cx = f.x + s.width / 2 + jx, cy = f.y + s.height * 0.55;
+    ctx.save();
+    ctx.globalAlpha = 0.5 * pulse;
+    ctx.fillStyle = safeRadialGrad(ctx, cx, cy, 6, cx, cy, s.height * 0.8, [[0, rgba(ERR_CY, 0.55)], [0.45, rgba(ERR, 0.4)], [1, rgba(ERR, 0)]]);
+    ctx.fillRect(cx - s.height, cy - s.height, s.height * 2, s.height * 2);
+    ctx.restore();
+    if (Math.random() < 0.45) {
+      spawnParticle(cx + (Math.random() - 0.5) * s.width * 1.4, f.y + s.height * Math.random(), (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.6, Math.random() < 0.5 ? ERR : ERR_CY, 14, 2 + Math.random() * 2);
+    }
+  }
+
+  // Phantom Input ghost: a flickering silhouette left where he stood, until it repeats the skill.
+  function drawErrataGhosts(ctx, f) {
+    if (!f.errataQ) return;
+    const s = f.stats;
+    for (const e of f.errataQ) {
+      if (e.kind !== "phantom") continue;
+      const k = Math.min(1, e.age / Math.max(1, e.life));
+      ctx.save();
+      ctx.globalAlpha = 0.2 + 0.35 * k;
+      ctx.fillStyle = ERR_CY;
+      ctx.fillRect(e.x - 2, e.y, s.width, s.height);
+      ctx.fillStyle = ERR;
+      ctx.globalAlpha = 0.18 + 0.25 * k;
+      ctx.fillRect(e.x + 3, e.y, s.width, s.height);
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < 3; i++) { // glitch bands
+        const by = e.y + ((Math.random() * s.height) | 0);
+        ctx.fillRect(e.x - 6 + (Math.random() * 12), by, s.width + 8, 2);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Unstable Rendering afterimages: a corrupted silhouette left at every spot he teleported from. Sliced bands slide sideways and it fades out.
+  function drawErrataAfterimages(ctx, f) {
+    if (!f.afterimages || !f.afterimages.length) return;
+    const s = f.stats, SL = 7, sh = s.height / SL;
+    for (const im of f.afterimages) {
+      const k = im.age / Math.max(1, im.life), a = (1 - k) * (1 - k) * 0.85;
+      ctx.save();
+      for (let i = 0; i < SL; i++) {
+        const seed = Math.sin((i + 1) * 12.9898 + im.x * 0.37 + Math.floor(im.age / 3) * 4.1) * 43758.5453, r = seed - Math.floor(seed);
+        const off = (r - 0.5) * (8 + 26 * k) * (i % 2 ? 1 : -1);
+        const y = im.y + i * sh;
+        ctx.globalAlpha = a * 0.7; ctx.fillStyle = ERR_CY; ctx.fillRect(im.x + off - 3, y, s.width, sh - 1);
+        ctx.globalAlpha = a * 0.65; ctx.fillStyle = ERR; ctx.fillRect(im.x + off + 3, y, s.width, sh - 1);
+        ctx.globalAlpha = a * (r > 0.5 ? 0.9 : 0.55); ctx.fillStyle = r > 0.5 ? "#f2f2f2" : "#0b0b13"; ctx.fillRect(im.x + off, y + 1, s.width, sh - 2);
+      }
+      ctx.globalAlpha = a * 0.8; ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < 2; i++) ctx.fillRect(im.x - 8 + Math.random() * 10, im.y + Math.random() * s.height, s.width + 10, 2);
+      ctx.restore();
+    }
+  }
+
+  // Unstable Rendering charge: glitch shards are pulled in and a ring tightens; everything speeds up as the charge fills.
+  function drawErrataCharge(ctx, f) {
+    const p = f.unstableCharge ? f.unstableCharge() : -1;
+    if (p < 0) return;
+    const s = f.stats, cx = f.x + s.width / 2, cy = f.y + s.height * 0.55, t = Date.now();
+    ctx.save();
+    const R = 70 - 44 * p, pulse = 0.5 + 0.5 * Math.sin(t * (0.012 + 0.05 * p));
+    ctx.lineWidth = 2 + 2 * p; ctx.globalAlpha = 0.35 + 0.5 * p;
+    ctx.strokeStyle = ERR_CY; ctx.beginPath(); ctx.arc(cx - 2, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = ERR; ctx.beginPath(); ctx.arc(cx + 2, cy, R * (0.86 + 0.1 * pulse), 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.25 + 0.5 * p; ctx.fillStyle = "#ffffff"; // tearing bands across the body, more of them as it charges
+    for (let i = 0; i < 1 + Math.floor(p * 5); i++) ctx.fillRect(f.x - 10 + (Math.random() - 0.5) * 10 * (1 + p), f.y + Math.random() * s.height, s.width + 20, 1 + Math.random() * 2);
+    ctx.restore();
+    if (Math.random() < 0.2 + 0.7 * p) { // shards flying inward
+      const a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 30;
+      spawnParticle(cx + Math.cos(a) * d, cy + Math.sin(a) * d, -Math.cos(a) * (2 + 3 * p), -Math.sin(a) * (2 + 3 * p), Math.random() < 0.5 ? ERR : ERR_CY, 14, 2 + Math.random() * 2.5);
+    }
+  }
+
+  // Code Breaker projectile: a black-and-white corrupted data block that flickers and tears as it flies; red / cyan fringes jitter around it.
+  function drawCodeBreakerShot(ctx, p) {
+    const r = p.size / 2, t = Date.now();
+    ctx.save();
+    for (let i = 5; i >= 1; i--) { // trail of jittering blocks
+      const tx = p.x - p.dir * i * 9, ty = p.y + (Math.random() - 0.5) * 8, sz = r * (1.1 - i * 0.14);
+      ctx.globalAlpha = 0.5 - i * 0.07;
+      ctx.fillStyle = i % 2 ? "#ffffff" : "#15151c";
+      ctx.fillRect(tx - sz / 2, ty - sz / 2, sz, sz);
+    }
+    const jx = () => (Math.random() < 0.4 ? (Math.random() - 0.5) * 7 : 0), jy = () => (Math.random() < 0.4 ? (Math.random() - 0.5) * 7 : 0);
+    ctx.globalAlpha = 0.7; ctx.fillStyle = ERR; ctx.fillRect(p.x - r + 3 + jx(), p.y - r + jy(), r * 2, r * 2);
+    ctx.fillStyle = ERR_CY; ctx.fillRect(p.x - r - 3 + jx(), p.y - r + jy(), r * 2, r * 2);
+    ctx.globalAlpha = 1;
+    ctx.translate(p.x, p.y); ctx.rotate(t * 0.012);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.fillStyle = "#0b0b13"; ctx.fillRect(-r * 0.55, -r * 0.55, r * 1.1, r * 1.1);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(-r * 0.2, -r * 0.2, r * 0.4, r * 0.4);
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = "#ffffff"; ctx.globalAlpha = 0.9;
+    for (let i = 0; i < 3; i++) ctx.fillRect(p.x - r - 6 + Math.random() * (r * 2 + 12), p.y - r + Math.random() * r * 2, 8 + Math.random() * 14, 2); // tear lines
+    ctx.restore();
+  }
+
+  // Victim of Code Breaker: black-and-white glitch bands over the body, trails in random directions, glitch particles and a corrupted
+  // symbol above the head, for as long as f.moveCorrupt lasts.
+  function drawMoveCorruptFx(ctx, f) {
+    const m = f.moveCorrupt;
+    if (!m || f.state === MW.STATE.KO) return;
+    const s = f.stats, cx = f.x + s.width / 2, cy = f.y + s.height * 0.5, t = Date.now();
+    ctx.save();
+    if (Math.random() < 0.3) { ctx.globalAlpha = 0.3; ctx.fillStyle = Math.random() < 0.5 ? "#ffffff" : "#000000"; ctx.fillRect(f.x - 2, f.y, s.width + 4, s.height); } // whole-body flicker
+    for (let i = 0; i < 5; i++) { // distortion bands
+      const by = f.y + Math.random() * s.height, bh = 2 + Math.random() * 6, ox = (Math.random() - 0.5) * 16;
+      ctx.globalAlpha = 0.55 + Math.random() * 0.3;
+      ctx.fillStyle = i % 2 ? "#ffffff" : "#050508";
+      ctx.fillRect(f.x + ox - 3, by, s.width + 6, bh);
+    }
+    ctx.restore();
+    if (Math.random() < 0.5) { // trails in random directions
+      const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 2.5;
+      spawnParticle(cx + (Math.random() - 0.5) * s.width, cy + (Math.random() - 0.5) * s.height, Math.cos(a) * sp, Math.sin(a) * sp, Math.random() < 0.5 ? "#ffffff" : "#8a8a96", 16, 2.2);
+    }
+    if (Math.random() < 0.4) spawnParticle(cx + (Math.random() - 0.5) * s.width * 1.6, cy + (Math.random() - 0.5) * s.height * 1.2, 0, -0.4, Math.random() < 0.5 ? ERR_CY : "#ffffff", 12, 1.6); // glitch bits
+    if (m.burst) { // streaks behind the direction he is being pushed
+      ctx.save(); ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const yy = f.y + s.height * (0.25 + i * 0.25), len = 18 + Math.random() * 22, x0 = cx - m.burstDir * (s.width * 0.5 + 4);
+        ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.7)" : "rgba(10,10,16,0.8)"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 - m.burstDir * len, yy); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // corrupted symbol above the head: a broken square with an X, jittering
+    const sx = cx + (Math.random() < 0.25 ? (Math.random() - 0.5) * 6 : 0), sy = f.y - 80, h = 11;
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 0.02));
+    ctx.fillStyle = "#0b0b13"; ctx.fillRect(sx - h, sy - h, h * 2, h * 2);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.strokeRect(sx - h, sy - h, h * 2, h * 2);
+    ctx.beginPath(); ctx.moveTo(sx - h * 0.6, sy - h * 0.6); ctx.lineTo(sx + h * 0.6, sy + h * 0.6); ctx.moveTo(sx + h * 0.6, sy - h * 0.6); ctx.lineTo(sx - h * 0.6, sy + h * 0.6); ctx.stroke();
+    ctx.fillStyle = ERR; ctx.fillRect(sx - h + 3, sy - h + (Math.random() * h * 2 | 0), h * 2, 2); // glitch line
+    ctx.restore();
+  }
+
+  const ERRATA_RING = { damage_overflow: "#ff7a3d", critical_fault: "#ffe27a", time_desync: "#7fd8ff", reverse_logic: "#c88bff", gravity_error: "#9a7bff" };
+  function errataEvent(ev) {
+    if (ev.kind === "proc") {
+      if (floats.length > 12) floats.shift();
+      floats.push({ x: ev.x, y: ev.y - 24, text: ev.label || "ERROR", life: 80, maxLife: 80, size: 22, color: Math.random() < 0.5 ? ERR : ERR_CY });
+      addRing(ev.x, ev.y + 20, 10, 96, 20, ERR, 3, 1);
+      addRing(ev.x + 4, ev.y + 20, 10, 80, 18, ERR_CY, 2, 1);
+      spawnBurst(ev.x, ev.y + 20, ERR, 10, 5);
+      spawnBurst(ev.x, ev.y + 20, ERR_CY, 10, 5);
+      addShake(3); addFlash(0.12, "#ffffff");
+    } else if (ev.kind === "hitfx") {
+      const col = ERRATA_RING[ev.effect] || ERR_CY;
+      addRing(ev.x, ev.y, 8, 70, 20, col, 3, 1);
+      spawnBurst(ev.x, ev.y, col, 10, 4);
+    } else if (ev.kind === "teleport") {
+      for (let i = 0; i <= 8; i++) {
+        const k = i / 8;
+        spawnParticle(ev.x + (ev.x2 - ev.x) * k, ev.y + (ev.y2 - ev.y) * k, 0, 0, i % 2 ? ERR : ERR_CY, 16, 3);
+      }
+      addRing(ev.x, ev.y, 8, 60, 16, ERR_CY, 3, 1);
+      addRing(ev.x2, ev.y2, 60, 8, 16, ERR, 3, 1);
+    } else if (ev.kind === "charge_start") {
+      addRing(ev.x, ev.y, 70, 20, 16, ERR_CY, 2, 1);
+    } else if (ev.kind === "charge_full") { // the charge is complete: a hard flash before the hops
+      addRing(ev.x, ev.y, 10, 120, 16, "#ffffff", 4, 1);
+      addRing(ev.x + 4, ev.y, 10, 100, 14, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR_CY, 12, 6); spawnBurst(ev.x, ev.y, ERR, 12, 6);
+      addShake(3);
+    } else if (ev.kind === "hop") { // one teleport: glitch trail along the jump, rings at both ends
+      for (let i = 0; i <= 10; i++) {
+        const k = i / 10;
+        spawnParticle(ev.x + (ev.x2 - ev.x) * k, ev.y + (ev.y2 - ev.y) * k + (Math.random() - 0.5) * 26, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5, i % 3 === 0 ? "#ffffff" : i % 2 ? ERR : ERR_CY, 14 + (Math.random() * 8 | 0), 2.5 + Math.random() * 2);
+      }
+      addRing(ev.x, ev.y, 8, 54, 12, ERR_CY, 3, 1);
+      addRing(ev.x2, ev.y2, 54, 8, 12, ERR, 3, 1);
+      addShake(1.5);
+    } else if (ev.kind === "hop_end") {
+      addRing(ev.x, ev.y, 8, 90, 18, "#ffffff", 3, 1);
+      spawnBurst(ev.x, ev.y, ERR, 10, 5); spawnBurst(ev.x, ev.y, ERR_CY, 10, 5);
+    } else if (ev.kind === "phantom") {
+      addRing(ev.x, ev.y, 8, 90, 18, ERR_CY, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR, 12, 5);
+      addShake(2);
+    } else if (ev.kind === "chain") {
+      for (let i = 0; i <= 10; i++) {
+        const k = i / 10, j = (Math.random() - 0.5) * 14;
+        spawnParticle(ev.x + (ev.x2 - ev.x) * k, ev.y + (ev.y2 - ev.y) * k + j, 0, 0, i % 2 ? ERR_CY : "#ffffff", 14, 2.5);
+      }
+      addRing(ev.x2, ev.y2, 6, 50, 14, ERR, 3, 1);
+    } else if (ev.kind === "echo") {
+      addRing(ev.x, ev.y, 8, 70, 16, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR_CY, 8, 4);
+    } else if (ev.kind === "cb_hit") { // Code Breaker connects
+      addRing(ev.x, ev.y, 8, 80, 18, "#ffffff", 3, 1);
+      addRing(ev.x + 4, ev.y, 8, 64, 16, "#15151c", 5, 1, true);
+      spawnBurst(ev.x, ev.y, "#ffffff", 12, 5); spawnBurst(ev.x, ev.y, "#6d6d7a", 8, 4);
+      addShake(2);
+    } else if (ev.kind === "cb_burst") { // a corrupted movement burst starts: glitch bits thrown the opposite way
+      for (let i = 0; i < 6; i++) spawnParticle(ev.x - ev.dir * 10, ev.y + (Math.random() - 0.5) * 50, -ev.dir * (1 + Math.random() * 3), (Math.random() - 0.5) * 1.5, i % 2 ? "#ffffff" : "#6d6d7a", 14, 2.4);
     }
   }
 
@@ -1021,6 +1262,7 @@
       return;
     }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "frost") { drawFrostShard(ctx, p); ctx.restore(); return; }
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "codebreaker") { drawCodeBreakerShot(ctx, p); ctx.restore(); return; } // Errata Code Breaker
     const r = p.size / 2;
     const [cr, cg, cb] = hexToRgb(p.color);
 
@@ -2223,8 +2465,18 @@
           if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(c, f);
           if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawAura(c, f); // flame aura replaces the static glow
           else drawMomentumAura(c, f);
+          if (s.id === "errata") { drawErrataAfterimages(c, f); drawErrataGhosts(c, f); drawErrataAura(c, f); drawErrataCharge(c, f); } // afterimages (hold key) + ghost copy (Phantom Input) + full-stack glow + charge
           // draw the full character body
+          const ucp = s.id === "errata" && f.unstableCharge ? f.unstableCharge() : -1;
+          if (ucp >= 0) { // charging Unstable Rendering: the body shakes and drops out for a frame more and more often
+            const flick = Math.floor(sim.tick * (0.15 + 0.9 * ucp)) % 2 === 0 && Math.random() < ucp * 0.7;
+            c.save(); c.translate((Math.random() - 0.5) * 8 * ucp, 0);
+            if (flick) c.globalAlpha *= 0.35;
+            drawCharacterBody(c, f, isFlash);
+            c.restore();
+          } else
           drawCharacterBody(c, f, isFlash);
+          if (f.moveCorrupt) drawMoveCorruptFx(c, f); // Errata Code Breaker: glitch overlay on the victim
         };
         if (cloaked) drawFaded(ctx, f.fade, paintBody); // cloaked Assassin: the art resets alpha itself, so fade the finished picture
         else if (f.tauntedBy && f.tauntedBy.left > 0 && f.state !== S.KO) drawTauntOutlined(ctx, paintBody); // Divine Taunt: red outline = taunted

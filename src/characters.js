@@ -778,8 +778,8 @@
     }),
 
     // ERRATA (internal id "errata"): the Mistake of Creation (looks: errata_art.js, design doc "Errata - The Mistake of Creation").
-    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so he fights with one basic attack:
-    // a quick 3-hit melee chain (keep tapping attack): 1 Slash, 2 Backhand, 3 Rift Cut (the finisher: a longer, harder cut).
+    // PASSIVE: Error Accumulation (see errata.passive below). HOLD KEY: Unstable Rendering (five glitch teleports). SKILL 1: Code Breaker (movement corruption). Skills 2-4 and the ultimate are not built yet.
+    // He fights with a quick 3-hit melee chain (keep tapping attack): 1 Slash, 2 Backhand, 3 Rift Cut (the finisher: a longer, harder cut).
     // Tall and elegant with a little more reach than Fulminar; his whole-body glitch is visual only and never touches the hit box,
     // physics or timing. Numbers are a first guess to feel him out in the arena. Hit box = width x height below.
     errata: define({
@@ -796,6 +796,63 @@
       runSpeed: 5.4,
       jumpStrength: 13,
       airJumpStrength: 11.8,
+      // PASSIVE - Error Accumulation: every landed hit (basic attacks and skills) adds 1 Error stack, max `max`. At max, the NEXT skill spends
+      // all stacks and gets ONE random corruption effect, picked when the skill activates. Every effect is tunable here; `weight` (default 1)
+      // changes how often an effect is picked. Duration / delay values are in ticks (60 = 1 s).
+      passive: {
+        type: "errata", max: 5,
+        effects: {
+          damage_overflow:     { label: "DAMAGE OVERFLOW",     bonus: 0.75, knockbackMul: 1.25 },                          // bonus damage (+75%)
+          double_execution:    { label: "DOUBLE EXECUTION",    delay: 22, damageMul: 0.6, maxWait: 90 },                    // the skill repeats after `delay` ticks at 60% damage
+          position_corruption: { label: "POSITION CORRUPTION", gap: 10 },                                                    // teleports behind the enemy after the cast
+          time_desync:         { label: "TIME DESYNC",         duration: 120, speedMul: 0.35 },                             // enemy slowed to 35% speed for 2 s
+          reverse_logic:       { label: "REVERSE LOGIC",       duration: 150 },                                             // enemy left / right controls swapped for 2.5 s
+          phantom_input:       { label: "PHANTOM INPUT",       delay: 26, damageMul: 0.7 },                                 // a ghost left behind repeats the skill at 70% damage
+          critical_fault:      { label: "CRITICAL FAULT",      damageMul: 1.9, knockbackMul: 1.5, stunBonus: 14 },          // enhanced critical hit
+          gravity_error:       { label: "GRAVITY ERROR",       launch: 13, pull: 8, launchChance: 0.5 },                     // launches the enemy up OR pulls him in (50 / 50)
+          null_frame:          { label: "NULL FRAME",          duration: 50 },                                              // Errata is untargetable for ~0.8 s
+          chain_exception:     { label: "CHAIN EXCEPTION",     range: 320, delay: 14, damageMul: 0.6, stun: 16 },           // the skill jumps to another nearby enemy (1v1: strikes the same enemy again)
+        },
+      },
+      skills: [
+        // SKILL 1 - Code Breaker: a corrupted projectile that passes THROUGH enemies. On hit it infects the target's movement system for
+        // `duration` ticks: in short random BURSTS the target's stick is overridden (left / right / forward / backward / a hop), with normal
+        // control in the pauses between bursts, so he can still fight back. Attacks and skills stay fully usable. Low damage, long cooldown.
+        // burst / pause = random length range (ticks); bossMul = duration multiplier for fighters with stats.boss (bossImmune: true = none).
+        {
+          id: "code_breaker", name: "Break", icon: "BRK", cooldown: 540, // 9 s
+          attack: {
+            id: "code_breaker", type: "projectile", isSkill: true, piercing: true,
+            damage: 5, startup: 12, active: 1, recovery: 16, knockback: 0.8, launchH: 0.5, launchV: 0.1, stun: 6, manaGain: 8,
+            corruptMove: {
+              duration: 120, burstMin: 12, burstMax: 24, pauseMin: 14, pauseMax: 30, firstPause: 4, hopChance: 0.15,
+              bossMul: 0.5, bossImmune: false,
+            },
+            projectile: { speed: 9, range: 640, size: 26, style: "codebreaker" },
+          },
+        },
+        null, null, null,
+      ],
+      // HOLD KEY - Unstable Rendering (no skill slot): TAP the attack button = basic attack, HOLD it (on the ground) = he starts to glitch,
+      // faster and faster. Charge is full `chargeTime` ticks after the press (48 = 0.8 s). Let go before that = cancelled (nothing is spent).
+      // When full he teleports `hops` times, one every `hopTicks` ticks (5 x 6 = 30 ticks = 0.5 s), and leaves a corrupted afterimage at every
+      // spot he leaves. Steer: the direction held on the stick when it fires (and any time during the hops) is the way he travels; with no
+      // direction he goes toward the enemy. Every hop is a little off: length +/- `distJitter` (fraction), and a
+      // `wrongWayChance` that a hop goes the other way. A hop only lands where there is a platform to stand on within `upRange` px above /
+      // `downRange` px below his feet (otherwise it is cut short), so he never ends in the void or inside the blast zone margin (`edgeMargin`).
+      // `charges` = stored uses; one comes back every `rechargeTime` ticks (240 = 4 s). During the charge he is still hittable (a hit cancels it).
+      // `untargetable: true` makes the five hops safe from hits (off by default).
+      hold: {
+        holdStart: 12, charges: 3, rechargeTime: 240,
+        attack: {
+          id: "unstable_rendering", name: "Unstable Rendering", type: "melee", isSkill: true, utility: true, pose: 0,
+          damage: 0, startup: 36, active: 1, recovery: 8, knockback: 0, range: 1, advance: 0, manaGain: 0,
+          unstable: {
+            chargeTime: 48, hops: 5, hopTicks: 6, hopDist: 170, distJitter: 0.4, wrongWayChance: 0.12,
+            upRange: 150, downRange: 200, snapChance: 0.35, edgeMargin: 70, imageLife: 28, releaseCancel: 6, untargetable: false,
+          },
+        },
+      },
       attack: {
         type: "melee", damage: 4, startup: 6, active: 3, recovery: 7, knockback: 2, range: 56, advance: 2, fxShape: "jab",
         chain: [

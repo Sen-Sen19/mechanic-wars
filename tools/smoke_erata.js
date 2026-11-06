@@ -30,7 +30,7 @@ check("every stat is a real number (no silent zeros)", ["maxHP", "armor", "weigh
   a.x = 500; b.x = 500 + F.width + 6; a.facing = 1; b.facing = -1;
   const hp0 = b.hp, seen = new Set();
   for (let i = 0; i < 90; i++) {
-    sim.step([intent({ attackPressed: true, attackHeld: true }), I]);
+    sim.step([intent({ attackPressed: true }), I]);
     if (a.hit) seen.add(a.chainIndex);
     b.invuln = 0;
   }

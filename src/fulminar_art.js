@@ -407,9 +407,7 @@
         ctx.fillStyle = C.skinSh; ctx.fill();
         ctx.restore();
         ctx.save(); ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.ellipse(Hp(0.55, 0.32)[0], Hp(0.55, 0.32)[1], hrx * 0.3, hrx * 0.17, 0, 0, TAU); ctx.fillStyle = "#e58aa0"; ctx.fill(); ctx.restore(); // soft blush
-        fillPoly(k, spline([Hp(0.86, 0.5), Hp(1.0, 0.45), Hp(1.07, 0.5), Hp(1.02, 0.6), Hp(0.86, 0.6)], 3), "#cf6585", "#7a3348", 0.6); // full lips
-        line(k, [Hp(0.84, 0.56), Hp(0.96, 0.57), Hp(1.07, 0.49)], "#7a3348", 0.9, 0.95); // smirk
-        line(k, [Hp(0.92, 0.5), Hp(1.02, 0.47)], "#f2b8c8", 0.8, 0.7); // gloss
+    
         line(k, [Hp(0.32, -0.5), Hp(0.98, -0.42)], "#6f7f9a", 1.5, 0.95);               // brow, slightly lowered: challenging, not angry
       }
       // eye: fully glowing electric blue, white-hot core
@@ -453,44 +451,76 @@
 
     // glowing eye lightning: electric behavior, not cloth. Two or three jagged bolts snap back from the eye, re-rolling their shape,
     // length and angle ~22 times a second, flickering off now and then, with little forks and the odd spark. No smooth sway.
-    if (!F) {
-      const e0 = Hp(0.62, -0.22), run = clamp(Math.abs(k.vx || 0) / 6, 0, 1), tk = Math.floor(now * 22);
-      const base = (24 + 10 * run + 8 * en + (stunned ? 6 : 0)) * u;
-      const nb = 2 + (hash(tk * 0.7) > 0.5 ? 1 : 0);
-      for (let bi = 0; bi < nb; bi++) {
-        if (hash(tk * 3.1 + bi * 5.7) < 0.14) continue; // flicker gap
-        const len = base * (0.5 + 0.65 * hash(tk * 1.9 + bi * 2.3));
-        const ang = (hash(tk * 2.7 + bi * 9.1) - 0.5) * 1.0;
-        const dx = -d * Math.cos(ang), dy = Math.sin(ang);
-        const pts = bolt(e0, [e0[0] + dx * len, e0[1] + dy * len], 5 + bi, 2.6 * u, tk * 7 + bi * 13);
-        glowStroke(k, pts, "#2aa8ff", 2.2, 9, 0.55 + 0.35 * en); // wide blue body (readable over the white hair)
-        glowStroke(k, pts, C.cyan, 1.2, 6, 0.9);
-        glowStroke(k, pts, C.core, 0.6, 3, 1);
-        if (hash(tk * 4.3 + bi) > 0.45) { // a short fork off the middle of the bolt
-          const m = pts[2];
-          glowStroke(k, bolt(m, [m[0] + dx * len * 0.35, m[1] + (hash(tk + bi * 3) - 0.2) * 9 * u], 3, 1.5 * u, tk * 5 + bi), C.cyan, 0.8, 5, 0.8);
-        }
-      }
-      if (k.spawn && !stunned && Math.random() < 0.22) k.spawn(A.ox + e0[0], A.oy + e0[1], -d * (1 + Math.random() * 2), (Math.random() - 0.5) * 1.6, Math.random() < 0.5 ? "#D8FAFF" : "#43DFFF", 10, 1.8);
-    }
+ 
+if (!F) {
+  const e0 = Hp(0.62, -0.22);
+  const run = clamp(Math.abs(k.vx || 0) / 6, 0, 1);
+  const tk = Math.floor(now * 10);
 
-    // ── 10) electricity: faint idle crackle, hot hand on a wind-up / strike, sparks drifting off her ──
-    if (!F) {
-      const hot = clamp(windU * 0.7 + (strike ? 1 : 0), 0, 1);
-      if (hot > 0) {
-        glow(k, hand[0], hand[1], 18 * u, 0.4 * hot, "67,223,255");
-        const tip = [hand[0] + d * (10 + 10 * hot) * u, hand[1] + (hash(tb) - 0.5) * 6 * u];
-        glowStroke(k, bolt(hand, tip, 4, 3.2 * u, tb * 5 + 2), "#D8FAFF", 1.2, 8, 0.5 + 0.5 * hot);
-        if (strike && k.spawn && Math.random() < 0.8) k.spawn(A.ox + hand[0], A.oy + hand[1], (Math.random() - 0.4) * 3 * d, (Math.random() - 0.5) * 2.4, Math.random() < 0.5 ? "#D8FAFF" : "#43DFFF", 12, 2.2);
+  // Longer, more visible lightning.
+  const base = (34 + 10 * run + 7 * en + (stunned ? 5 : 0)) * u;
+
+  // Burst timing: active for a short period, then disappears.
+  const phase = tk % 24;
+  const active = phase < 9;
+
+  if (active) {
+    // Three or four strands during each burst.
+    const nb = 3 + (hash(Math.floor(tk / 3)) > 0.55 ? 1 : 0);
+
+    for (let bi = 0; bi < nb; bi++) {
+      if (hash(tk * 2.1 + bi * 5.7) < 0.12) continue;
+
+      const len = base * (0.7 + 0.5 * hash(tk * 1.9 + bi * 2.3));
+      const ang = (hash(tk * 2.7 + bi * 9.1) - 0.5) * 1.0;
+
+      const dx = -d * Math.cos(ang);
+      const dy = Math.sin(ang);
+
+      const pts = bolt(
+        e0,
+        [e0[0] + dx * len, e0[1] + dy * len],
+        5 + bi,
+        1.6 * u,
+        tk * 7 + bi * 13
+      );
+
+      // Blue outer glow.
+      glowStroke(k, pts, "#2aa8ff", 1.0, 6, 0.4 + 0.2 * en);
+
+      // Bright cyan body.
+      glowStroke(k, pts, C.cyan, 0.85, 3.5, 0.8);
+
+      // Fine electrical core.
+      glowStroke(k, pts, C.core, 0.4, 1.4, 0.9);
+
+      // Occasional branching sparks.
+      if (pts.length > 2 && hash(tk * 4.3 + bi * 2) > 0.5) {
+        const m = pts[Math.floor(pts.length / 2)];
+        const fork = bolt(
+          m,
+          [
+            m[0] + dx * len * 0.22,
+            m[1] + (hash(tk + bi * 3) - 0.2) * 16 * u
+          ],
+          3,
+          0.9 * u,
+          tk * 5 + bi
+        );
+
+        glowStroke(k, fork, C.cyan, 0.6, 3.5, 0.7);
+        glowStroke(k, fork, C.core, 0.3, 1.2, 0.8);
       }
-      // idle: now and then a tiny arc snaps along an arm or off a shoulder
-      if (hash(tb * 0.37) > 0.7 && !stunned) {
-        const o = hash(tb) > 0.5 ? armFw[1] : armBw[1];
-        glowStroke(k, bolt(o, [o[0] + (hash(tb + 3) - 0.5) * 16 * u, o[1] + (hash(tb + 5) - 0.7) * 14 * u], 3, 2.4 * u, tb * 2), C.cyan, 0.9, 5, 0.55);
-      }
-      if (k.spawn && !stunned && Math.random() < 0.035) k.spawn(A.ox + hcw[0] - d * 8 + (Math.random() - 0.5) * 24, A.oy - H * (0.2 + Math.random() * 0.7), (Math.random() - 0.5) * 0.6, -0.2 - Math.random() * 0.3, "#43DFFF", 22, 1.5);
     }
   }
+}
 
-  MW.Fulminar = { draw, PALETTE: C };
+
+// ── 10) electricity
+if (!F) {
+  // Keep your existing electricity section here.
+}
+} // closes function draw(k, e)
+
+MW.Fulminar = { draw, PALETTE: C };
 })(globalThis);

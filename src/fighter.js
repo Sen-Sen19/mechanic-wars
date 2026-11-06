@@ -123,6 +123,17 @@
       this.slashFx = null; // visual one-shot: { x, y, dir, big } extra slash arcs for Onslaught / Death Sentence
       this.foe = this.foe || null; // the opponent (set by Sim.step); only used by the Decoy illusion to chase
       this.mark = { target: null, stacks: 0, idle: 0, marked: false, left: 0 }; // Assassin passive: Death Mark on the enemy
+      this.errors = 0; // Errata passive (Error Accumulation): Error stacks, one per landed hit, spent by the next skill at max
+      this.holdCharges = (this.stats.hold && this.stats.hold.charges) || 0; // Errata hold key (Unstable Rendering): stored uses
+      this.holdRecharge = 0; // ticks until the next stored use comes back
+      this.unstable = null; // Unstable Rendering in progress: { phase: "charge" | "hop", p: 0..1 charge, ... }
+      this.afterimages = []; // Errata: corrupted afterimages left by the teleports { x, y, facing, age, life }
+      this.errataQ = []; // Errata: delayed corruption events { kind: echo | teleport | phantom | chain, left, ... }
+      this.reversed = null; // Reverse Logic on THIS fighter (as the victim): { left } left and right are swapped
+      this.moveCorrupt = null; // Code Breaker on THIS fighter (as the victim): { left, cfg, burst: { kind, left } | null, pause } random movement bursts
+      this.ghostShots = []; // Errata Phantom Input: projectiles fired by a ghost { x, y, facing, hit } (the Sim turns them into Projectiles)
+      this.nullFrame = 0; // Errata Null Frame: ticks of untargetable left
+      this.others = []; // every other fighter (set by Sim.step)
       this.chainIndex = 0;
       this.comboQueued = false;
       this.hitTargets = new Set(); // fighter ids already hit by the current swing
@@ -194,6 +205,17 @@
       this.overload = false;
       this.overloadHits = 0;
       this.overloadIdle = 0;
+      this.errors = 0;
+      this.holdCharges = (this.stats.hold && this.stats.hold.charges) || 0;
+      this.holdRecharge = 0;
+      this.unstable = null;
+      this.afterimages = [];
+      this.errataQ = [];
+      this.reversed = null;
+      this.moveCorrupt = null;
+      this.ghostShots = [];
+      this.nullFrame = 0;
+      this.untargetable = false;
       this.respawn(arena);
     }
 
@@ -263,6 +285,14 @@
       if (this.armorHit > 0) this.armorHit--;
       switch (this.state) {
         case STATE.ATTACK_STARTUP:
+          if (this.hit && this.hit.unstable && !this.attackHeld) {
+            // Unstable Rendering: letting go before the charge is full cancels it (nothing is spent)
+            this.unstable = null;
+            this.hit = Object.assign({}, this.hit, { recovery: this.hit.unstable.releaseCancel || 6 });
+            this.state = STATE.ATTACK_RECOVERY;
+            this.stateTimer = this.hit.recovery;
+            break;
+          }
           if (this.hit && this.hit.holyGuard && !this.attackHeld) {
             // Holy Guard: letting go before the barrier is up drops the stance (short recovery, no barrier)
             this.hit = Object.assign({}, this.hit, { recovery: this.hit.releaseCancel || 10 });
@@ -309,6 +339,7 @@
             this.stateTimer = this.hit.active || 1;
             if (this.hit.decoy) this.beginDecoy();
             if (this.hit.transit) this.beginTransit();
+            if (this.hit.unstable) this.beginUnstable();
             if (this.hit.wraiths) this.beginWraiths();
             if (this.hit.spikes) this.pendingZone = { type: "spikes", cfg: this.hit.spikes };
             else if (this.hit.grasp) this.pendingZone = { type: "grasp", cfg: this.hit.grasp };
@@ -1138,10 +1169,279 @@
           this.fxOut.push({ kind: "overload_ready" });
         }
       }
+      if (P && P.type === "errata" && !(hit && hit.noError) && this.errors < P.max) this.errors++; // Error Accumulation: every successful attack = 1 stack
       if (P && P.type === "momentum") {
         this.momentum = Math.min(P.max, this.momentum + (hit && hit.momentumGain !== undefined ? hit.momentumGain : 1));
         this.momentumIdle = 0;
       }
+    }
+
+    // ══════════ ERRATA skill 1: Code Breaker (movement corruption, victim side) ══════════
+    // For cfg.duration ticks the victim alternates between PAUSES (normal control) and short BURSTS in which the stick is overridden by a
+    // random direction: left / right / forward / backward (relative to where he faces) or, rarely, a hop. Attacks and skills are never touched.
+    beginMoveCorrupt(cfg) {
+      let dur = cfg.duration;
+      if (this.stats.boss) { if (cfg.bossImmune) return; dur = Math.round(dur * (cfg.bossMul === undefined ? 0.5 : cfg.bossMul)); }
+      const first = !this.moveCorrupt;
+      this.moveCorrupt = { left: dur, total: dur, cfg: cfg, burst: null, pause: cfg.firstPause || 0 };
+      this.fxOut.push({ type: "errata", kind: "cb_hit", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.45, fresh: first });
+    }
+
+    moveCorruptIntent(intent) {
+      const m = this.moveCorrupt, C = m.cfg, rnd = (this.rand || Math.random);
+      const between = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
+      if (this.state === STATE.KO || --m.left <= 0) { this.moveCorrupt = null; return intent; }
+      if (!m.burst) {
+        if (--m.pause > 0) return intent; // pause: the player is in control
+        const kinds = ["left", "right", "forward", "backward"];
+        let kind = kinds[Math.min(3, Math.floor(rnd() * 4))];
+        if (rnd() < (C.hopChance || 0)) kind = "hop";
+        m.burst = { kind: kind, left: between(C.burstMin, C.burstMax) };
+        m.burstDir = kind === "left" ? -1 : kind === "right" ? 1 : kind === "forward" ? this.facing : kind === "backward" ? -this.facing : (rnd() < 0.5 ? -1 : 1);
+        this.fxOut.push({ type: "errata", kind: "cb_burst", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5, dir: m.burstDir });
+        if (kind === "hop") m.hopDone = false;
+      }
+      const b = m.burst;
+      if (--b.left <= 0) { m.burst = null; m.pause = between(C.pauseMin, C.pauseMax); }
+      const o = { left: m.burstDir < 0, right: m.burstDir > 0 };
+      if (b.kind === "hop" && !m.hopDone) { o.jumpPressed = true; m.hopDone = true; }
+      return Object.assign({}, intent, o);
+    }
+
+    // ══════════ ERRATA passive: Error Accumulation ══════════
+    // Every landed hit = 1 Error stack (max P.max). At max, the NEXT skill spends them all and gets ONE random corruption effect,
+    // picked at the moment the skill activates. All numbers live in characters.js (errata.passive.effects).
+    errataFull() {
+      const P = this.stats.passive;
+      return !!(P && P.type === "errata" && this.errors >= P.max);
+    }
+
+    applyCorruption(hit, slot) {
+      const P = this.stats.passive, ids = Object.keys(P.effects);
+      let total = 0;
+      for (const id of ids) total += P.effects[id].weight === undefined ? 1 : P.effects[id].weight;
+      const rnd = (this.rand || Math.random);
+      let pick = rnd() * total, id = ids[ids.length - 1];
+      for (const k of ids) {
+        pick -= P.effects[k].weight === undefined ? 1 : P.effects[k].weight;
+        if (pick < 0) { id = k; break; }
+      }
+      const E = P.effects[id];
+      this.errors = 0; // consumed
+      const base = Object.assign({}, hit); // untouched copy (Double Execution / Phantom Input repeat this)
+      hit = Object.assign({}, hit, { corrupted: id, corruptCfg: E, noError: true, empowered: true });
+      const w = this.stats.width;
+      switch (id) {
+        case "damage_overflow": hit.damage *= 1 + E.bonus; hit.knockback *= E.knockbackMul || 1; break;
+        case "critical_fault":
+          hit.damage *= E.damageMul; hit.knockback *= E.knockbackMul || 1; hit.crit = true;
+          hit.stun = (hit.stun !== undefined ? hit.stun : 18) + (E.stunBonus || 0);
+          break;
+        case "double_execution": {
+          const echo = Object.assign({}, base, { damage: base.damage * E.damageMul, corrupted: "echo", noError: true, empowered: true });
+          this.errataQ.push({ kind: "echo", left: E.delay, wait: E.maxWait || 90, slot: slot, hit: echo });
+          break;
+        }
+        case "position_corruption":
+          this.errataQ.push({ kind: "teleport", left: (hit.startup || 0) + (hit.active || 0) + 1, cfg: E });
+          break;
+        case "phantom_input": {
+          const gh = Object.assign({}, base, { damage: base.damage * E.damageMul, corrupted: "phantom", noError: true });
+          this.errataQ.push({ kind: "phantom", left: E.delay, age: 0, life: E.delay, x: this.x, y: this.y, facing: this.facing, hit: gh });
+          break;
+        }
+        case "null_frame": this.nullFrame = E.duration; this.untargetable = true; break;
+        default: break; // time_desync / reverse_logic / gravity_error / chain_exception act when the skill connects (errataOnHit)
+      }
+      this.fxOut.push({ type: "errata", kind: "proc", effect: id, label: E.label || id, x: this.x + w / 2, y: this.y + this.stats.height * 0.3 });
+      return hit;
+    }
+
+    // The corrupted skill connected: effects that act on the victim.
+    errataOnHit(victim, hit) {
+      const E = hit.corruptCfg || {}, rnd = (this.rand || Math.random);
+      const vx = victim.x + victim.stats.width / 2, vy = victim.y + victim.stats.height * 0.45;
+      if (hit.corrupted === "time_desync") victim.slow = { left: E.duration, mul: E.speedMul, noJump: false };
+      else if (hit.corrupted === "reverse_logic") victim.reversed = { left: E.duration };
+      else if (hit.corrupted === "gravity_error") {
+        victim.grounded = false; victim.standingOn = null;
+        if (rnd() < (E.launchChance === undefined ? 0.5 : E.launchChance)) { victim.vy = -E.launch; victim.vx = 0; hit.gravityMode = "launch"; }
+        else { victim.vx = (this.x + this.stats.width / 2 > vx ? 1 : -1) * E.pull; victim.vy = -2; hit.gravityMode = "pull"; }
+      } else if (hit.corrupted === "chain_exception") {
+        this.errataQ.push({ kind: "chain", left: E.delay, victim: victim, cfg: E, damage: hit.damage * E.damageMul, knockback: hit.knockback * E.damageMul, stun: E.stun || 16 });
+      }
+      this.fxOut.push({ type: "errata", kind: "hitfx", effect: hit.corrupted, x: vx, y: vy });
+    }
+
+    errataStep() {
+      const S = STATE;
+      if (this.state === S.KO) { this.errataQ.length = 0; this.nullFrame = 0; this.untargetable = false; this.unstable = null; this.afterimages.length = 0; return; }
+      for (let i = this.afterimages.length - 1; i >= 0; i--) if (++this.afterimages[i].age >= this.afterimages[i].life) this.afterimages.splice(i, 1);
+      if (this.nullFrame > 0 && --this.nullFrame <= 0) this.untargetable = false;
+      const q = this.errataQ;
+      for (let i = q.length - 1; i >= 0; i--) {
+        const e = q[i];
+        if (e.kind === "echo" && this.state === S.HITSTUN) { q.splice(i, 1); continue; } // a hit breaks the repeat
+        if (e.left > 0) { e.left--; if (e.kind === "phantom") e.age++; continue; }
+        if (e.kind === "echo") {
+          if (LOCOMOTION.has(this.state)) { q.splice(i, 1); this.fxOut.push({ type: "errata", kind: "echo", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.4 }); this.startSkill(e.slot, e.hit); }
+          else if (--e.wait <= 0) q.splice(i, 1);
+        } else if (e.kind === "teleport") { q.splice(i, 1); this.teleportBehind(e.cfg); }
+        else if (e.kind === "phantom") { q.splice(i, 1); this.phantomStrike(e); }
+        else if (e.kind === "chain") { q.splice(i, 1); this.chainStrike(e); }
+      }
+    }
+
+    // Position Corruption: after the cast he reappears right behind the enemy, facing him.
+    teleportBehind(E) {
+      const f = this.foe, w = this.stats.width;
+      if (!f || f.state === STATE.KO) return;
+      const bz = (this.arenaRef && this.arenaRef.blastZone) || MW.ARENA.blastZone;
+      const behind = f.facing > 0 ? -1 : 1; // the side the enemy is NOT facing
+      let nx = behind < 0 ? f.x - w - E.gap : f.x + f.stats.width + E.gap;
+      let ny = f.y + f.stats.height - this.stats.height; // feet level with the enemy's feet
+      const pl = f.grounded && f.standingOn;
+      if (pl && pl.w) nx = Math.max(pl.x, Math.min(pl.x + pl.w - w, nx)); // never land off the platform the enemy stands on
+      nx = Math.max(bz.left + 120, Math.min(bz.right - 120 - w, nx));
+      this.fxOut.push({ type: "errata", kind: "teleport", x: this.x + w / 2, y: this.y + this.stats.height * 0.5, x2: nx + w / 2, y2: ny + this.stats.height * 0.5 });
+      this.x = nx; this.y = ny; this.px = nx; this.py = ny; this.vx = 0; this.vy = 0;
+      this.facing = f.x + f.stats.width / 2 >= nx + w / 2 ? 1 : -1;
+    }
+
+    // ══════════ ERRATA hold key: Unstable Rendering ══════════
+    // Hold the attack button: he glitches faster and faster (charge), then teleports hops times in a row. Every hop leaves a corrupted afterimage.
+    // All numbers live in characters.js (errata.hold). This is NOT a skill: it never touches the Error stacks and is never corrupted by them.
+    holdReady() {
+      const H = this.stats.hold;
+      if (!H) return false;
+      return H.charges ? this.holdCharges > 0 : this.holdCd <= 0;
+    }
+
+    // Charge fraction 0..1 while charging (the renderer reads it), -1 when he is not charging.
+    unstableCharge() {
+      return this.unstable && this.unstable.phase === "charge" ? this.unstable.p : -1;
+    }
+
+    // Called once when the hold is read (the charge starts). atkHeldTicks is already counted, so the charge is measured from the press.
+    startUnstable(cfg) {
+      const U = cfg.attack.unstable;
+      this.guardLock = true; // one per press: release the button to use it again
+      this.tapPending = false;
+      this.vx = 0;
+      const startup = Math.max(1, U.chargeTime - this.atkHeldTicks);
+      this.startSkill(-4, Object.assign({}, cfg.attack, { startup: startup }));
+      this.unstable = { phase: "charge", cfg: U, p: Math.min(1, this.atkHeldTicks / U.chargeTime), t: this.atkHeldTicks, n: 0, dir: 0 };
+      this.fxOut.push({ type: "errata", kind: "charge_start", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5 });
+    }
+
+    // The charge is full: spend one stored use and start the five hops.
+    beginUnstable() {
+      const U = this.unstable;
+      if (!U || U.phase !== "charge") { this.unstable = null; return; }
+      const H = this.stats.hold;
+      if (H && H.charges && this.holdCharges > 0) this.holdCharges--;
+      U.phase = "hop"; U.t = 0; U.n = 0; U.p = 1;
+      const foe = this.foe;
+      U.dir = this.heldDir || (foe ? (foe.x >= this.x ? 1 : -1) : this.facing);
+      if (U.cfg.untargetable) this.untargetable = true;
+      this.hit = Object.assign({}, this.hit, { active: U.cfg.hops * U.cfg.hopTicks + 2 });
+      this.stateTimer = this.hit.active;
+      this.fxOut.push({ type: "errata", kind: "charge_full", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5 });
+    }
+
+    // One hop: a slightly random distance along the travel direction. If there is no platform under the landing spot, the hop is cut
+    // short (walked back toward where he stands) until there is one, so he goes as far as is safe and never ends over the void.
+    // Randomness uses Math.random on purpose: the match seed is fixed, which would make every match's first hops identical.
+    pickHopSpot(U) {
+      const C = U.cfg, s = this.stats, arena = this.arenaRef;
+      if (!arena) return null;
+      const R = Math.random, bz = arena.blastZone, w = s.width, h = s.height;
+      const feet = this.y + h;
+      const dirNow = this.heldDir || U.dir; // the player can steer between hops
+      U.dir = dirNow;
+      const dir = R() < (C.wrongWayChance || 0) ? -dirNow : dirNow;
+      const dist = dir * C.hopDist * (1 - C.distJitter + R() * 2 * C.distJitter);
+      const want = Math.max(bz.left + C.edgeMargin, Math.min(bz.right - C.edgeMargin - w, this.x + dist));
+      for (let k = 0; k <= 12; k++) {
+        const nx = want + (this.x - want) * (k / 12), cx = nx + w / 2;
+        const cand = arena.platforms.filter((p) => cx >= p.x && cx <= p.x + p.w && p.y >= feet - C.upRange && p.y <= feet + C.downRange && p.y - h > bz.top);
+        if (!cand.length) continue;
+        let pick;
+        if (R() < (C.snapChance || 0)) pick = cand[Math.floor(R() * cand.length)]; // sometimes a different height
+        else { pick = cand[0]; for (const p of cand) if (Math.abs(p.y - feet) < Math.abs(pick.y - feet)) pick = p; } // usually the same height
+        return { x: nx, y: pick.y - h, p: pick };
+      }
+      return null; // no safe spot at all: this hop only glitches in place
+    }
+
+    unstableStep() {
+      const U = this.unstable, C = U.cfg, s = this.stats;
+      if (!this.hit || this.hit.id !== "unstable_rendering" || this.state === STATE.HITSTUN || this.state === STATE.KO) {
+        this.unstable = null; // interrupted
+        if (U.cfg.untargetable) this.untargetable = this.nullFrame > 0;
+        return;
+      }
+      if (U.phase === "charge") { // the normal STARTUP state counts the time; this only tracks the fraction for the glitch / aura
+        U.t++;
+        U.p = Math.min(1, U.t / C.chargeTime);
+        return;
+      }
+      // hop phase: he hangs where he is and jumps on every hopTicks-th tick
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.ctl = { vx: 0, vy: 0, left: 2 };
+      this.vx = 0; this.vy = 0;
+      if (U.n < C.hops && U.t % C.hopTicks === 0) {
+        const spot = this.pickHopSpot(U);
+        const w = s.width, fx = this.x + w / 2, fy = this.y + s.height * 0.5;
+        this.afterimages.push({ x: this.x, y: this.y, facing: this.facing, age: 0, life: C.imageLife });
+        if (spot) {
+          this.facing = spot.x >= this.x ? 1 : (spot.x < this.x ? -1 : this.facing);
+          this.x = spot.x; this.y = spot.y; this.px = this.x; this.py = this.y;
+          this.grounded = true; this.standingOn = spot.p; this.airJumpsLeft = s.maxAirJumps;
+        }
+        this.fxOut.push({ type: "errata", kind: "hop", n: U.n, x: fx, y: fy, x2: this.x + w / 2, y2: this.y + s.height * 0.5 });
+        U.n++;
+      }
+      U.t++;
+      if (U.n >= C.hops && U.t >= C.hops * C.hopTicks) { // the last hop is done: he reappears at his final position
+        this.unstable = null;
+        if (C.untargetable) this.untargetable = this.nullFrame > 0;
+        if (this.foe) this.facing = this.foe.x >= this.x ? 1 : -1;
+        this.fxOut.push({ type: "errata", kind: "hop_end", x: this.x + s.width / 2, y: this.y + s.height * 0.5 });
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = this.hit.recovery;
+      }
+    }
+
+    // Phantom Input: a ghost left where he stood repeats the skill (melee shape from the ghost's spot), at reduced damage.
+    phantomStrike(g) {
+      const keep = { x: this.x, y: this.y, facing: this.facing, hit: this.hit };
+      const victims = [];
+      this.x = g.x; this.y = g.y; this.facing = g.facing; this.hit = g.hit;
+      if (g.hit.type === "projectile") this.ghostShots.push({ x: g.x, y: g.y, facing: g.facing, hit: g.hit }); // the ghost fires it too (the Sim spawns it)
+      if (g.hit.type === "melee") {
+        for (const t of this.others) if (t.state !== STATE.KO && t.invuln <= 0 && !t.untargetable && this.hitsRect(t.rect())) victims.push(t);
+      }
+      this.x = keep.x; this.y = keep.y; this.facing = keep.facing; this.hit = keep.hit;
+      this.fxOut.push({ type: "errata", kind: "phantom", x: g.x + this.stats.width / 2, y: g.y + this.stats.height * 0.4, dir: g.facing });
+      for (const t of victims) t.takeHit(this, g.hit, g.facing);
+    }
+
+    // Chain Exception: the skill jumps to ANOTHER nearby enemy. In a 1v1 there is nobody else, so it lashes the same enemy again.
+    chainStrike(e) {
+      const E = e.cfg;
+      let tgt = null, best = 1e9;
+      for (const o of this.others) {
+        if (o === e.victim || o.state === STATE.KO || o.invuln > 0 || o.untargetable) continue;
+        const d = Math.abs(o.x - e.victim.x);
+        if (d <= E.range && d < best) { best = d; tgt = o; }
+      }
+      if (!tgt) tgt = e.victim; // 1v1 fallback
+      if (!tgt || tgt.state === STATE.KO || tgt.invuln > 0 || tgt.untargetable) return;
+      const dir = tgt.x >= this.x ? 1 : -1;
+      this.fxOut.push({ type: "errata", kind: "chain", x: e.victim.x + e.victim.stats.width / 2, y: e.victim.y + e.victim.stats.height * 0.45, x2: tgt.x + tgt.stats.width / 2, y2: tgt.y + tgt.stats.height * 0.45 });
+      tgt.takeHit(this, { type: "melee", damage: e.damage, knockback: e.knockback, stun: e.stun, launchH: 0.6, launchV: 0.3, noError: true, noMark: true, corrupted: "chain_echo" }, dir);
     }
 
     momentumFull() {
@@ -1177,6 +1477,7 @@
 
     // Void Mage hold key (stats.hold): Void Step. Same read-the-press flow as Holy Guard; it starts as an ordinary skill (slot -4).
     startHold(cfg) {
+      if (cfg.attack && cfg.attack.unstable) { this.startUnstable(cfg); return; } // Errata: Unstable Rendering
       this.guardLock = true; // one per press: release the button to use it again
       this.tapPending = false;
       this.holdCd = cfg.cooldown || 0;
@@ -1223,6 +1524,7 @@
         hit = Object.assign({}, hit, { damage: hit.damage * (1 + P.bonus), markMul: 1 + P.bonus, empowered: true });
         this.clearMark();
       }
+      if (P && P.type === "errata" && this.errors >= P.max && hit.corruptible !== false) hit = this.applyCorruption(hit, slot); // full Error stacks: this skill is corrupted
       this.startSkill(slot, hit);
       return true;
     }
@@ -1388,6 +1690,8 @@
         stun: stun,
         lost: lost,
       };
+      if (hit.corruptMove && this.hp > 0) this.beginMoveCorrupt(hit.corruptMove); // Errata Code Breaker: movement corruption starts
+      if (hit.corrupted && this.hp > 0 && attacker && attacker.errataOnHit) attacker.errataOnHit(this, hit); // Errata: on-hit corruption (slow / reverse / gravity / chain)
       if (hit.scythe && this.hp > 0 && attacker && attacker.beginScythe) attacker.beginScythe(this, hit); // chained: pull starts
       if (hit.onslaught && this.hp > 0 && attacker && attacker.beginOnslaught) attacker.beginOnslaught(this, hit); // Phantom Onslaught starts
       if (hit.sentence && this.hp > 0 && attacker && attacker.beginSentence) attacker.beginSentence(this, hit); // Death Sentence starts
@@ -1407,6 +1711,11 @@
         this.jumpBuf = 0;
         this.atkBuf = 0;
       }
+      if (this.reversed) { // Reverse Logic: left and right are swapped while it lasts
+        if (--this.reversed.left <= 0) this.reversed = null;
+        else intent = Object.assign({}, intent, { left: intent.right, right: intent.left });
+      }
+      if (this.moveCorrupt) intent = this.moveCorruptIntent(intent); // Code Breaker: short random bursts override the stick
       // Direction held this tick. A new swing (including the next hit of a chain started
       // by buffered/spammed presses) turns to face it, so reversing the stick mid-spam works.
       this.heldDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
@@ -1420,11 +1729,13 @@
       if (this.sentence) this.sentenceStep(arena);
       if (this.decoy) this.decoyStep(arena);
       if (this.transit) this.transitStep(arena);
+      if (this.unstable) this.unstableStep();
       if (this.wraiths) this.wraithStep();
       if (this.gravSlam) this.gravSlamStep();
       if (this.execution) this.executionStep();
       if (this.judgment) this.judgmentStep();
       this.wrathStep();
+      if (s.passive && s.passive.type === "errata") this.errataStep();
 
       if (this.holyDeflectionCooldown > 0) this.holyDeflectionCooldown--;
 
@@ -1474,7 +1785,7 @@
         else if (this.tapPending && (!(wasGrounded && this.attackHeld) || this.overload)) { // let go early (or left the ground / the orb is ready): it was a tap
           this.tapPending = false;
           this.atkBuf = Math.max(this.atkBuf, 1);
-        } else if (wasGrounded && this.attackHeld && !this.guardLock && !this.overload && !(s.hold && this.holdCd > 0)) {
+        } else if (wasGrounded && this.attackHeld && !this.guardLock && !this.overload && !(s.hold && !this.holdReady())) {
           if (this.atkHeldTicks >= GD.holdStart) { if (s.guard) this.startGuard(GD); else this.startHold(GD); this.atkBuf = 0; }
           else if (this.atkBuf > 0) { this.tapPending = true; this.atkBuf = 0; }
         }
@@ -1512,6 +1823,10 @@
       // cooldowns tick down; passive momentum fades while no hit lands
       for (let i = 0; i < 4; i++) if (this.cooldowns[i] > 0) this.cooldowns[i]--;
       if (this.holdCd > 0) this.holdCd--;
+      if (s.hold && s.hold.charges && this.holdCharges < s.hold.charges) { // Errata: one stored use comes back every rechargeTime ticks
+        if (this.holdRecharge <= 0) this.holdRecharge = s.hold.rechargeTime;
+        if (--this.holdRecharge <= 0) this.holdCharges++;
+      }
       if (this.voidSetup > 0) this.voidSetup--;
       if (this.guardEmpowered && --this.guardEmpowerLeft <= 0) this.guardEmpowered = false; // bonus runs out
       const PM = s.passive;

@@ -73,7 +73,12 @@
     eyeRed: "#FF315A",
     eyeGray: "#C8CBD6",
     sclera: "#F3F1F2",
-
+    // Void face.
+    face: "#111018",
+    faceSh: "#292431",
+    faceHi: "#514653",
+    faceLine: "#080810",
+    faceLip: "#80616F",
     lip: "#A9646E",
   };
 
@@ -737,142 +742,253 @@ function drawBody(k, e) {
     1.0
   );
 
+ 
   // ---------------------------------------------------------------
-  // FACE: clean profile, defined jaw, restrained expression.
-  // ---------------------------------------------------------------
-
-const face = [
-  Hp(-0.48, -0.96),
-  Hp(0.28, -1.02),
-  Hp(0.78, -0.78),
-  Hp(0.96, -0.42),
-  Hp(1.00, -0.08),
-
-  // Nose and front of face.
-  Hp(1.17, 0.18),
-  Hp(1.02, 0.29),
-
-  // Mouth and lower cheek.
-  Hp(1.04, 0.47),
-  Hp(0.98, 0.67),
-
-  // Strong jaw angle.
-  Hp(0.83, 0.91),
-  Hp(0.55, 1.12),
-
-  // Defined chin tip.
-  Hp(0.19, 1.22),
-  Hp(-0.08, 1.15),
-
-  // Back jaw and cheek.
-  Hp(-0.38, 0.91),
-  Hp(-0.58, 0.55),
-  Hp(-0.65, 0.12),
-  Hp(-0.62, -0.45)
-];
-
-  // ---------------------------------------------------------------
-  // EYES: one crimson, one cold silver.
+  // FACE: void-black entity, defined original jaw and chin.
   // ---------------------------------------------------------------
 
-  const eye = (a, b, w, iris, red) => {
-    const p0 = Hp(a, b);
-    const p1 = Hp(a + w, b - 0.015);
-    const top = Hp(a + w * 0.5, b - 0.14);
-    const bot = Hp(a + w * 0.5, b + 0.09);
+  const face = [
+    Hp(-0.48, -0.96),
+    Hp(0.28, -1.02),
+    Hp(0.78, -0.78),
+    Hp(0.96, -0.42),
+    Hp(1.00, -0.08),
 
-    pathOf(ctx, [p0, top, p1, bot]);
+    // Nose and front of face.
+    Hp(1.17, 0.18),
+    Hp(1.02, 0.29),
 
-    ctx.fillStyle = C.sclera;
-    ctx.fill();
-    edge(k, C.line, 0.7);
+    // Mouth and lower cheek.
+    Hp(1.04, 0.47),
+    Hp(0.98, 0.67),
 
-    if (F) return;
+    // Strong jaw angle.
+    Hp(0.83, 0.91),
+    Hp(0.55, 1.12),
 
-    const ic = Hp(a + w * 0.57, b - 0.015);
+    // Defined chin tip.
+    Hp(0.19, 1.22),
+    Hp(-0.08, 1.15),
 
-    ctx.save();
+    // Back jaw and cheek.
+    Hp(-0.38, 0.91),
+    Hp(-0.58, 0.55),
+    Hp(-0.65, 0.12),
+    Hp(-0.62, -0.45)
+  ];
 
-    if (red) {
-      ctx.shadowColor = C.eyeRed;
-      ctx.shadowBlur = 7;
+  // Main void-black face silhouette.
+  fillPoly(
+    k,
+    face,
+    C.face,
+    C.faceLine,
+    1.15
+  );
+
+  // Subtle angular jaw shading.
+  fillPoly(
+    k,
+    [
+      Hp(-0.38, 0.53),
+      Hp(-0.12, 0.88),
+      Hp(0.19, 1.08),
+      Hp(0.55, 1.04),
+      Hp(0.83, 0.82),
+      Hp(0.68, 0.98),
+      Hp(0.19, 1.22),
+      Hp(-0.08, 1.15),
+      Hp(-0.38, 0.91)
+    ],
+    C.faceSh,
+    C.faceSh,
+    0.4
+  );
+
+  // Restrained cheek highlight.
+  line(
+    k,
+    [
+      Hp(-0.28, 0.30),
+      Hp(-0.18, 0.55),
+      Hp(0.02, 0.73)
+    ],
+    C.faceHi,
+    0.8,
+    0.55
+  );
+
+  // ---------------------------------------------------------------
+  // BLINDFOLD: hides the eyes completely.
+  // ---------------------------------------------------------------
+  // ---------------------------------------------------------------
+  // BLINDFOLD: corrupted digital fabric.
+  // ---------------------------------------------------------------
+
+  {
+    const fold = [
+      Hp(-0.82, -0.43),
+      Hp(-0.55, -0.52),
+      Hp(-0.18, -0.49),
+      Hp(0.2, -0.45),
+      Hp(0.62, -0.42),
+      Hp(1.02, -0.36),
+      Hp(1.04, -0.12),
+      Hp(0.68, -0.17),
+      Hp(0.25, -0.20),
+      Hp(-0.2, -0.23),
+      Hp(-0.62, -0.20),
+      Hp(-0.85, -0.18)
+    ];
+
+    fillPoly(k, fold, "#08080E", "#05050A", 0.9);
+
+    if (!F) {
+      const tick = Math.floor(now * 12);
+      const colors = [
+        G.crimson,
+        G.cyan,
+        G.magenta,
+        G.violet,
+        G.white
+      ];
+
+      // Fine diagonal pattern across the fabric.
+      for (let i = 0; i < 9; i++) {
+        const x = -0.72 + i * 0.2;
+        const offset = (hash(i * 17.3) - 0.5) * 0.045;
+
+        line(
+          k,
+          [
+            Hp(x, -0.45 + offset),
+            Hp(x + 0.13, -0.2 + offset)
+          ],
+          "#393541",
+          0.55,
+          0.65
+        );
+      }
+
+      // Moving colored data lines.
+      for (let i = 0; i < 5; i++) {
+        const phase = hash(i * 31.7 + Math.floor(tick / 3));
+        const active = hash(tick * 2.3 + i * 9.1);
+
+        if (active < 0.3) continue;
+
+        const y = -0.43 + i * 0.052;
+        const start = -0.76 + hash(tick + i * 7.2) * 0.45;
+        const end = 0.15 + hash(tick * 1.7 + i * 4.1) * 0.7;
+
+        const color = colors[
+          Math.floor(hash(Math.floor(tick / 4) + i * 5.7) * colors.length)
+        ];
+
+        const shift = (phase - 0.5) * 0.035;
+
+        line(
+          k,
+          [
+            Hp(start, y + shift),
+            Hp(end, y + shift)
+          ],
+          color,
+          0.65 + active * 0.45,
+          0.65 + active * 0.3
+        );
+      }
+
+      // Broken rectangular glitch segments.
+      for (let i = 0; i < 4; i++) {
+        if (hash(tick * 1.3 + i * 13.1) < 0.55) continue;
+
+        const x = -0.6 + hash(tick + i * 3.7) * 1.45;
+        const y = -0.4 + hash(tick * 2 + i * 8.2) * 0.2;
+        const w = 0.06 + hash(i * 4.1 + tick) * 0.17;
+
+        const color = colors[
+          Math.floor(hash(tick + i * 11.3) * colors.length)
+        ];
+
+        line(
+          k,
+          [
+            Hp(x, y),
+            Hp(x + w, y)
+          ],
+          color,
+          1.1,
+          0.9
+        );
+      }
+
+      // A few bright circuit-like intersections.
+      for (let i = 0; i < 3; i++) {
+        const x = -0.48 + i * 0.55;
+        const y = -0.31 + hash(i * 7.2 + Math.floor(tick / 5)) * 0.1;
+
+        const color = colors[
+          Math.floor(hash(tick + i * 17) * colors.length)
+        ];
+
+        line(
+          k,
+          [
+            Hp(x, y - 0.035),
+            Hp(x, y + 0.035)
+          ],
+          color,
+          0.8,
+          0.75
+        );
+      }
+
+      // Occasional bright horizontal interference.
+      if (hash(Math.floor(tick / 2) * 4.7) > 0.72) {
+        const y = -0.35 + hash(tick * 3.1) * 0.18;
+
+        line(
+          k,
+          [
+            Hp(-0.8, y),
+            Hp(-0.2, y),
+            Hp(0.25, y + 0.015),
+            Hp(0.95, y)
+          ],
+          G.white,
+          0.8,
+          0.85
+        );
+      }
     }
 
-    ctx.fillStyle = iris;
-    ctx.beginPath();
-    ctx.ellipse(
-      ic[0],
-      ic[1],
-      Math.max(0.8, hrx * 0.105),
-      Math.max(1.0, hrx * 0.15),
-      0,
-      0,
-      TAU
-    );
-    ctx.fill();
-
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = C.line;
-
-    ctx.beginPath();
-    ctx.ellipse(
-      ic[0],
-      ic[1],
-      Math.max(0.3, hrx * 0.028),
-      Math.max(1.0, hrx * 0.12),
-      0,
-      0,
-      TAU
-    );
-    ctx.fill();
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.beginPath();
-    ctx.arc(ic[0] - d * 0.35, ic[1] - 0.5, 0.35, 0, TAU);
-    ctx.fill();
-
-    ctx.restore();
-  };
-
-  if (!F) {
-    // Light eye shadows.
+    // Dark fabric border.
     line(
       k,
-      [Hp(0.28, -0.35), Hp(0.5, -0.39), Hp(0.7, -0.32)],
-      "#65545F",
-      1.2,
-      0.65
-    );
-
-    line(
-      k,
-      [Hp(0.7, -0.35), Hp(0.96, -0.34)],
-      "#65545F",
-      1.1,
+      [Hp(-0.82, -0.43), Hp(-0.2, -0.49), Hp(0.62, -0.42), Hp(1.02, -0.36)],
+      "#514653",
+      0.7,
       0.55
     );
+
+    // Trailing corrupted fabric strip.
+    taper(
+      k,
+      [
+        Hp(-0.78, -0.31),
+        Hp(-1.02, -0.12),
+        Hp(-1.12, 0.12),
+        flut(Hp(-1.05, 0.42), 0.12, 2.4)
+      ],
+      2.8 * u,
+      0.4 * u,
+      "#101018",
+      "#080810",
+      0.5,
+      4
+    );
   }
-
-  eye(0.68, -0.21, 0.25, C.eyeGray, false);
-  eye(0.34, -0.21, 0.3, C.eyeRed, true);
-
-  // Heavy, straight eyebrows.
-  line(
-    k,
-    [Hp(0.24, -0.53), Hp(0.46, -0.59), Hp(0.72, -0.54)],
-    C.hairBlk,
-    1.8,
-    1
-  );
-
-  line(
-    k,
-    [Hp(0.75, -0.53), Hp(1.0, -0.49)],
-    C.hairBlk,
-    1.7,
-    1
-  );
-
   // ---------------------------------------------------------------
   // HAIR: layered split colour, not a large patchwork helmet.
   // ---------------------------------------------------------------
@@ -1141,6 +1257,11 @@ const face = [
     } else if (k.isFlash) {
       level = 3;
       stutter = 1;
+    } else if (f.unstable) {
+      // Unstable Rendering: the glitch gets faster and heavier while he charges, and is at full while he teleports.
+      const p = f.unstable.phase === "hop" ? 1 : clamp(f.unstable.p || 0, 0, 1);
+      level = p < 0.35 ? 1 : p < 0.75 ? 2 : 3;
+      stutter = 0.45 + 0.55 * p;
     } else if (stunned) {
       // No animation-state mutation. Damage flash handles the critical flash.
       level = 2;
