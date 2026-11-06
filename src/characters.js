@@ -831,7 +831,68 @@
             projectile: { speed: 9, range: 640, size: 26, style: "codebreaker" },
           },
         },
-        null, null, null,
+        {
+          id: "frame_skip", name: "Skip", icon: "SKP", cooldown: 540,
+          attack: {
+            id: "frame_skip", type: "melee", isSkill: true, corruptible: true, fxShape: "jab",
+            damage: 22, startup: 18, active: 6, recovery: 24,
+            knockback: 5, launchH: 0.9, launchV: 0.25, stun: 28,
+            range: 72, boxH: 0.9, advance: 0, manaGain: 14,
+            // flickerEvery: emit a ghost-pose every N ticks during startup (18 ticks / 4 = ~4 flickers before the snap)
+            // flickerLife: how long each ghost-pose afterimage lingers (ticks)
+            frameSkip: { snapRange: 56, edgeMargin: 90, flickerEvery: 4, flickerLife: 10 },
+          },
+        },
+        // SKILL 3 - Phantom Recursion: Errata splits into three corrupted copies around the enemy.
+        // One randomly-chosen copy (the real Errata) delivers the actual strike; the other two are
+        // visual decoys. Each copy attacks at a slightly different time, forcing the opponent to guess.
+        // The real Errata teleports to the real copy's position at the start of the sequence (so the
+        // hitbox is correct); the two decoys are purely visual fx events for the renderer.
+        // copies: dx/dy = offset from the enemy's centre-feet (px), hitAt = ticks after sequence start,
+        // pose = art variant index used by errata_art.js for each copy.
+        // collapse = ticks after all strikes before the copies dissolve and recovery begins.
+        {
+          id: "phantom_recursion", name: "Phantom", icon: "PHR", cooldown: 720, // 12 s
+          attack: {
+            id: "phantom_recursion", type: "melee", isSkill: true, corruptible: true, utility: true, pose: 0,
+            damage: 28, startup: 14, active: 2, recovery: 36,
+            knockback: 6, launchH: 1.0, launchV: 0.3, stun: 32,
+            range: 80, boxH: 0.9, advance: 0, manaGain: 16,
+            recursion: {
+              copies: [
+                { dx: -120, dy: 0,   hitAt: 18, pose: 0 }, // left   copy: attacks first
+                { dx:    0, dy: -90, hitAt: 21, pose: 1 }, // above  copy: attacks second
+                { dx:  120, dy: 0,   hitAt: 24, pose: 2 }, // right  copy: attacks third
+              ],
+              collapse: 14,   // ticks after all copies attacked before they dissolve
+              endRecovery: 36,
+            },
+          },
+        },
+        // SKILL 4 - Data Corruption: Errata gathers corrupted energy and releases a massive,
+        // battlefield-wide glitch wave of black, white, and crimson data.
+        // Piercing projectile that sweeps across the whole arena, damaging all enemies in its wake
+        // and leaving temporary corrupted pixel fragments behind.
+        // On hit, infects the enemy with Data Corruption:
+        // Every 3 seconds (interval: 180 ticks), triggers a 1-second corruption surge (duration: 60 ticks)
+        // for 8 iterations total. During each 1s surge, the enemy takes damage over time and any attack or
+        // cast is interrupted/cancelled, while their appearance is violently glitched/corrupted.
+        {
+          id: "data_corruption", name: "Corrupt", icon: "DAT", cooldown: 780, // 13 s
+          attack: {
+            id: "data_corruption", type: "projectile", isSkill: true, corruptible: true, piercing: true, pose: 0,
+            damage: 26, startup: 22, active: 1, recovery: 28,
+            knockback: 7, launchH: 1.1, launchV: 0.35, stun: 30, manaGain: 18,
+            projectile: { speed: 11, range: 1100, size: 140, style: "datacorruption" },
+            dataCorrupt: {
+              cycles: 8,            // 8 corruption surges
+              cycleInterval: 180,   // every 3 seconds (180 ticks) between surge starts
+              surgeDuration: 60,    // each corruption surge lasts 1 second (60 ticks)
+              surgeDamage: 10,      // damage dealt over the 1s surge
+              interruptInterval: 15,// cancels/interrupts actions repeatedly every 15 ticks during surge
+            },
+          },
+        },
       ],
       // HOLD KEY - Unstable Rendering (no skill slot): TAP the attack button = basic attack, HOLD it (on the ground) = he starts to glitch,
       // faster and faster. Charge is full `chargeTime` ticks after the press (48 = 0.8 s). Let go before that = cancelled (nothing is spent).

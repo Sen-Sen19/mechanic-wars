@@ -131,8 +131,10 @@
       this.errataQ = []; // Errata: delayed corruption events { kind: echo | teleport | phantom | chain, left, ... }
       this.reversed = null; // Reverse Logic on THIS fighter (as the victim): { left } left and right are swapped
       this.moveCorrupt = null; // Code Breaker on THIS fighter (as the victim): { left, cfg, burst: { kind, left } | null, pause } random movement bursts
+      this.dataCorrupt = null; // Data Corruption on THIS fighter (as victim): { by, cfg, ticksLeft, intervalTimer } dot damage + interrupt every 3s
       this.ghostShots = []; // Errata Phantom Input: projectiles fired by a ghost { x, y, facing, hit } (the Sim turns them into Projectiles)
       this.nullFrame = 0; // Errata Null Frame: ticks of untargetable left
+      this.recursion = null; // Errata Phantom Recursion in progress: { id, target, t, cfg, copies, realIdx, collapsing, collapseAt }
       this.others = []; // every other fighter (set by Sim.step)
       this.chainIndex = 0;
       this.comboQueued = false;
@@ -213,9 +215,11 @@
       this.errataQ = [];
       this.reversed = null;
       this.moveCorrupt = null;
+      this.dataCorrupt = null;
       this.ghostShots = [];
       this.nullFrame = 0;
       this.untargetable = false;
+      this.recursion = null;
       this.respawn(arena);
     }
 
@@ -334,6 +338,11 @@
             }
             this.chargeReleased = true;
           }
+          if (this.hit && this.hit.frameSkip && this.stateTimer > 2) {
+            const _fsc = this.hit.frameSkip;
+            if (_fsc.flickerEvery && this.stateTimer % _fsc.flickerEvery === 0) this.frameSkipFlicker();
+          }
+          if (this.hit && this.hit.frameSkip && this.stateTimer === 2) this.frameSkipSnap(this.arenaRef);
           if (--this.stateTimer <= 0) {
             this.state = STATE.ATTACK_ACTIVE;
             this.stateTimer = this.hit.active || 1;
@@ -346,6 +355,7 @@
             if (this.hit.execution) this.beginExecution();
             if (this.hit.judgment) this.beginJudgment();
             if (this.hit.taunt) this.beginTaunt(this.hit.taunt);
+            if (this.hit.recursion) this.beginRecursion();
             if (this.hit.id === "unrelenting_wrath" && this.foe) this.hitTargets.add(this.foe.id); // the first slam is the first beat, not a free extra hit
             if (this.hit.heal) {
                 this.hp = Math.min(this.stats.maxHP, this.hp + (this.hit.healPct ? this.stats.maxHP * this.hit.healPct : this.hit.heal));
@@ -1208,6 +1218,76 @@
       return Object.assign({}, intent, o);
     }
 
+    // ══════════ ERRATA skill 4: Data Corruption (victim side) ══════════
+    // Cycles 8 times total. Every 3 seconds (180 ticks), triggers a 1-second (60 ticks)
+    // corruption surge. During each 1s surge, the victim takes damage, has any casts or
+    // attacks repeatedly interrupted/cancelled, and appears heavily corrupted.
+    beginDataCorrupt(attacker, cfg) {
+      this.dataCorrupt = {
+        by: attacker,
+        cfg: cfg,
+        cyclesLeft: cfg.cycles || 8,
+        intervalTimer: cfg.cycleInterval || 180,
+        cycleInterval: cfg.cycleInterval || 180,
+        surgeTicks: 0,
+        surgeDuration: cfg.surgeDuration || 60,
+        damagePerTick: (cfg.surgeDamage || 10) / (cfg.surgeDuration || 60),
+      };
+      this.fxOut.push({ type: "errata", kind: "data_corrupt_infect", x: this.x + this.stats.width / 2, y: this.y + this.stats.height * 0.5 });
+    }
+
+    dataCorruptStep() {
+      const D = this.dataCorrupt;
+      if (!D || this.state === STATE.KO || this.hp <= 0 || D.by.state === STATE.KO) {
+        this.dataCorrupt = null;
+        return;
+      }
+
+      // Check if currently inside a 1-second active corruption surge
+      if (D.surgeTicks > 0) {
+        D.surgeTicks--;
+        const taken = Combat.damageTaken(D.damagePerTick, this.stats.armor);
+        this.hp = Math.max(0, this.hp - taken);
+
+        // Cancel / interrupt casts repeatedly during the surge
+        const intEvery = D.cfg.interruptInterval || 15;
+        if (D.surgeTicks % intEvery === 0) {
+          if (this.hp <= 0) {
+            this.state = STATE.KO;
+            this.stateTimer = 0;
+            this.hit = null;
+            this.dataCorrupt = null;
+            return;
+          } else {
+            this.state = STATE.HITSTUN;
+            this.stateTimer = Math.max(this.stateTimer, 12);
+            this.hit = null;
+            this.pendingProjectile = null;
+            this.comboQueued = false;
+          }
+          this.flash = Math.max(this.flash, 3);
+          this.fxOut.push({
+            type: "errata",
+            kind: "data_corrupt_proc",
+            x: this.x + this.stats.width / 2,
+            y: this.y + this.stats.height * 0.5,
+            cyclesLeft: D.cyclesLeft
+          });
+        }
+      } else {
+        // Waiting for the next 3-second cycle
+        D.intervalTimer--;
+        if (D.intervalTimer <= 0) {
+          D.cyclesLeft--;
+          D.intervalTimer = D.cycleInterval;
+          D.surgeTicks = D.surgeDuration; // start 1-second corruption surge!
+        }
+        if (D.cyclesLeft <= 0 && D.surgeTicks <= 0) {
+          this.dataCorrupt = null;
+        }
+      }
+    }
+
     // ══════════ ERRATA passive: Error Accumulation ══════════
     // Every landed hit = 1 Error stack (max P.max). At max, the NEXT skill spends them all and gets ONE random corruption effect,
     // picked at the moment the skill activates. All numbers live in characters.js (errata.passive.effects).
@@ -1275,7 +1355,7 @@
 
     errataStep() {
       const S = STATE;
-      if (this.state === S.KO) { this.errataQ.length = 0; this.nullFrame = 0; this.untargetable = false; this.unstable = null; this.afterimages.length = 0; return; }
+      if (this.state === S.KO) { this.errataQ.length = 0; this.nullFrame = 0; this.untargetable = false; this.unstable = null; this.recursion = null; this.afterimages.length = 0; return; }
       for (let i = this.afterimages.length - 1; i >= 0; i--) if (++this.afterimages[i].age >= this.afterimages[i].life) this.afterimages.splice(i, 1);
       if (this.nullFrame > 0 && --this.nullFrame <= 0) this.untargetable = false;
       const q = this.errataQ;
@@ -1306,6 +1386,211 @@
       this.fxOut.push({ type: "errata", kind: "teleport", x: this.x + w / 2, y: this.y + this.stats.height * 0.5, x2: nx + w / 2, y2: ny + this.stats.height * 0.5 });
       this.x = nx; this.y = ny; this.px = nx; this.py = ny; this.vx = 0; this.vy = 0;
       this.facing = f.x + f.stats.width / 2 >= nx + w / 2 ? 1 : -1;
+    }
+
+    // ══════════ ERRATA skill 2: Frame Skip ══════════
+    // During the last tick of startup, Errata teleports to just outside the enemy's near edge
+    // and immediately swings. If the enemy is already close enough, the snap is skipped.
+    // Flickering: every flickerEvery ticks during startup a ghost-pose afterimage appears at a
+    // random intermediate position between Errata and the enemy, giving the "corrupted animation
+    // sequence" look without moving his actual hitbox.
+    frameSkipFlicker() {
+      const f = this.foe, s = this.stats;
+      const C = this.hit && this.hit.frameSkip;
+      if (!C || !f || f.state === MW.STATE.KO) return;
+      const rnd = this.rand || Math.random;
+      // Random fraction of the way along the vector from Errata's centre to the enemy's centre
+      const t = 0.15 + rnd() * 0.7;
+      const ax = this.x + s.width / 2, ay = this.y + s.height * 0.5;
+      const bx = f.x + f.stats.width / 2, by = f.y + f.stats.height * 0.5;
+      const gx = ax + (bx - ax) * t, gy = ay + (by - ay) * t;
+      // Afterimage at the ghost position (visual only — does not move the real fighter)
+      this.afterimages.push({ x: gx - s.width / 2, y: gy - s.height * 0.5, facing: (bx >= ax ? 1 : -1), age: 0, life: C.flickerLife || 10 });
+      this.fxOut.push({ type: "errata", kind: "frame_skip_flicker", x: gx, y: gy, t: t });
+    }
+
+    frameSkipSnap(arena) {
+      const f = this.foe, s = this.stats;
+      const C = this.hit && this.hit.frameSkip;
+      if (!C || !f || f.state === MW.STATE.KO) return;
+      const snap = C.snapRange || 56;
+      const margin = C.edgeMargin || 90;
+      // gap between body edges along the x axis
+      const myRight = this.x + s.width;
+      const fLeft = f.x, fRight = f.x + f.stats.width;
+      const gapR = fLeft - myRight; // positive = enemy is to the right
+      const gapL = this.x - fRight; // positive = enemy is to the left
+      const gap = Math.max(gapR, gapL);
+      if (gap <= snap) return; // already close enough: just swing
+      // decide which side to land on (same side as before, or the nearest side)
+      const dir = (f.x + f.stats.width / 2 >= this.x + s.width / 2) ? 1 : -1;
+      let nx, ny;
+      if (dir > 0) {
+        nx = f.x - s.width - 4; // land just to the left of the enemy (we face right)
+      } else {
+        nx = f.x + f.stats.width + 4; // land just to the right of the enemy (we face left)
+      }
+      // keep inside the blast zone with margin
+      const bz = (arena && arena.blastZone) || (this.arenaRef && this.arenaRef.blastZone) || MW.ARENA.blastZone;
+      nx = Math.max(bz.left + margin, Math.min(bz.right - margin - s.width, nx));
+      // snap to the platform the enemy stands on (if grounded), or keep the same y
+      if (f.grounded && f.standingOn) {
+        ny = f.standingOn.y - s.height;
+      } else {
+        ny = f.y + f.stats.height - s.height; // feet level with the enemy
+      }
+      // emit fx
+      this.fxOut.push({ type: "errata", kind: "frame_skip_out", x: this.x + s.width / 2, y: this.y + s.height * 0.5 });
+      // leave afterimage
+      this.afterimages.push({ x: this.x, y: this.y, facing: this.facing, age: 0, life: 18 });
+      // teleport
+      this.x = nx; this.y = ny; this.px = nx; this.py = ny;
+      this.facing = dir;
+      this.vx = 0; this.vy = 0;
+      if (f.grounded && f.standingOn) { this.grounded = true; this.standingOn = f.standingOn; }
+      this.fxOut.push({ type: "errata", kind: "frame_skip_in", x: this.x + s.width / 2, y: this.y + s.height * 0.5 });
+    }
+
+    // ══════════ ERRATA skill 3: Phantom Recursion ══════════
+    // Errata splits into three corrupted versions around the target.
+    // Each copy attacks at a different tick, but only ONE randomly selected copy
+    // deals actual damage. When all strikes finish, the copies collapse into the real Errata.
+    beginRecursion() {
+      const C = this.hit && this.hit.recursion, s = this.stats, v = this.foe;
+      if (!C || !v || v.state === STATE.KO) return;
+      const rnd = this.rand || Math.random;
+      const copiesDef = C.copies || [
+        { dx: -120, dy: 0, hitAt: 18, pose: 0 },
+        { dx: 0, dy: -90, hitAt: 21, pose: 1 },
+        { dx: 120, dy: 0, hitAt: 24, pose: 2 }
+      ];
+      const realIdx = Math.floor(rnd() * copiesDef.length);
+      const vcx = v.x + v.stats.width / 2;
+      const vFeet = v.y + v.stats.height;
+      const bz = (this.arenaRef && this.arenaRef.blastZone) || MW.ARENA.blastZone;
+
+      const copies = copiesDef.map((cp, idx) => {
+        let cx = vcx + cp.dx - s.width / 2;
+        cx = Math.max(bz.left + 80, Math.min(bz.right - 80 - s.width, cx));
+        let cy = vFeet - s.height + (cp.dy || 0);
+        const facing = vcx >= cx + s.width / 2 ? 1 : -1;
+        return {
+          id: idx,
+          dx: cp.dx,
+          dy: cp.dy || 0,
+          hitAt: cp.hitAt,
+          pose: cp.pose,
+          x: cx,
+          y: cy,
+          facing: facing,
+          isReal: idx === realIdx,
+          done: false
+        };
+      });
+
+      const maxHitAt = Math.max(...copies.map(c => c.hitAt));
+      const collapseAt = maxHitAt + (C.collapse || 14);
+
+      // Place real Errata at the chosen copy position immediately
+      const realCopy = copies[realIdx];
+      this.x = realCopy.x;
+      this.y = realCopy.y;
+      this.px = this.x;
+      this.py = this.y;
+      this.facing = realCopy.facing;
+      this.vx = 0;
+      this.vy = 0;
+
+      this.recursion = {
+        id: this.hit.id,
+        target: v,
+        t: 0,
+        cfg: C,
+        copies: copies,
+        realIdx: realIdx,
+        collapseAt: collapseAt,
+        collapsing: false,
+        hitSpec: Object.assign({}, this.hit, { isSkill: true, noError: false })
+      };
+
+      this.fxOut.push({
+        type: "errata",
+        kind: "recursion_split",
+        x: vcx,
+        y: v.y + v.stats.height * 0.5,
+        copies: copies.map(c => ({ x: c.x, y: c.y, facing: c.facing, pose: c.pose, isReal: c.isReal }))
+      });
+    }
+
+    recursionStep() {
+      const R = this.recursion, v = R && R.target;
+      if (!R || !this.hit || this.hit.id !== R.id || this.state === STATE.HITSTUN || this.state === STATE.KO || !v || v.state === STATE.KO) {
+        this.recursion = null;
+        return;
+      }
+
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.vx = 0;
+      this.vy = 0;
+      this.holdVictim(v);
+      R.t++;
+
+      for (const cp of R.copies) {
+        if (!cp.done && R.t >= cp.hitAt) {
+          cp.done = true;
+          if (cp.isReal) {
+            // Real strike connects!
+            const hitSpec = Object.assign({}, R.hitSpec, {
+              damage: this.hit.damage,
+              knockback: this.hit.knockback,
+              launchH: this.hit.launchH,
+              launchV: this.hit.launchV,
+              stun: this.hit.stun
+            });
+            this.strikeHit(v, hitSpec, cp.facing);
+            this.holdVictim(v);
+            this.fxOut.push({
+              type: "errata",
+              kind: "recursion_strike",
+              isReal: true,
+              x: cp.x + this.stats.width / 2,
+              y: cp.y + this.stats.height * 0.5,
+              targetX: v.x + v.stats.width / 2,
+              targetY: v.y + v.stats.height * 0.5,
+              facing: cp.facing,
+              pose: cp.pose
+            });
+          } else {
+            // Decoy strike: pure visual effect, no damage
+            this.fxOut.push({
+              type: "errata",
+              kind: "recursion_strike",
+              isReal: false,
+              x: cp.x + this.stats.width / 2,
+              y: cp.y + this.stats.height * 0.5,
+              targetX: v.x + v.stats.width / 2,
+              targetY: v.y + v.stats.height * 0.5,
+              facing: cp.facing,
+              pose: cp.pose
+            });
+          }
+        }
+      }
+
+      if (R.t >= R.collapseAt) {
+        // All copies collapse back into the real Errata
+        this.fxOut.push({
+          type: "errata",
+          kind: "recursion_collapse",
+          x: this.x + this.stats.width / 2,
+          y: this.y + this.stats.height * 0.5
+        });
+        const recov = R.cfg.endRecovery || this.hit.recovery || 36;
+        this.recursion = null;
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = recov;
+      }
     }
 
     // ══════════ ERRATA hold key: Unstable Rendering ══════════
@@ -1691,6 +1976,7 @@
         lost: lost,
       };
       if (hit.corruptMove && this.hp > 0) this.beginMoveCorrupt(hit.corruptMove); // Errata Code Breaker: movement corruption starts
+      if (hit.dataCorrupt && this.hp > 0 && attacker && attacker !== this) this.beginDataCorrupt(attacker, hit.dataCorrupt); // Errata Data Corruption
       if (hit.corrupted && this.hp > 0 && attacker && attacker.errataOnHit) attacker.errataOnHit(this, hit); // Errata: on-hit corruption (slow / reverse / gravity / chain)
       if (hit.scythe && this.hp > 0 && attacker && attacker.beginScythe) attacker.beginScythe(this, hit); // chained: pull starts
       if (hit.onslaught && this.hp > 0 && attacker && attacker.beginOnslaught) attacker.beginOnslaught(this, hit); // Phantom Onslaught starts
@@ -1730,6 +2016,7 @@
       if (this.decoy) this.decoyStep(arena);
       if (this.transit) this.transitStep(arena);
       if (this.unstable) this.unstableStep();
+      if (this.recursion) this.recursionStep();
       if (this.wraiths) this.wraithStep();
       if (this.gravSlam) this.gravSlamStep();
       if (this.execution) this.executionStep();
@@ -1946,6 +2233,7 @@
 
       if (this.bleed) this.bleedStep();
       if (this.bleedPulse > 0) this.bleedPulse--;
+      if (this.dataCorrupt) this.dataCorruptStep();
       if (this.cloak && --this.cloak.left <= 0) this.cloak = null;
       this.fade = this.vanished ? 0 : this.cloak ? this.cloak.alpha : 1;
       if (this.transit) this.fade = this.transit.fade; // Abyssal Transit: melting / reforming body opacity

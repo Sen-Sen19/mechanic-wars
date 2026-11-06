@@ -687,23 +687,103 @@
     }
   }
 
-  // Unstable Rendering afterimages: a corrupted silhouette left at every spot he teleported from. Sliced bands slide sideways and it fades out.
-  function drawErrataAfterimages(ctx, f) {
-    if (!f.afterimages || !f.afterimages.length) return;
-    const s = f.stats, SL = 7, sh = s.height / SL;
-    for (const im of f.afterimages) {
-      const k = im.age / Math.max(1, im.life), a = (1 - k) * (1 - k) * 0.85;
+  // Mirror clones cache for Errata's poses
+  const errataCloneArt = {};
+
+  // Phantom Recursion copies: draw the decoy copies as REAL character copies of Errata
+  // using MW.CharacterArt.draw, complete with corrupted glitch trails and tear lines
+  function drawErrataRecursionCopies(ctx, f) {
+    const R = f.recursion;
+    if (!R || !R.copies || !MW.CharacterArt) return;
+    const s = f.stats;
+    for (const cp of R.copies) {
+      if (cp.isReal) continue; // Real Errata is already drawn as the main character body
       ctx.save();
-      for (let i = 0; i < SL; i++) {
-        const seed = Math.sin((i + 1) * 12.9898 + im.x * 0.37 + Math.floor(im.age / 3) * 4.1) * 43758.5453, r = seed - Math.floor(seed);
-        const off = (r - 0.5) * (8 + 26 * k) * (i % 2 ? 1 : -1);
-        const y = im.y + i * sh;
-        ctx.globalAlpha = a * 0.7; ctx.fillStyle = ERR_CY; ctx.fillRect(im.x + off - 3, y, s.width, sh - 1);
-        ctx.globalAlpha = a * 0.65; ctx.fillStyle = ERR; ctx.fillRect(im.x + off + 3, y, s.width, sh - 1);
-        ctx.globalAlpha = a * (r > 0.5 ? 0.9 : 0.55); ctx.fillStyle = r > 0.5 ? "#f2f2f2" : "#0b0b13"; ctx.fillRect(im.x + off, y + 1, s.width, sh - 2);
-      }
-      ctx.globalAlpha = a * 0.8; ctx.fillStyle = "#ffffff";
-      for (let i = 0; i < 2; i++) ctx.fillRect(im.x - 8 + Math.random() * 10, im.y + Math.random() * s.height, s.width + 10, 2);
+
+      // Corrupted crimson/cyan displacement pass (mirror glitch trails)
+      const jx = (Math.random() - 0.5) * 5;
+      const jy = (Math.random() - 0.5) * 2;
+      const key = f.id + ":recursion:" + cp.id;
+
+      // Draw Errata's full body on the decoy copy
+      const clone = Object.create(f);
+      clone.x = cp.x + jx;
+      clone.y = cp.y + jy;
+      clone.px = clone.x;
+      clone.py = clone.y;
+      clone.facing = cp.facing;
+      clone.state = cp.done ? MW.STATE.ATTACK_RECOVERY : MW.STATE.ATTACK_ACTIVE;
+      clone.grounded = true;
+      clone.hit = f.hit;
+      clone.chainIndex = cp.pose || 0;
+      clone.stateTimer = 4;
+      clone.flash = 0;
+      clone.chargeReleased = true;
+      clone._art = errataCloneArt[key] || null;
+
+      // Draw faint chromatic trail behind the mirror
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.translate(cp.facing * 4, 0);
+      MW.CharacterArt.draw(ctx, clone, false, null);
+      ctx.restore();
+
+      // Main mirror body
+      ctx.globalAlpha = 0.9;
+      MW.CharacterArt.draw(ctx, clone, false, null);
+      errataCloneArt[key] = clone._art;
+
+      // Overlay tear lines and glitch bands across the mirror
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = ERR; // crimson glitch slice
+      const gy = cp.y + (Math.random() * s.height);
+      ctx.fillRect(cp.x - 4, gy, s.width + 8, 2);
+      ctx.fillStyle = "#ffffff";
+      const gy2 = cp.y + (Math.random() * s.height);
+      ctx.fillRect(cp.x - 2, gy2, s.width + 4, 1.5);
+
+      ctx.restore();
+    }
+  }
+
+  // Unstable Rendering & Frame Skip afterimages: draw real character mirrors of Errata with glitch slices fading out
+  function drawErrataAfterimages(ctx, f) {
+    if (!f.afterimages || !f.afterimages.length || !MW.CharacterArt) return;
+    const s = f.stats;
+    for (let i = 0; i < f.afterimages.length; i++) {
+      const im = f.afterimages[i];
+      const k = im.age / Math.max(1, im.life);
+      const a = (1 - k) * (1 - k);
+      if (a <= 0.02) continue;
+      ctx.save();
+
+      const key = f.id + ":afterimage:" + i;
+      const clone = Object.create(f);
+      clone.x = im.x;
+      clone.y = im.y;
+      clone.px = im.x;
+      clone.py = im.y;
+      clone.facing = im.facing;
+      clone.state = MW.STATE.ATTACK_ACTIVE;
+      clone.grounded = true;
+      clone.hit = f.hit;
+      clone.chainIndex = 0;
+      clone.stateTimer = 4;
+      clone.flash = 0;
+      clone.chargeReleased = true;
+      clone._art = errataCloneArt[key] || null;
+
+      // Draw the mirrored silhouette of Errata himself
+      ctx.globalAlpha = a * 0.75;
+      MW.CharacterArt.draw(ctx, clone, false, null);
+      errataCloneArt[key] = clone._art;
+
+      // Sliced glitch displacement overlay
+      const gy = im.y + (Math.random() * s.height);
+      ctx.globalAlpha = a * 0.8;
+      ctx.fillStyle = Math.random() < 0.5 ? ERR : ERR_CY;
+      ctx.fillRect(im.x - 4, gy, s.width + 8, 2);
+
       ctx.restore();
     }
   }
@@ -752,6 +832,62 @@
     ctx.restore();
   }
 
+  // Skill 4: Data Corruption - massive wall-like glitch wave of black, white, and crimson
+  function drawDataCorruptionWave(ctx, p) {
+    const w = 48, h = p.size || 140, halfH = h / 2, t = Date.now();
+    ctx.save();
+
+    // Trailing corrupted pixel fragments in its wake
+    for (let i = 6; i >= 1; i--) {
+      const tx = p.x - p.dir * i * 22, ty = p.y + (Math.sin(t * 0.01 + i) * 16);
+      const alpha = (0.6 - i * 0.08);
+      ctx.globalAlpha = alpha;
+      const bw = 12 + (i % 3) * 6, bh = 8 + (i % 2) * 12;
+      ctx.fillStyle = (i % 2 === 0) ? ERR : ((i % 3 === 0) ? "#ffffff" : "#0a0a10");
+      ctx.fillRect(tx - bw / 2, ty - bh / 2, bw, bh);
+
+      // Trailing crimson error pixels
+      if (Math.random() < 0.4) {
+        spawnParticle(tx + (Math.random() - 0.5) * 10, ty + (Math.random() - 0.5) * h, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, Math.random() < 0.6 ? ERR : "#ffffff", 14, 3);
+      }
+    }
+
+    // Chromatic glitch fringes (cyan & crimson leading edges)
+    const jx = (Math.random() - 0.5) * 8;
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = ERR;
+    ctx.fillRect(p.x - w / 2 + 8 + jx, p.y - halfH, w, h);
+    ctx.fillStyle = ERR_CY;
+    ctx.fillRect(p.x - w / 2 - 8 - jx, p.y - halfH, w, h);
+
+    // Main multi-sliced distorted glitch wave front
+    const SL = 10, segH = h / SL;
+    for (let i = 0; i < SL; i++) {
+      const sliceOff = (Math.sin(t * 0.03 + i * 1.5) * 14) + ((Math.random() - 0.5) * 6);
+      const sy = p.y - halfH + i * segH;
+
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = (i % 2 === 0) ? "#0c0c14" : "#f0f0f5";
+      ctx.fillRect(p.x - w / 2 + sliceOff, sy, w, segH - 1);
+
+      // Crimson error symbol / core pixel
+      if (i % 3 === 0) {
+        ctx.fillStyle = ERR;
+        ctx.fillRect(p.x - 6 + sliceOff, sy + segH * 0.25, 12, segH * 0.5);
+      }
+    }
+
+    // Horizontal tear lines
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 4; i++) {
+      const tearY = p.y - halfH + Math.random() * h;
+      ctx.fillRect(p.x - w * 1.2, tearY, w * 2.4, 2);
+    }
+
+    ctx.restore();
+  }
+
   // Victim of Code Breaker: black-and-white glitch bands over the body, trails in random directions, glitch particles and a corrupted
   // symbol above the head, for as long as f.moveCorrupt lasts.
   function drawMoveCorruptFx(ctx, f) {
@@ -789,6 +925,60 @@
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.strokeRect(sx - h, sy - h, h * 2, h * 2);
     ctx.beginPath(); ctx.moveTo(sx - h * 0.6, sy - h * 0.6); ctx.lineTo(sx + h * 0.6, sy + h * 0.6); ctx.moveTo(sx + h * 0.6, sy - h * 0.6); ctx.lineTo(sx - h * 0.6, sy + h * 0.6); ctx.stroke();
     ctx.fillStyle = ERR; ctx.fillRect(sx - h + 3, sy - h + (Math.random() * h * 2 | 0), h * 2, 2); // glitch line
+    ctx.restore();
+  }
+
+  // Victim of Data Corruption: turns the enemy body completely corrupted
+  // with glitch chromatic ghosts, corrupted silhouettes, tearing horizontal scan-slices, and error particles
+  function drawDataCorruptStatusFx(ctx, f) {
+    const D = f.dataCorrupt;
+    if (!D || f.state === MW.STATE.KO || !MW.CharacterArt) return;
+    const s = f.stats, cx = f.x + s.width / 2, cy = f.y + s.height * 0.5, t = Date.now();
+    ctx.save();
+
+    // 1. Chromatic aberration ghost copies of the actual character
+    // A crimson ghost slightly offset to the right
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = ERR;
+    ctx.translate(4 + Math.sin(t * 0.05) * 3, 0);
+    MW.CharacterArt.draw(ctx, f, true, null);
+    ctx.restore();
+
+    // A cyan/white glitch ghost offset to the left
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.translate(-4 - Math.cos(t * 0.04) * 3, 0);
+    MW.CharacterArt.draw(ctx, f, false, null);
+    ctx.restore();
+
+    // 2. Multi-color horizontal glitch slices running through the body
+    const slices = 5, segH = s.height / slices;
+    for (let i = 0; i < slices; i++) {
+      if (Math.random() < 0.35) continue;
+      const off = (Math.sin(t * 0.06 + i * 2) * 10) + ((Math.random() - 0.5) * 6);
+      const sy = f.y + i * segH;
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = i % 2 === 0 ? ERR : "#ffffff";
+      ctx.fillRect(f.x + off - 3, sy, s.width + 6, 2.5);
+    }
+
+    // 3. Leaking crimson & white data corruption particles
+    if (Math.random() < 0.55) {
+      spawnParticle(cx + (Math.random() - 0.5) * s.width * 1.3, cy + (Math.random() - 0.5) * s.height, (Math.random() - 0.5) * 2.5, -1 - Math.random() * 2, Math.random() < 0.6 ? ERR : "#ffffff", 14, 2.5);
+    }
+
+    // 4. Corrupted error glyph pulsing above the head
+    const pulse = 0.7 + 0.3 * Math.sin(t * 0.02);
+    ctx.globalAlpha = 0.9 * pulse;
+    ctx.strokeStyle = ERR;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 7, f.y - 20, 14, 14);
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, f.y - 18); ctx.lineTo(cx + 5, f.y - 8);
+    ctx.moveTo(cx + 5, f.y - 18); ctx.lineTo(cx - 5, f.y - 8);
+    ctx.stroke();
+
     ctx.restore();
   }
 
@@ -851,6 +1041,57 @@
       addShake(2);
     } else if (ev.kind === "cb_burst") { // a corrupted movement burst starts: glitch bits thrown the opposite way
       for (let i = 0; i < 6; i++) spawnParticle(ev.x - ev.dir * 10, ev.y + (Math.random() - 0.5) * 50, -ev.dir * (1 + Math.random() * 3), (Math.random() - 0.5) * 1.5, i % 2 ? "#ffffff" : "#6d6d7a", 14, 2.4);
+    } else if (ev.kind === "frame_skip_flicker") { // Skill 2: Frame Skip flickers across frames
+      for (let i = 0; i < 4; i++) {
+        spawnParticle(ev.x + (Math.random() - 0.5) * 20, ev.y + (Math.random() - 0.5) * 40, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, Math.random() < 0.6 ? ERR : "#ffffff", 10 + (Math.random() * 6 | 0), 2.5);
+      }
+      addRing(ev.x, ev.y, 6, 36, 10, ERR, 2, 1);
+    } else if (ev.kind === "frame_skip_out") { // Skill 2: Departure flicker & distortion
+      addRing(ev.x, ev.y, 8, 55, 14, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR, 8, 4);
+      addShake(1.5);
+    } else if (ev.kind === "frame_skip_in") { // Skill 2: Sharp glitch explosion on appearance
+      addRing(ev.x, ev.y, 4, 75, 16, "#ffffff", 4, 1);
+      addRing(ev.x + 3, ev.y, 4, 60, 14, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR, 12, 5);
+      spawnBurst(ev.x, ev.y, "#ffffff", 8, 4);
+      addShake(3);
+      addFlash(0.08, "#ffffff");
+    } else if (ev.kind === "recursion_split") { // Skill 3: Distortion when Errata splits into 3 copies
+      addRing(ev.x, ev.y, 10, 110, 20, "#ffffff", 4, 1);
+      addRing(ev.x, ev.y, 10, 85, 16, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, ERR, 16, 6);
+      spawnBurst(ev.x, ev.y, "#000000", 12, 4);
+      addShake(3.5);
+      addFlash(0.14, "#000000"); // Black-and-white screen distortion
+    } else if (ev.kind === "recursion_strike") { // Skill 3: Individual copy strike
+      const col = ev.isReal ? ERR : "#666677";
+      addRing(ev.x, ev.y, 6, ev.isReal ? 75 : 45, 14, col, ev.isReal ? 3 : 2, 1);
+      spawnBurst(ev.x, ev.y, col, ev.isReal ? 14 : 6, ev.isReal ? 5 : 3);
+      if (ev.isReal) {
+        addShake(4);
+        addFlash(0.12, "#ffffff"); // Screen distortion on real strike
+      } else {
+        addShake(1);
+      }
+    } else if (ev.kind === "recursion_collapse") { // Skill 3: Copies collapse back
+      addRing(ev.x, ev.y, 80, 8, 16, ERR, 3, 1);
+      addRing(ev.x, ev.y, 60, 6, 14, "#ffffff", 2, 1);
+      spawnBurst(ev.x, ev.y, ERR, 10, 4);
+      addShake(2);
+    } else if (ev.kind === "data_corrupt_infect") { // Skill 4: Enemy infected by Data Corruption
+      addRing(ev.x, ev.y, 10, 80, 16, ERR, 3, 1);
+      addRing(ev.x, ev.y, 6, 60, 14, "#000000", 4, 1);
+      spawnBurst(ev.x, ev.y, ERR, 14, 5);
+      spawnBurst(ev.x, ev.y, "#ffffff", 10, 4);
+      addShake(2.5);
+    } else if (ev.kind === "data_corrupt_proc") { // Skill 4: 3-second recurring damage tick & interrupt
+      addRing(ev.x, ev.y, 6, 65, 14, ERR, 3, 1);
+      addRing(ev.x, ev.y, 4, 50, 12, "#ffffff", 2, 1);
+      spawnBurst(ev.x, ev.y, ERR, 10, 4);
+      spawnBurst(ev.x, ev.y, "#0a0a14", 8, 3);
+      addShake(2);
+      addFlash(0.06, "#ffffff");
     }
   }
 
@@ -1263,6 +1504,7 @@
     }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "frost") { drawFrostShard(ctx, p); ctx.restore(); return; }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "codebreaker") { drawCodeBreakerShot(ctx, p); ctx.restore(); return; } // Errata Code Breaker
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "datacorruption") { drawDataCorruptionWave(ctx, p); ctx.restore(); return; } // Errata Skill 4: Data Corruption
     const r = p.size / 2;
     const [cr, cg, cb] = hexToRgb(p.color);
 
@@ -2465,7 +2707,7 @@
           if (s.id === "assassin" && MW.AssassinFx) MW.AssassinFx.drawAura(c, f);
           if (s.id === "fighter" && MW.BrawlerFx) MW.BrawlerFx.drawAura(c, f); // flame aura replaces the static glow
           else drawMomentumAura(c, f);
-          if (s.id === "errata") { drawErrataAfterimages(c, f); drawErrataGhosts(c, f); drawErrataAura(c, f); drawErrataCharge(c, f); } // afterimages (hold key) + ghost copy (Phantom Input) + full-stack glow + charge
+          if (s.id === "errata") { drawErrataAfterimages(c, f); drawErrataGhosts(c, f); drawErrataRecursionCopies(c, f); drawErrataAura(c, f); drawErrataCharge(c, f); } // afterimages (hold key) + ghost copy (Phantom Input) + recursion decoys + full-stack glow + charge
           // draw the full character body
           const ucp = s.id === "errata" && f.unstableCharge ? f.unstableCharge() : -1;
           if (ucp >= 0) { // charging Unstable Rendering: the body shakes and drops out for a frame more and more often
@@ -2477,6 +2719,7 @@
           } else
           drawCharacterBody(c, f, isFlash);
           if (f.moveCorrupt) drawMoveCorruptFx(c, f); // Errata Code Breaker: glitch overlay on the victim
+          if (f.dataCorrupt) drawDataCorruptStatusFx(c, f); // Errata Data Corruption: completely corrupted appearance on victim
         };
         if (cloaked) drawFaded(ctx, f.fade, paintBody); // cloaked Assassin: the art resets alpha itself, so fade the finished picture
         else if (f.tauntedBy && f.tauntedBy.left > 0 && f.state !== S.KO) drawTauntOutlined(ctx, paintBody); // Divine Taunt: red outline = taunted

@@ -15,7 +15,7 @@ function check(name, ok, extra) { console.log((ok ? "PASS " : "FAIL ") + name + 
 const F = C.errata;
 check("errata is defined and last in the roster", !!F && MW.CHARACTER_ORDER[MW.CHARACTER_ORDER.length - 1] === "errata");
 check("name / title / look", F.name === "Errata" && F.title === "The Mistake of Creation" && F.look === "errata");
-check("passive (Error Accumulation) + skill 1 (Code Breaker), no other skills or ultimate yet", F.passive && F.passive.type === "errata" && F.skills[0] && F.skills[0].id === "code_breaker" && F.skills.slice(1).every((s) => s === null) && !F.ultimate);
+check("passive + all 4 skills configured, no ultimate yet", F.passive && F.passive.type === "errata" && F.skills[0] && F.skills[0].id === "code_breaker" && F.skills[1] && F.skills[1].id === "frame_skip" && F.skills[2] && F.skills[2].id === "phantom_recursion" && F.skills[3] && F.skills[3].id === "data_corruption" && !F.ultimate);
 check("3-hit melee chain", F.attack.type === "melee" && F.attack.chain.length === 3);
 check("lighter than Titan, lower HP than Titan", F.weight < C.fighter.weight && F.maxHP < C.fighter.maxHP);
 check("narrower and lighter than Titan, so Titan stays the big body", F.width < C.fighter.width && F.weight < C.fighter.weight);
