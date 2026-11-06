@@ -748,11 +748,11 @@
       },
     }),
 
-    // MOCHI (internal id "mochi"): the Sleepy Dreamer. A petite, cozy woman who always looks like she just woke up
-    // (looks: mochi_art.js, design doc "Mochi - The Sleepy Dreamer"; hit box 36 x 68 from the document).
-    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so she fights with one
-    // placeholder basic attack, a lazy Sleepy Swat (a short, slow-ish sleeve swing). Short and light, so she is easy to launch.
-    // Every number below is a first guess to feel her out in the arena; tune after a few matches.
+    // MOCHI (internal id "mochi"): the Sleepy Dreamer (looks: mochi_art.js, design doc "Mochi - The Sleepy Dreamer").
+    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so she fights with one basic attack:
+    // a slow, lazy 3-hit sleeve chain (keep tapping attack): 1 Sleepy Swat, 2 Backhand Flop, 3 Drowsy Slam (the finisher: a heavier shove).
+    // Small, light and a little slow, like a sleepy Fulminar with more reach from her huge sleeves; every number is a first guess to feel her out
+    // in the arena. Hit box = width x height below (the ears, the hoodie hem and the pillow backpack are drawn on top of it, not part of it).
     mochi: define({
       id: "mochi",
       name: "Mochi",
@@ -760,16 +760,52 @@
       color: "#C9B6E8", // pale lavender: select card, chips, HUD
       look: "mochi",
       width: 36,
-      height: 68, // the ahoge and bunny ears are drawn outside the hit box
-      maxHP: 230,
+      height: 68,
+      maxHP: 240,
       armor: 6,
       weight: 78,
-      runSpeed: 4.8,
-      jumpStrength: 12.8,
-      airJumpStrength: 11.6,
-      attack: { type: "melee", damage: 4, startup: 9, active: 3, recovery: 14, knockback: 2.2, range: 46, advance: 0 },
+      runSpeed: 4.6,
+      jumpStrength: 13,
+      airJumpStrength: 11.8,
+      attack: {
+        type: "melee", damage: 4, startup: 8, active: 4, recovery: 10, knockback: 2, range: 50, advance: 1, fxShape: "jab",
+        chain: [
+          {},                                                                                                       // 1 Sleepy Swat: one huge sleeve swings out
+          { startup: 7, damage: 5, knockback: 2.4, fxShape: "hook" },                                               // 2 Backhand Flop: the other sleeve flops back through
+          { startup: 12, damage: 7, active: 5, recovery: 18, knockback: 5.5, range: 56, launchH: 0.9, launchV: 0.3, boxH: 0.9, fxShape: "hook", stun: 20 }, // 3 Drowsy Slam: both sleeves come down together
+        ],
+      },
+    }),
+
+    // ERRATA (internal id "errata"): the Mistake of Creation (looks: errata_art.js, design doc "Errata - The Mistake of Creation").
+    // TRIAL ENTRY: looks only for now. No skills, passive or ultimate yet: every slot is empty, so he fights with one basic attack:
+    // a quick 3-hit melee chain (keep tapping attack): 1 Slash, 2 Backhand, 3 Rift Cut (the finisher: a longer, harder cut).
+    // Tall and elegant with a little more reach than Fulminar; his whole-body glitch is visual only and never touches the hit box,
+    // physics or timing. Numbers are a first guess to feel him out in the arena. Hit box = width x height below.
+    errata: define({
+      id: "errata",
+      name: "Errata",
+      title: "The Mistake of Creation",
+      color: "#FF315A", // error crimson: select card, chips, HUD
+      look: "errata",
+      width: 38,
+      height: 88,
+      maxHP: 270,
+      armor: 10,
+      weight: 86,
+      runSpeed: 5.4,
+      jumpStrength: 13,
+      airJumpStrength: 11.8,
+      attack: {
+        type: "melee", damage: 4, startup: 6, active: 3, recovery: 7, knockback: 2, range: 56, advance: 2, fxShape: "jab",
+        chain: [
+          {},                                                                                                       // 1 Slash: lead hand, clean and quick
+          { startup: 5, damage: 5, knockback: 2.4, fxShape: "hook" },                                               // 2 Backhand: the other hand cuts back through
+          { startup: 9, damage: 8, active: 5, recovery: 18, knockback: 6, range: 62, launchH: 0.9, launchV: 0.35, boxH: 0.9, fxShape: "hook", stun: 22 }, // 3 Rift Cut: finisher
+        ],
+      },
     }),
   };
 
-  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi"];
+  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata"];
 })(globalThis);

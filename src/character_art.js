@@ -27,6 +27,7 @@
     marionettist: { main: "#11101B", dark: "#080710", light: "#7955A8", accent: "#C5A5FF", skin: "#e4ddea", hair: "#211B2C", pants: "#11101B", boot: "#0b0a12", glow: "#C5A5FF" },
     fulminar: { main: "#14243D", dark: "#080E1B", light: "#397FD1", accent: "#43DFFF", skin: "#e6ecf5", hair: "#E5EDF7", pants: "#14243D", boot: "#14243D", glow: "#43DFFF" },
     mochi: { main: "#C9B6E8", dark: "#5B4A86", light: "#E3D7F5", accent: "#F3B9CB", skin: "#FCE3D6", hair: "#A8E6CF", pants: "#9D8CB9", boot: "#F5F1F7", glow: "#FFF0D5" },
+    errata: { main: "#101019", dark: "#080810", light: "#EEE6D2", accent: "#FF315A", skin: "#EEDDD4", hair: "#EAEDF4", pants: "#252534", boot: "#0b0b13", glow: "#00E5FF" },
     tank: { main: "#c9a032", dark: "#5a3d12", light: "#f2d46e", accent: "#fff0a6", skin: "#b08c74", hair: "#d9a92a", pants: "#7a5518", boot: "#c9a032", glow: "#fff4c2", glowHi: "#ffffff" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
@@ -38,7 +39,8 @@
     monarch: { leg: 0.43, tor: 0.31, hr: 0.10, sw: 0.80, hw: 0.46, lw: 0.22, aw: 0.20, arm: 0.37, stride: 0.40 }, // from the design document: tall, V-shaped, long slim legs
     marionettist: { leg: 0.45, tor: 0.30, hr: 0.10, sw: 0.62, hw: 0.40, lw: 0.16, aw: 0.11, arm: 0.42, stride: 0.40 }, // tall, slender, narrow shoulders, long limbs
     fulminar: { leg: 0.46, tor: 0.30, hr: 0.105, sw: 0.56, hw: 0.42, lw: 0.17, aw: 0.12, arm: 0.38, stride: 0.52 }, // athletic: narrow waist, strong long legs, a long stride
-    mochi: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.58, hw: 0.50, lw: 0.17, aw: 0.13, arm: 0.36, stride: 0.34 }, // from the design document: petite adult, short, soft and slim, a big hoodie on top
+    mochi: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.58, hw: 0.50, lw: 0.17, aw: 0.13, arm: 0.36, stride: 0.34 }, // petite adult: head 1/4 of her height, slim limbs under a huge hoodie
+    errata: { leg: 0.46, tor: 0.31, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.16, aw: 0.11, arm: 0.39, stride: 0.45 }, // tall, slender, elegant
     tank: { leg: 0.36, tor: 0.33, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
@@ -111,8 +113,18 @@
       { wind: kf([0.35, 0.2], [-0.1, 0.35], -0.12, -3, 0.03), strike: kf([0.4, 0.2], [1.14, -0.02], 0.3, 9, 0.04) },
       { wind: kf([-0.35, 0.5], [0.3, 0.2], -0.32, -5, 0.05), strike: kf([1.04, 0.28], [0.55, 0.0], 0.52, 13, 0.07) },
     ],
-    // Mochi: a lazy swat. The lead sleeve is hauled back and up, then flops forward with the whole body leaning into it.
-    mochi: [{ wind: kf([-0.2, -0.5], [0.12, 0.62], -0.12, -2, 0.03), strike: kf([1.0, 0.08], [0.1, 0.62], 0.2, 4, 0.03) }],
+    // Mochi: lazy sleeve swings. 0 swat = the lead sleeve flops out, 1 backhand = the other sleeve swings back across, 2 slam = both sleeves raised, then dropped together.
+    mochi: [
+      { wind: kf([0.05, 0.5], [0.1, 0.9], -0.1, -1, 0.02), strike: kf([1.1, 0.0], [0.1, 0.9], 0.16, 4, 0.03) },
+      { wind: kf([0.5, 0.2], [-0.15, 0.1], -0.14, -2, 0.03), strike: kf([0.3, 0.3], [1.1, 0.05], 0.24, 5, 0.04) },
+      { wind: kf([0.3, -1.0], [0.1, -0.95], -0.3, -3, 0.0), strike: kf([0.95, 0.6], [0.8, 0.6], 0.42, 8, 0.08) },
+    ],
+    // Errata: clean, elegant cuts. 0 slash = lead hand, 1 backhand = the other hand cuts back, 2 rift cut = a lunging two-handed sweep.
+    errata: [
+      { wind: kf([0.2, 0.2], [0.3, 0.3], -0.08, -2, 0.02), strike: kf([1.1, -0.04], [0.3, 0.3], 0.14, 5, 0.02) },
+      { wind: kf([0.4, 0.2], [-0.1, 0.3], -0.1, -2, 0.03), strike: kf([0.4, 0.2], [1.12, 0.0], 0.26, 7, 0.04) },
+      { wind: kf([-0.3, 0.4], [0.3, 0.2], -0.28, -4, 0.04), strike: kf([1.0, 0.3], [0.6, 0.0], 0.5, 12, 0.06) },
+    ],
     mage: [{ wind: kf([0.15, -0.55], [0.2, 0.5], -0.16, -2, 0.02), strike: kf([0.95, -0.2], [0.2, 0.5], 0.2, 3, 0.02) }],
     hitter: [{ wind: kf([0.95, 0.08], [0.5, 0.04], -0.05, -1, 0.02), strike: kf([0.92, -0.02], [0.46, -0.06], 0.08, -3, 0.02) }], // two-handed rifle: raised level, small kick
   };
@@ -264,10 +276,10 @@
       ff = airborne ? [Wd * 0.3, -H * 0.08] : [Wd * 0.28, 0]; bf = airborne ? [-Wd * 0.25, -H * 0.04] : [-Wd * 0.3, 0];
     } else if (attacking && f.hit) {
       const seq = ATK[id] || ATK.fighter;
-      let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
+      let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "errata" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = id === "mochi" ? kf([0.28, 0.5], [0.1, 0.66], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.5], [0.5, 0.42], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.5], [0.5, 0.42], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
         const wind0 = f.hit.chargeHold && !f.chargeReleased ? f.chargeTicks / Math.max(1, f.hit.chargeTime) : 1 - f.stateTimer / Math.max(1, f.hit.startup);
@@ -342,7 +354,8 @@
       if (id === "mage") { fh = [0.25 + sw1 * 0.4, 0.66 - 0.2 * Math.abs(sw1)]; bh = [0.05 + sw2 * 0.4, 0.7 - 0.2 * Math.abs(sw2)]; } // long arms, small swing
       if (id === "tank") { fh = [0.55 + sw1 * 0.02, 0.2]; bh = [0.25 + sw2 * 0.25, 0.5 - 0.1 * Math.abs(sw2)]; lean += 0.03; } // shield held steady, gauntlet arm swings
       if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.42]; bh = [0.5, 0.36 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
-      if (id === "mochi") { lean += 0.03; fh = [0.18 + sw1 * 0.34, 0.64 - 0.1 * Math.abs(sw1)]; bh = [0.1 + sw2 * 0.34, 0.66 - 0.1 * Math.abs(sw2)]; } // sleepy jog: slouched, floppy sleeves swinging low
+      if (id === "errata") { fh = [0.3 + sw1 * 0.45, 0.55 - 0.18 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.45, 0.58 - 0.18 * Math.abs(sw2)]; lean += 0.02; } // long easy strides, arms swinging loosely
+      if (id === "mochi") { lean += 0.07; fh = [0.1 + sw1 * 0.22, 0.92 - 0.07 * Math.abs(sw1)]; bh = [0.02 + sw2 * 0.22, 0.94 - 0.07 * Math.abs(sw2)]; } // a sleepy shuffle: long sleeves just dangle and swing a little
       if (id === "fulminar") { lean += 0.0; fh = [0.3 + sw1 * 0.5, 0.5 - 0.2 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.5, 0.52 - 0.2 * Math.abs(sw2)]; } // sprinter's lean, arms pumping
       if (id === "fighter") { fh = [0.5 + sw1 * 0.26, 0.14 + 0.1 * (1 - Math.abs(sw1))]; bh = [0.3 + sw2 * 0.22, 0.24 + 0.1 * (1 - Math.abs(sw2))]; lean += 0.04; } // guard up, fists pump with each step
     } else {
@@ -380,12 +393,19 @@
         bob = Math.abs(Math.sin(now * 2.2)) * H * 0.006; crouch = H * 0.008;
         ff = [Wd * 0.2, 0]; bf = [-Wd * 0.23, 0];
       }
-      if (id === "mochi") { // just woke up: a slight forward slouch, a slow sway, hands lost inside the sleeves, heels together
+      if (id === "errata") { // relaxed and sure of himself: hands loose, chin a little up, a slow sway
+        const sl = Math.sin(now * 1.5);
+        fh = [0.2 + 0.02 * sl, 0.64 + 0.02 * idle]; bh = [0.1, 0.68 - 0.02 * idle];
+        lean = 0.0 + 0.01 * sl; tilt = -0.03 + idle * 0.01;
+        bob = Math.abs(Math.sin(now * 2.0)) * H * 0.005; crouch = H * 0.008;
+        ff = [Wd * 0.17, 0]; bf = [-Wd * 0.2, 0];
+      }
+      if (id === "mochi") { // dozing on her feet: slouched, head tilted, sleeves dangling, feet close together, a slow sway
         const sl = Math.sin(now * 1.3);
-        fh = [0.2 + 0.02 * sl, 0.66 + 0.02 * idle]; bh = [0.08, 0.7 - 0.02 * idle];
-        lean = 0.06 + 0.012 * sl; tilt = 0.03 + idle * 0.012;
-        bob = idle * H * 0.004; crouch = H * 0.012;
-        ff = [Wd * 0.16, 0]; bf = [-Wd * 0.18, 0];
+        fh = [0.06 + 0.02 * sl, 0.93 + 0.01 * idle]; bh = [-0.02, 0.95 - 0.01 * idle];
+        lean = 0.06 + 0.015 * sl; tilt = 0.09 + idle * 0.02;
+        bob = idle * H * 0.006; crouch = H * 0.01;
+        ff = [Wd * 0.14, 0]; bf = [-Wd * 0.16, 0];
       }
       if (id === "marionettist") { // performing for an invisible audience: upright but tilted, one hand raised with relaxed fingers, the other at the waist
         const sl = Math.sin(now * 1.6);
@@ -400,7 +420,7 @@
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
     }
 
-    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
       if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
       else {
         A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
@@ -939,17 +959,24 @@
       return;
     }
 
-    // ───────────── MOCHI ─────────────
-    // Drawn in mochi_art.js (sleepy cozy woman: mint hair, oversized lavender bunny-ear hoodie, pillow backpack).
-    if (id === "mochi" && MW.Mochi) {
-      MW.Mochi.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
-      return;
-    }
-
     // ───────────── FULMINAR ─────────────
     // Drawn in fulminar_art.js (silver and electric-blue storm warrior: lightning-edged armor, silver-white ponytail, glowing chest core).
     if (id === "fulminar" && MW.Fulminar) {
       MW.Fulminar.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
+    // ───────────── ERRATA ─────────────
+    // Drawn in errata_art.js (elegant man in a black-and-ivory coat whose whole body glitches as one picture).
+    if (id === "errata" && MW.Errata) {
+      MW.Errata.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
+    // ───────────── MOCHI ─────────────
+    // Drawn in mochi_art.js (cozy pastel adult woman: lavender bunny-ear hoodie, mint hair, pillow backpack, bunny slippers).
+    if (id === "mochi" && MW.Mochi) {
+      MW.Mochi.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
       return;
     }
 

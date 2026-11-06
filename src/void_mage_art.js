@@ -1,6 +1,5 @@
-
 // Mechanic Wars - Void Mage art (render only, never touches the sim).
-// A tall, faceless figure half-consumed by a dimensional void: obsidian body, asymmetrical armor
+// A tall astral figure half-consumed by a dimensional void: obsidian body, a midnight-violet starry face, asymmetrical armor
 // with glowing violet cracks, a cloak of living smoke, claw hands, shoulder tentacles and a
 // singularity in the chest. Called from character_art.js DETAIL() for id === "mage".
 // k = the shared rig state from character_art.js, e = a few precomputed values (see DETAIL).
@@ -12,6 +11,13 @@
 
   // obs = obsidian body, rim = violet edge light (keeps the silhouette readable on dark stages)
   const C = { void: "#020106", obs: "#0c0a14", obs2: "#1b1533", obs3: "#30265a", deep: "#3a1680", rim: "#4a2699", elec: "#b44bff", hot: "#e6bcff" };
+
+  // star specks on the face: [x, y, size, twinkle phase] in head-ellipse units (-1..1)
+  const VOID_STARS = [
+    [0.15, -0.7, 1, 0], [0.62, -0.55, 0.7, 1.3], [-0.3, -0.35, 0.6, 2.1], [0.8, -0.1, 0.8, 0.7], [0.45, 0.05, 0.5, 3.0],
+    [-0.55, 0.1, 0.7, 4.2], [0.25, 0.35, 1, 5.1], [0.72, 0.38, 0.8, 2.6], [-0.1, 0.55, 0.5, 3.7], [0.5, 0.7, 0.7, 1.9],
+    [-0.45, 0.62, 0.6, 0.4], [0.05, -0.15, 0.5, 4.8], [0.9, -0.45, 0.5, 5.5], [-0.7, -0.3, 0.6, 2.9], [0.35, -0.92, 0.6, 3.3], [0.0, 0.85, 0.5, 6.0],
+  ];
 
   // ── tiny drawing helpers ───────────────────────────────────────────
   function pathOf(ctx, pts, close) {
@@ -298,32 +304,174 @@
     // ── 7) neck, head (smooth, elongated humanoid with black void face), floating fragments ──
     taper(k, [T(torL * 1.0, 0), [hcw[0], hcw[1] + hr * 0.5]], 4.2, 3.2, C.obs, C.rim, 1.2);
 
-    // Head shell (smooth, elongated humanoid)
-    ctx.beginPath();
-    ctx.ellipse(hcw[0], hcw[1], hr * 0.85, hr * 1.25, 0.05 * d, 0, TAU); // Adjusted proportions for elongated humanoid
-    ctx.fillStyle = k.col(C.obs2); ctx.fill(); edge(k, C.rim, 1.6);
+    // ── 8) front shoulder (big spiked pauldron) + front arm + the hand that casts ──
+    taper(k, [armFw[0], armFw[1]], aw * 1.1, aw * 0.9, C.obs2, C.rim, 1.3);
+    taper(k, [armFw[1], armFw[2]], aw * 0.9, aw * 0.62, C.obs2, C.rim, 1.3);
+    bracer(armFw, true);
+    const sP = armFw[0];
+    fillPoly(k, [J(sP, -2.5, 2.8), J(sP, -3.1, -1.9), J(sP, -0.3, -4.3), J(sP, 3.1, -5.3), J(sP, 8.4, -7.4), J(sP, 5.0, -2.5), J(sP, 6.8, 1.6), J(sP, 2.5, 3.4)], C.obs3, C.rim, 1.6);
+    fillPoly(k, [J(sP, 1.6, -0.6), J(sP, 3.1, -3.4), J(sP, 9.3, -5.9), J(sP, 5.9, -0.9)], C.obs2, C.rim, 1.2);
+    glowStroke(k, crack(J(sP, -1.2, 1.2), J(sP, 6.8, -5.6), 7, 1.2), C.elec, 0.9, 4, 0.85);
+    const hand = claws(armFw, power, true);
 
-    // Completely black facial void (no clipping needed, just fill the 'face' area)
-    // Draw the inner face area, slightly recessed or darker than the head shell
-    ctx.beginPath();
-    ctx.ellipse(hcw[0] + d * hr * 0.1, hcw[1] + hr * 0.1, hr * 0.7, hr * 0.9, 0.08 * d, 0, TAU);
+    // singularity gathering between the claws (grows while casting)
+    const orbR = 2.2 + 1.2 * pulse * 0.4 + 5.5 * windU + (strike ? 3 : 0);
+    const orb = [hand.palm[0] + Math.cos(hand.dir) * (aw * 3.4 + orbR * 0.4), hand.palm[1] + Math.sin(hand.dir) * (aw * 3.4 + orbR * 0.4) - 1];
+    A.orb = [A.ox + orb[0], A.oy + orb[1]]; // used by mage_fx.js
+    ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU);
     ctx.fillStyle = k.col(C.void); ctx.fill();
-    edge(k, C.obs, 0.8); // Subtle edge for the void section
-
-    // Eyes: two narrow slanted slits
-    const eyeCol = stunned ? "#ffffff" : C.elec;
-    const eye = (x, y, w, h) => {
+    if (!F) {
       ctx.save();
-      ctx.translate(x, y); ctx.rotate(-0.38 * d);
-      if (!F) { ctx.shadowColor = C.elec; ctx.shadowBlur = 9 + 5 * power; }
-      ctx.fillStyle = F ? "#fff" : eyeCol;
-      ctx.beginPath(); ctx.ellipse(0, 0, w, h, 0, 0, TAU); ctx.fill();
-      ctx.shadowBlur = 0; ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.ellipse(0, 0, w * 0.62, h * 0.45, 0, 0, TAU); ctx.fill(); // inner highlight
+      ctx.shadowColor = C.elec; ctx.shadowBlur = 8 + 10 * power;
+      ctx.strokeStyle = C.hot; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU); ctx.stroke();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = C.elec; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(orb[0], orb[1], orbR * 1.9, orbR * 0.55, now * 3, 0, TAU); ctx.stroke();
+      ctx.restore();
+    } else { ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU); ctx.fillStyle = "#fff"; ctx.fill(); }
+
+    // ── 9) the head is drawn LAST so the front pauldron never hides the face ──
+    // ── ASTRAL FACE: midnight-violet skin dusted with stars, nebula cheeks, dark cosmic markings,
+    //    pupil-less pale-lavender eyes, flat calm mouth. Features are placed in head units (hr) with
+    //    HP(u, v): u = forward (the way he faces), v = down. ──
+    const hx = hcw[0], hy = hcw[1], rx = hr * 0.85, ry = hr * 1.25;
+    const HP = (u, v) => [hx + d * u * hr, hy + v * hr];
+    const shellPath = () => { ctx.beginPath(); ctx.ellipse(hx, hy, rx, ry, 0.05 * d, 0, TAU); };
+    const lw1 = (m) => Math.max(0.5, hr * m); // line width that never vanishes at game scale
+    const DARK = "#05020c", LAV = "#d9ccff";
+
+    // head shell: deep midnight violet, lighter on the brow, darker toward the jaw
+    shellPath();
+    if (F) ctx.fillStyle = "#ffffff";
+    else {
+      const sg = ctx.createLinearGradient(hx, hy - ry, hx, hy + ry);
+      sg.addColorStop(0, "#32206e"); sg.addColorStop(0.5, "#1d1144"); sg.addColorStop(1, "#0e0823");
+      ctx.fillStyle = sg;
+    }
+    ctx.fill();
+    edge(k, "#5a37b8", 1.6);
+
+    // small straight nose ridge breaking the profile (calm, sharp)
+    {
+      const n0 = HP(0.74, -0.02), n1 = HP(1.0, 0.36), n2 = HP(0.72, 0.42);
+      ctx.beginPath(); ctx.moveTo(n0[0], n0[1]); ctx.lineTo(n1[0], n1[1]); ctx.lineTo(n2[0], n2[1]); ctx.closePath();
+      ctx.fillStyle = F ? "#ffffff" : "#1f1248"; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(n0[0], n0[1]); ctx.lineTo(n1[0], n1[1]); ctx.lineTo(n2[0], n2[1]);
+      ctx.lineJoin = "round"; ctx.lineWidth = 1.1; ctx.strokeStyle = F ? "#fff" : "#5a37b8"; ctx.stroke();
+    }
+
+    if (!F) {
+      ctx.save();
+      shellPath(); ctx.clip(); // everything below stays inside the head
+
+      // nebula clouds on the cheeks (indigo + magenta + a cold cyan edge), faint and slow
+      const neb = (u, v, r, c0, c1, al) => {
+        const c = HP(u, v), g2 = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r * hr);
+        g2.addColorStop(0, c0); g2.addColorStop(1, c1);
+        ctx.globalAlpha = al; ctx.fillStyle = g2;
+        ctx.fillRect(c[0] - r * hr, c[1] - r * hr, r * hr * 2, r * hr * 2);
+      };
+      const drift = Math.sin(now * 0.6) * 0.05;
+      neb(0.5 + drift, 0.5, 0.62, "rgba(160,90,255,0.9)", "rgba(80,30,190,0)", 0.75);
+      neb(0.62, 0.42, 0.34, "rgba(255,120,220,0.9)", "rgba(200,60,200,0)", 0.45);
+      neb(0.02 - drift, 0.5, 0.5, "rgba(110,70,240,0.9)", "rgba(60,30,170,0)", 0.6);
+      neb(0.3, 0.75, 0.4, "rgba(90,200,255,0.8)", "rgba(40,100,220,0)", 0.18);
+      // thin nebula wisps curling across the cheek
+      ctx.globalAlpha = 0.32; ctx.strokeStyle = "#cdb4ff"; ctx.lineWidth = lw1(0.045); ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const s0 = HP(0.18 + i * 0.16, 0.34 + i * 0.1), s1 = HP(0.46 + i * 0.12, 0.2 + i * 0.12), s2 = HP(0.86, 0.46 + i * 0.1);
+        ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.quadraticCurveTo(s1[0], s1[1], s2[0], s2[1]); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // dark cosmic markings (drawn under the eyes so the glow stays on top)
+      ctx.fillStyle = DARK; ctx.strokeStyle = DARK; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      // forehead: tall diamond sigil with a spine rising into the hairline and two arcs sweeping to the temples
+      const fc = HP(0.3, -0.7);
+      ctx.beginPath();
+      ctx.moveTo(fc[0], fc[1] - hr * 0.32); ctx.lineTo(fc[0] + hr * 0.1, fc[1]); ctx.lineTo(fc[0], fc[1] + hr * 0.32); ctx.lineTo(fc[0] - hr * 0.1, fc[1]);
+      ctx.closePath(); ctx.fill();
+      ctx.lineWidth = lw1(0.09);
+      let q0 = HP(0.3, -1.0), q1 = HP(0.3, -1.3);
+      ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.stroke();
+      const arc = (a, c, b, w) => { ctx.lineWidth = lw1(w); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(c[0], c[1], b[0], b[1]); ctx.stroke(); };
+      arc(HP(0.3, -0.46), HP(0.78, -0.92), HP(1.12, -0.46), 0.08);
+      arc(HP(0.3, -0.46), HP(-0.18, -0.92), HP(-0.5, -0.5), 0.08);
+      // eye surrounds: heavy stern brow bars, winged outer corners, one falling streak under each eye
+      const surround = (u, v, inn, wing) => {
+        let a = HP(u - inn * 0.36, v - 0.34), b = HP(u + inn * 0.26, v - 0.2);
+        ctx.lineWidth = lw1(0.095); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); // brow bar, inner end low = stern
+        a = HP(u - inn * 0.22, v - 0.06); b = HP(u - inn * wing, v - 0.2);
+        ctx.lineWidth = lw1(0.1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); // outer wing
+        a = HP(u - inn * 0.04, v + 0.14); b = HP(u - inn * 0.16, v + 0.56);
+        ctx.lineWidth = lw1(0.07); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); // falling streak
+      };
+      surround(0.5, -0.18, -1, 0.9);
+      surround(0.08, -0.15, 1, 0.62);
+      // faint lavender glints along the markings
+      ctx.globalAlpha = 0.55 + 0.15 * Math.sin(now * 2); ctx.strokeStyle = "#a98bff"; ctx.lineWidth = lw1(0.03);
+      ctx.beginPath(); ctx.moveTo(fc[0], fc[1] - hr * 0.3); ctx.lineTo(fc[0] + hr * 0.08, fc[1]); ctx.lineTo(fc[0], fc[1] + hr * 0.3); ctx.lineTo(fc[0] - hr * 0.08, fc[1]); ctx.closePath(); ctx.stroke();
+      // tiny constellation on the temple: 4 stars joined by hair-thin lines
+      const cs = [HP(0.86, -0.78), HP(0.98, -0.52), HP(0.84, -0.3), HP(0.72, -0.62)];
+      ctx.globalAlpha = 0.5; ctx.strokeStyle = "#cdb8ff"; ctx.lineWidth = lw1(0.025);
+      ctx.beginPath(); ctx.moveTo(cs[0][0], cs[0][1]); for (let i = 1; i < cs.length; i++) ctx.lineTo(cs[i][0], cs[i][1]); ctx.stroke();
+      ctx.globalAlpha = 0.95; ctx.fillStyle = "#ffffff";
+      for (const c of cs) { ctx.beginPath(); ctx.arc(c[0], c[1], Math.max(0.45, hr * 0.05), 0, TAU); ctx.fill(); }
+      ctx.globalAlpha = 1;
+
+      // star specks scattered over the skin (twinkling)
+      for (let i = 0; i < VOID_STARS.length; i++) {
+        const st = VOID_STARS[i];
+        const sx = hx + d * st[0] * rx * 0.95, sy = hy + st[1] * ry * 0.92;
+        const tw = 0.45 + 0.55 * Math.max(0, Math.sin(now * 2.2 + st[3]));
+        ctx.globalAlpha = tw; ctx.fillStyle = i % 4 === 0 ? "#ffffff" : "#d7c8ff";
+        ctx.beginPath(); ctx.arc(sx, sy, Math.max(0.4, hr * 0.045 * st[2] * 1.6), 0, TAU); ctx.fill();
+        if (st[2] > 0.95) { // a couple of brighter ones get a tiny cross glint
+          ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 0.35; const g = hr * 0.14 * tw;
+          ctx.beginPath(); ctx.moveTo(sx - g, sy); ctx.lineTo(sx + g, sy); ctx.moveTo(sx, sy - g); ctx.lineTo(sx, sy + g); ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // mouth: one flat, expressionless line with a faint cold highlight under it
+    {
+      const m0 = HP(0.12, 0.64), m1 = HP(0.66, 0.6);
+      ctx.lineCap = "round";
+      ctx.strokeStyle = F ? "#fff" : DARK; ctx.lineWidth = lw1(0.07);
+      ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
+      if (!F) {
+        ctx.globalAlpha = 0.22; ctx.strokeStyle = "#cdb8ff"; ctx.lineWidth = lw1(0.03);
+        ctx.beginPath(); ctx.moveTo(m0[0], m0[1] + hr * 0.07); ctx.lineTo(m1[0], m1[1] + hr * 0.07); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Eyes: pale-lavender light, NO pupil. Flat heavy upper lid, outer corner raised (stern, unblinking).
+    const eyeLight = stunned ? "#ffffff" : LAV;
+    const eye = (u, v, w, h, inn) => {
+      const I = HP(u + inn * w, v + h * 0.2), O = HP(u - inn * w * 1.12, v - h * 0.5);
+      const top = HP(u, v - h * 0.72), bot = HP(u, v + h * 1.5), c = HP(u, v);
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(I[0], I[1]); ctx.quadraticCurveTo(top[0], top[1], O[0], O[1]); ctx.quadraticCurveTo(bot[0], bot[1], I[0], I[1]); ctx.closePath();
+      if (!F) {
+        ctx.shadowColor = stunned ? "#ffffff" : "#c9b2ff"; ctx.shadowBlur = 9 + 6 * power;
+        const eg = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], w * hr * 1.1);
+        eg.addColorStop(0, "#ffffff"); eg.addColorStop(0.55, eyeLight); eg.addColorStop(1, "#a78bf0");
+        ctx.fillStyle = eg;
+      } else ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (!F) { // heavy lid shadow along the top edge
+        ctx.beginPath(); ctx.moveTo(I[0], I[1]); ctx.quadraticCurveTo(top[0], top[1], O[0], O[1]);
+        ctx.strokeStyle = DARK; ctx.lineWidth = lw1(0.075); ctx.lineCap = "round"; ctx.stroke();
+      }
       ctx.restore();
     };
-    eye(hcw[0] + d * hr * 0.48, hcw[1] - hr * 0.18, hr * 0.30, hr * 0.09); // Main eye
-    eye(hcw[0] + d * hr * 0.1, hcw[1] - hr * 0.15, hr * 0.20, hr * 0.075);  // Far eye (slightly smaller)
+    eye(0.5, -0.16, 0.3, 0.27, -1); // near eye
+    eye(0.09, -0.13, 0.21, 0.22, 1); // far eye (turned away, a little smaller)
 
     // Floating fragments above and behind the head (replaces crown shards)
     if (!F) {
@@ -367,33 +515,6 @@
       }
       ctx.restore();
     }
-
-    // ── 8) front shoulder (big spiked pauldron) + front arm + the hand that casts ──
-    taper(k, [armFw[0], armFw[1]], aw * 1.1, aw * 0.9, C.obs2, C.rim, 1.3);
-    taper(k, [armFw[1], armFw[2]], aw * 0.9, aw * 0.62, C.obs2, C.rim, 1.3);
-    bracer(armFw, true);
-    const sP = armFw[0];
-    fillPoly(k, [J(sP, -2.5, 2.8), J(sP, -3.1, -1.9), J(sP, -0.3, -4.3), J(sP, 3.1, -5.3), J(sP, 8.4, -7.4), J(sP, 5.0, -2.5), J(sP, 6.8, 1.6), J(sP, 2.5, 3.4)], C.obs3, C.rim, 1.6);
-    fillPoly(k, [J(sP, 1.6, -0.6), J(sP, 3.1, -3.4), J(sP, 9.3, -5.9), J(sP, 5.9, -0.9)], C.obs2, C.rim, 1.2);
-    glowStroke(k, crack(J(sP, -1.2, 1.2), J(sP, 6.8, -5.6), 7, 1.2), C.elec, 0.9, 4, 0.85);
-    const hand = claws(armFw, power, true);
-
-    // singularity gathering between the claws (grows while casting)
-    const orbR = 2.2 + 1.2 * pulse * 0.4 + 5.5 * windU + (strike ? 3 : 0);
-    const orb = [hand.palm[0] + Math.cos(hand.dir) * (aw * 3.4 + orbR * 0.4), hand.palm[1] + Math.sin(hand.dir) * (aw * 3.4 + orbR * 0.4) - 1];
-    A.orb = [A.ox + orb[0], A.oy + orb[1]]; // used by mage_fx.js
-    ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU);
-    ctx.fillStyle = k.col(C.void); ctx.fill();
-    if (!F) {
-      ctx.save();
-      ctx.shadowColor = C.elec; ctx.shadowBlur = 8 + 10 * power;
-      ctx.strokeStyle = C.hot; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU); ctx.stroke();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = C.elec; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(orb[0], orb[1], orbR * 1.9, orbR * 0.55, now * 3, 0, TAU); ctx.stroke();
-      ctx.restore();
-    } else { ctx.beginPath(); ctx.arc(orb[0], orb[1], orbR, 0, TAU); ctx.fillStyle = "#fff"; ctx.fill(); }
   }
 
   MW.VoidMage = { draw, C };
