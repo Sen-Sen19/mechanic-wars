@@ -249,978 +249,841 @@
   // NORMAL FORM
   // ═══════════════════════════════════════════════════════════════════
 
-  function drawBody(k, e) {
-    const { ctx, d, now } = k;
-    const F = k.isFlash;
+function drawBody(k, e) {
+  const { ctx, d, now } = k;
+  const F = k.isFlash;
 
-    const {
-      shW,
-      hipW,
-      hcw,
-      armBw,
-      armFw,
-      windU,
-      strike,
-      stunned,
-    } = e;
+  const {
+    shW, hipW, hcw, armBw, armFw,
+    windU, strike, stunned
+  } = e;
 
-    const H = k.H;
-    const u = H / 100;
+  const H = k.H;
+  const u = H / 100;
+  const torL = k.torL;
+  const sw = k.sw;
+  const hw = k.hw;
+  const hr = k.hr;
+  const legL = k.legL;
 
-    const torL = k.torL;
-    const sw = k.sw;
-    const hw = k.hw;
-    const hr = k.hr;
-    const legL = k.legL;
+  const vx = clamp(k.vx || 0, -9, 9);
+  const vy = clamp(k.vy || 0, -16, 16);
 
-    const vx = clamp(k.vx || 0, -9, 9);
-    const vy = clamp(k.vy || 0, -16, 16);
+  // Coordinate frame follows the fighter's actual pose.
+  let ux = shW[0] - hipW[0];
+  let uy = shW[1] - hipW[1];
+  const tl = Math.hypot(ux, uy) || 1;
 
-    // Torso frame.
-    let ux = shW[0] - hipW[0];
-    let uy = shW[1] - hipW[1];
+  ux /= tl;
+  uy /= tl;
 
-    const tl = Math.hypot(ux, uy) || 1;
+  let nx = -uy;
+  let ny = ux;
 
-    ux /= tl;
-    uy /= tl;
+  if (nx * d < 0) {
+    nx = -nx;
+    ny = -ny;
+  }
 
-    let nx = -uy;
-    let ny = ux;
+  const T = (a, b) => [
+    hipW[0] + ux * a + nx * b,
+    hipW[1] + uy * a + ny * b
+  ];
 
-    if (nx * d < 0) {
-      nx = -nx;
-      ny = -ny;
-    }
+  const J = (o, a, b) => [
+    o[0] + ux * a + nx * b,
+    o[1] + uy * a + ny * b
+  ];
 
-    const T = (a, b) => [
-      hipW[0] + ux * a + nx * b,
-      hipW[1] + uy * a + ny * b,
+  const hx = hcw[0];
+  const hy = hcw[1];
+  const hrx = hr * 1.2;
+
+  const Hp = (a, b) => [
+    hx + d * hrx * a,
+    hy + hrx * b
+  ];
+
+  const flut = (p, w, ph) => [
+    p[0] - vx * 2.0 * w * w - d * 1.1 * w
+      + Math.sin(now * 2.2 + ph) * 0.8 * w,
+    p[1] - vy * 0.4 * w
+      + Math.sin(now * 2.8 + ph) * 0.7 * w
+  ];
+
+  // ---------------------------------------------------------------
+  // BACK COAT: one clean silhouette instead of many small panels.
+  // ---------------------------------------------------------------
+
+  {
+    const pts = [
+      T(torL * 0.92, -sw * 0.28),
+      T(torL * 0.48, -hw * 0.55),
+      T(1, -hw * 0.65),
+      flut(T(-legL * 0.35, -hw * 0.95), 0.4, 0.5),
+      flut(T(-legL * 0.85, -hw * 0.92), 0.85, 1.2),
+      flut(T(-legL * 0.95, -hw * 0.45), 1.0, 2.0),
+      T(-legL * 0.35, -hw * 0.12),
+      T(torL * 0.35, -hw * 0.1)
     ];
 
-    const J = (o, a, b) => [
-      o[0] + ux * a + nx * b,
-      o[1] + uy * a + ny * b,
-    ];
+    fillPoly(k, pts, C.coat, C.line, 1.3);
 
-    // Head frame.
-    const hx = hcw[0];
-    const hy = hcw[1];
-    const hrx = hr * 1.2;
-
-    const Hp = (a, b) => [
-      hx + d * hrx * a,
-      hy + hrx * b,
-    ];
-
-    // Cloth movement.
-    const flut = (p, w, ph) => [
-      p[0] -
-        vx * 2.5 * w * w -
-        d * 1.4 * w +
-        Math.sin(now * 2.3 + ph) * 1.2 * w,
-
-      p[1] -
-        vy * 0.5 * w +
-        Math.sin(now * 3.1 + ph * 1.3) * 0.9 * w -
-        0.6 * w,
-    ];
-
-    // ── 1. BACK COAT PANEL ──────────────────────────────────────────
-
-    {
-      const pts = [
-        T(torL * 0.96, -sw * 0.34),
-        T(torL * 0.4, -hw * 0.66),
-        T(2, -hw * 0.72),
-        flut(T(-legL * 0.38, -hw * 1.0), 0.35, 0.4),
-        flut(T(-legL * 0.72, -hw * 1.05), 0.8, 1.1),
-        flut(T(-legL * 0.98, -hw * 0.86), 1.1, 2.0),
-        flut(T(-legL * 0.7, -hw * 0.3), 0.8, 2.6),
-        flut(T(-legL * 0.3, hw * 0.1), 0.4, 3.2),
-        T(4, hw * 0.2),
-        T(torL * 0.4, hw * 0.1),
-      ];
-
-      fillPoly(k, pts, C.coat, C.line, 1.2);
-
-      if (!F) {
-        line(
-          k,
-          [pts[2], pts[3], pts[4]],
-          C.coat2,
-          1.6,
-          0.9
-        );
-
-        line(
-          k,
-          [
-            mix(pts[2], pts[7], 0.5),
-            mix(pts[3], pts[6], 0.5),
-            mix(pts[4], pts[6], 0.62),
-          ],
-          C.coatHi,
-          0.9,
-          0.7
-        );
-
-        stitch(k, [pts[3], pts[4], pts[5], pts[6]], 0.9);
-      }
-
-      // Narrow ivory accent along the outer edge.
-      const inset = [
-        mix(pts[2], pts[3], 0.10),
-        mix(pts[3], pts[4], 0.12),
-        mix(pts[4], pts[5], 0.14),
-        mix(pts[5], pts[6], 0.12),
-        mix(pts[6], pts[7], 0.10),
-      ];
-
-      taper(
-        k,
-        inset,
-        2.8 * u,
-        1.4 * u,
-        C.ivory,
-        C.line,
-        0.5
-      );
-    }
-
-    // ── 2. BACK ARM ─────────────────────────────────────────────────
-
-    const arm = (pts, front) => {
-      const [s0, el, wr] = pts;
-
-      const sl = front ? C.coat : C.coat;
-      const sl2 = front ? C.coat2 : C.coat2;
-      const cuff = front ? C.ivory : C.coat;
-
-      taper(k, [s0, el], 6.0 * u, 4.9 * u, sl, C.line, 1.1);
-      taper(k, [el, wr], 4.9 * u, 4.0 * u, sl2, C.line, 1.1);
-
-      const vx0 = wr[0] - el[0];
-      const vy0 = wr[1] - el[1];
-      const len = Math.hypot(vx0, vy0) || 1;
-
-      const tx = vx0 / len;
-      const ty = vy0 / len;
-      const qx = -ty;
-      const qy = tx;
-
-      const P = (t, q) => [
-        el[0] + tx * len * t + qx * q * u,
-        el[1] + ty * len * t + qy * q * u,
-      ];
-
-      line(
-        k,
-        [P(0.04, -2.3), P(0.12, 0.2), P(0.04, 2.3)],
-        C.coatHi,
-        0.9,
-        0.75
-      );
-
-      fillPoly(
-        k,
-        [
-          P(0.7, -3.0),
-          P(1.02, -2.7),
-          P(1.02, 2.7),
-          P(0.7, 3.0),
-        ],
-        cuff,
-        C.line,
-        1
-      );
-
-      stitch(k, [P(0.76, -2.8), P(0.76, 2.8)], 0.7);
-
-      // Slender hand and long fingers.
-      const Gp = (t, q) => [
-        wr[0] + (tx * t + qx * q) * u,
-        wr[1] + (ty * t + qy * q) * u,
-      ];
-
-      fillPoly(
-        k,
-        [
-          Gp(-1, -2.4),
-          Gp(2.6, -2.6),
-          Gp(7.2, -2.0),
-          Gp(9.2, -0.4),
-          Gp(8.2, 1.2),
-          Gp(7.0, 2.2),
-          Gp(2.6, 2.6),
-          Gp(-1, 2.4),
-        ],
-        C.skin,
-        C.line,
-        0.9
-      );
-
-      for (const t of [5.0, 6.6]) {
-        line(
-          k,
-          [Gp(t, -2.0), Gp(t + 0.8, 1.8)],
-          C.skinSh,
-          0.6,
-          0.8
-        );
-      }
-
-      fillPoly(
-        k,
-        [
-          Gp(1.0, 2.2),
-          Gp(4.4, 3.8),
-          Gp(5.8, 3.2),
-          Gp(3.0, 1.8),
-        ],
-        C.skin,
-        C.line,
-        0.6
-      );
-
-      return Gp(8.6, 0);
-    };
-
-    arm(armBw, true);
-
-    // ── 3. BACK LEG ─────────────────────────────────────────────────
-
-    const leg = (pts, isBack) => {
-      const [h, kn, ft] = pts;
-
-      const tr = isBack ? C.pants : C.pants2;
-
-      taper(k, [h, kn], 9.6 * u, 6.6 * u, tr, C.line, 1.1);
-      taper(k, [kn, ft], 6.6 * u, 4.8 * u, tr, C.line, 1.1);
-
-      line(
-        k,
-        [mix(h, kn, 0.1), mix(h, kn, 0.9)],
-        C.coatHi,
-        0.8,
-        0.5
-      );
-
-      const bt = mix(kn, ft, 0.4);
-
-      taper(k, [bt, ft], 5.8 * u, 5.4 * u, C.boot, C.line, 1.1);
-
-      fillPoly(
-        k,
-        [
-          [ft[0] - d * 4.4 * u, ft[1] - 6 * u],
-          [ft[0] + d * 4 * u, ft[1] - 6 * u],
-          [ft[0] + d * 4.6 * u, ft[1] - 2.8 * u],
-          [ft[0] + d * 13.4 * u, ft[1] - 0.6 * u],
-          [ft[0] + d * 12.6 * u, ft[1] + 1.2 * u],
-          [ft[0] - d * 5 * u, ft[1] + 1.2 * u],
-        ],
-        C.boot,
-        C.line,
-        1.1
-      );
-
-      line(
-        k,
-        [
-          [ft[0] + d * 6 * u, ft[1] - 2.4 * u],
-          [ft[0] + d * 12.4 * u, ft[1] - 0.8 * u],
-        ],
-        C.bootHi,
-        0.9,
-        0.7
-      );
-
-      const bc = mix(kn, ft, 0.38);
-
-      stitch(
-        k,
-        [
-          [bc[0] - d * 3.4 * u, bc[1]],
-          [bc[0] + d * 3.4 * u, bc[1] + 0.6 * u],
-        ],
-        0.8
-      );
-
-      line(
-        k,
-        [
-          [ft[0] - d * 3.4 * u, ft[1] - 7.6 * u],
-          [ft[0] + d * 3.6 * u, ft[1] - 7.2 * u],
-        ],
-        C.bootHi,
-        1.2,
-        0.8
-      );
-    };
-
-    leg(k.MP(k.legB), true);
-
-    // ── 4. TORSO ────────────────────────────────────────────────────
-
-    fillPoly(
+    // Narrow ivory edge, not a large competing panel.
+    taper(
       k,
       [
-        T(torL * 0.98, -sw * 0.3),
-        T(torL * 1.0, sw * 0.3),
-        T(torL * 0.6, sw * 0.36),
-        T(2, hw * 0.5),
-        T(2, -hw * 0.58),
-        T(torL * 0.5, -hw * 0.5),
+        pts[2],
+        pts[3],
+        pts[4],
+        pts[5]
       ],
-      C.coat2,
+      2.0 * u,
+      0.8 * u,
+      C.ivory2,
+      C.line,
+      0.5
+    );
+
+    line(k, [pts[2], pts[3], pts[4]], C.coatHi, 1.2, 0.65);
+    stitch(k, [pts[3], pts[4], pts[5]], 0.8);
+  }
+
+  // ---------------------------------------------------------------
+  // ARMS: tailored sleeves, compact hands.
+  // ---------------------------------------------------------------
+
+  const arm = (pts, front) => {
+    const [shoulder, elbow, wrist] = pts;
+
+    const sleeve = front ? C.coat : C.coat2;
+
+    taper(
+      k,
+      [shoulder, elbow],
+      7.0 * u,
+      5.0 * u,
+      sleeve,
       C.line,
       1.2
     );
 
-    // Asymmetric ivory coat panel.
-    fillPoly(
+    taper(
       k,
-      [
-        T(torL * 0.98, -sw * 0.32),
-        T(torL * 1.0, -sw * 0.08),
-        T(torL * 0.5, -hw * 0.1),
-        T(2, -hw * 0.12),
-        T(2, -hw * 0.34),
-        T(torL * 0.5, -hw * 0.32),
-      ],
-      C.ivory,
+      [elbow, wrist],
+      5.0 * u,
+      3.8 * u,
+      C.coat,
       C.line,
       1.1
     );
 
-    stitch(
-      k,
-      [
-        T(torL * 1.0, -sw * 0.08),
-        T(torL * 0.5, -hw * 0.1),
-        T(2, -hw * 0.12),
-      ],
-      0.9
-    );
-
-    // Black front coat with angled lapel.
-    fillPoly(
-      k,
-      [
-        T(torL * 1.0, -sw * 0.1),
-        T(torL * 1.02, sw * 0.32),
-        T(torL * 0.64, sw * 0.4),
-        T(2, hw * 0.56),
-        T(2, -hw * 0.1),
-        T(torL * 0.5, -hw * 0.12),
-      ],
-      C.coat,
-      C.line,
-      1.2
-    );
-
-    fillPoly(
-      k,
-      [
-        T(torL * 1.0, sw * 0.02),
-        T(torL * 0.74, sw * 0.18),
-        T(torL * 0.52, hw * 0.1),
-        T(torL * 0.8, -sw * 0.04),
-      ],
-      C.coat2,
-      C.line,
-      0.8
-    );
-
+    // Subtle sleeve highlight.
     line(
       k,
       [
-        T(torL * 0.98, sw * 0.3),
-        T(torL * 0.64, sw * 0.39),
-        T(4, hw * 0.55),
-      ],
-      C.ivory2,
-      1.3,
-      0.95
-    );
-
-    line(
-      k,
-      [
-        T(torL * 0.9, sw * 0.1),
-        T(torL * 0.5, hw * 0.3),
-        T(6, hw * 0.36),
+        mix(shoulder, elbow, 0.18),
+        mix(shoulder, elbow, 0.65)
       ],
       C.coatHi,
-      0.9,
+      1.0,
       0.7
     );
 
-    stitch(
-      k,
-      [
-        T(torL * 0.94, sw * 0.24),
-        T(torL * 0.62, sw * 0.33),
-        T(4, hw * 0.46),
-      ],
-      0.8
-    );
+    const dx = wrist[0] - elbow[0];
+    const dy = wrist[1] - elbow[1];
+    const len = Math.hypot(dx, dy) || 1;
 
-    // Belt and buckle.
+    const tx = dx / len;
+    const ty = dy / len;
+    const qx = -ty;
+    const qy = tx;
+
+    const P = (t, q) => [
+      elbow[0] + tx * len * t + qx * q * u,
+      elbow[1] + ty * len * t + qy * q * u
+    ];
+
+    // Small ivory cuff.
     fillPoly(
       k,
       [
-        T(7, -hw * 0.58),
-        T(7, hw * 0.54),
-        T(2, hw * 0.54),
-        T(2, -hw * 0.58),
+        P(0.78, -2.0),
+        P(1.02, -1.8),
+        P(1.02, 1.8),
+        P(0.78, 2.0)
       ],
-      C.coat2,
-      C.line,
-      1.1
-    );
-
-    fillPoly(
-      k,
-      [
-        J(T(4.5, hw * 0.1), 1.6, -2.2),
-        J(T(4.5, hw * 0.1), 1.6, 2.2),
-        J(T(4.5, hw * 0.1), -1.6, 2.2),
-        J(T(4.5, hw * 0.1), -1.6, -2.2),
-      ],
-      C.ivory2,
+      front ? C.ivory : C.coat2,
       C.line,
       0.8
     );
 
-    // ── 5. FRONT LEG AND COAT FLAP ──────────────────────────────────
-
-    leg(k.MP(k.legF), false);
-
-    {
-      const pts = [
-        T(7, -hw * 0.1),
-        T(7, hw * 0.62),
-        flut(T(-legL * 0.1, hw * 0.84), 0.2, 0.8),
-        flut(T(-legL * 0.34, hw * 0.64), 0.45, 1.5),
-        flut(T(-legL * 0.5, hw * 0.06), 0.7, 2.4),
-        flut(T(-legL * 0.24, -hw * 0.14), 0.4, 3.0),
-      ];
-
-      fillPoly(k, pts, C.coat, C.line, 1.2);
-
-      if (!F) {
-        line(
-          k,
-          [pts[0], mix(pts[3], pts[4], 0.4)],
-          C.coat2,
-          1.8,
-          0.9
-        );
-
-        line(
-          k,
-          [mix(pts[1], pts[2], 0.3), mix(pts[2], pts[3], 0.5)],
-          C.coatHi,
-          0.8,
-          0.6
-        );
-
-        stitch(k, [pts[2], pts[3], pts[4], pts[5]], 0.9);
-      }
-    }
-
-    // ── 6. FRONT ARM ─────────────────────────────────────────────────
-
-    const hand = arm(armFw, true);
-
-    // ── 7. HEAD AND NECK ────────────────────────────────────────────
-
-    const nb = T(torL * 1.0, 0);
+    // Hand follows wrist orientation.
+    const Gp = (t, q) => [
+      wrist[0] + (tx * t + qx * q) * u,
+      wrist[1] + (ty * t + qy * q) * u
+    ];
 
     fillPoly(
       k,
       [
-        Hp(-0.3, 0.4),
-        Hp(0.5, 0.5),
-        Hp(0.56, 1.6),
-        Hp(-0.4, 1.55),
+        Gp(-0.5, -1.8),
+        Gp(2.0, -2.0),
+        Gp(4.4, -1.7),
+        Gp(5.5, -0.5),
+        Gp(5.1, 1.1),
+        Gp(3.8, 1.9),
+        Gp(1.4, 1.8),
+        Gp(-0.5, 1.3)
       ],
-      C.skinSh,
+      C.skin,
       C.line,
-      1
+      0.8
     );
 
-    // High ivory collar.
+    // Natural finger separations.
+    line(k, [Gp(3.4, -1.2), Gp(4.5, 0.1)], C.skinSh, 0.55, 0.7);
+    line(k, [Gp(2.7, 0.1), Gp(3.8, 1.3)], C.skinSh, 0.55, 0.7);
+
+    // Thumb.
     fillPoly(
       k,
       [
-        J(nb, -3, -sw * 0.34),
-        J(nb, 8.4 * u, -sw * 0.34),
-        J(nb, 11 * u, -sw * 0.1),
-        J(nb, 3 * u, sw * 0.0),
-        J(nb, -3, sw * 0.04),
+        Gp(0.7, 1.2),
+        Gp(2.0, 1.8),
+        Gp(3.0, 3.0),
+        Gp(2.4, 3.4),
+        Gp(1.2, 2.5)
       ],
-      C.ivory,
+      C.skin,
       C.line,
-      1.1
-    );
-
-    stitch(
-      k,
-      [
-        J(nb, 1.4, -sw * 0.3),
-        J(nb, 8.6 * u, -sw * 0.28),
-        J(nb, 10.4 * u, -sw * 0.1),
-      ],
-      0.7
-    );
-
-    // ── BACK HAIR: BEHIND THE NECK AND FACE ──────────────────────────
-
-    {
-      const lock = (a0, b0, dx, dy, w, col, ph) => {
-        const p0 = Hp(a0, b0);
-        const tip = Hp(a0 + dx, b0 + dy);
-        const fl2 = flut(tip, 0.5, ph);
-
-        const mid = [
-          (p0[0] + fl2[0]) / 2 - d * u,
-          (p0[1] + fl2[1]) / 2,
-        ];
-
-        const edgeCol =
-          col === C.hairBlk || col === C.hairBlk2
-            ? C.hairBlk
-            : C.hair2;
-
-        taper(
-          k,
-          [p0, mid, fl2],
-          w * u,
-          0.7 * u,
-          col,
-          edgeCol,
-          0.5,
-          4
-        );
-      };
-
-      lock(-0.7, -0.3, -0.55, 0.85, 4.6, C.hairBlk2, 0.3);
-      lock(-0.9, -0.5, -0.4, 0.9, 4.4, C.hair2, 1.2);
-      lock(-0.5, -0.4, -0.5, 0.65, 3.8, C.hairBlk, 2.1);
-      lock(-1.0, -0.2, -0.25, 0.8, 4.0, C.hair, 2.9);
-    }
-
-    // ── FACE ────────────────────────────────────────────────────────
-
-    {
-      // Unsettlingly beautiful: clean, fine-boned profile with a defined (not heavy) jaw and chin.
-      const face = [Hp(-0.35, -0.95), Hp(0.55, -1.02), Hp(0.95, -0.7), Hp(1.0, -0.42), Hp(1.04, -0.18)]
-        .concat(spline([Hp(1.04, -0.18), Hp(1.26, 0.2), Hp(1.02, 0.3), Hp(1.05, 0.42), Hp(1.0, 0.56), Hp(1.02, 0.76), Hp(0.94, 0.98), Hp(0.62, 1.12), Hp(0.2, 1.06), Hp(-0.3, 0.84)], 4).slice(1))
-        .concat([Hp(-0.6, 0.4), Hp(-0.6, -0.3)]);
-
-      fillPoly(k, face, C.skin, C.line, 1.3);
-
-      if (!F) {
-        ctx.save();
-        ctx.globalAlpha = 0.4;
-
-        pathOf(
-          ctx,
-          [
-            Hp(0.1, 0.1),
-            Hp(0.78, 0.28),
-            Hp(0.86, 0.84),
-            Hp(0.5, 1.06),
-            Hp(-0.1, 0.95),
-          ]
-        );
-
-        ctx.fillStyle = C.skinSh;
-        ctx.fill();
-        ctx.restore();
-
-        // Thin, flat mouth with the faintest smirk at the corner (no colored lips).
-        // Crooked smirk: the line sags flat, then the corner snaps up too high (a human smile, slightly wrong), with a faint cheek crease.
-        line(k, [Hp(0.74, 0.68), Hp(0.88, 0.69), Hp(0.97, 0.63), Hp(1.04, 0.52)], "#6a4a54", 1.1, 1);
-        line(k, [Hp(0.8, 0.72), Hp(0.92, 0.73)], "#b48a96", 0.9, 0.7);   // soft lower lip
-        line(k, [Hp(0.9, 0.5), Hp(0.8, 0.56)], C.skinSh, 0.8, 0.6);      // cheek crease from the lifted corner
-
-        // Jaw line and cheekbone shadow (angular, not soft).
-        line(k, [Hp(0.0, 0.72), Hp(0.28, 1.0), Hp(0.62, 1.12)], C.skinSh, 1.0, 0.7);
-        line(k, [Hp(0.4, 0.14), Hp(0.7, 0.36), Hp(0.9, 0.38)], C.skinSh, 0.9, 0.7);
-
-        line(
-          k,
-          [Hp(0.74, 0.4), Hp(0.8, 0.5)],
-          C.skinSh,
-          0.8,
-          0.8
-        );
-
-
-        // Nose.
-        line(
-          k,
-          [Hp(1.04, -0.12), Hp(1.2, 0.18), Hp(1.02, 0.27)],
-          C.skinSh,
-          0.8,
-          0.7
-        );
-      }
-
-      // Heterochromatic eyes.
-      const eye = (a, b, w, iris, glowOn, kind) => {
-        const p0 = Hp(a, b);
-        const p1 = Hp(a + w, b - 0.04);
-        const top = Hp(a + w * 0.5, b - 0.19);
-        const bot = Hp(a + w * 0.5, b + 0.1);
-
-        pathOf(ctx, [p0, top, p1, bot]);
-
-        ctx.fillStyle = k.col(C.sclera);
-        ctx.fill();
-
-        edge(k, C.line, 0.8);
-
-        if (!F) {
-          const ic = Hp(a + w * 0.62 + (kind === "pin" ? 0.05 : 0), b - 0.03); // the grey iris sits slightly too far forward
-
-          ctx.save();
-
-          if (glowOn) {
-            ctx.shadowColor = C.eyeRed;
-            ctx.shadowBlur = 9;
-          }
-
-          ctx.fillStyle = iris;
-
-          ctx.beginPath();
-          ctx.ellipse(
-            ic[0],
-            ic[1],
-            Math.max(0.9, hrx * 0.11),
-            Math.max(1.2, hrx * 0.17),
-            0,
-            0,
-            TAU
-          );
-          ctx.fill();
-
-          ctx.restore();
-
-          // Unnatural pupils: the red eye has a thin vertical slit, the grey eye a pinprick inside a dark ring.
-          ctx.fillStyle = C.line;
-          ctx.beginPath();
-          if (kind === "slit") ctx.ellipse(ic[0] + d * 0.1, ic[1], Math.max(0.3, hrx * 0.03), Math.max(1.3, hrx * 0.19), 0, 0, TAU);
-          else ctx.arc(ic[0] + d * 0.2, ic[1], Math.max(0.28, hrx * 0.028), 0, TAU);
-          ctx.fill();
-          if (kind === "pin") {
-            ctx.strokeStyle = "#6f7384";
-            ctx.lineWidth = 0.4;
-            ctx.beginPath();
-            ctx.ellipse(ic[0], ic[1], Math.max(0.9, hrx * 0.11), Math.max(1.2, hrx * 0.17), 0, 0, TAU);
-            ctx.stroke();
-          }
-
-          ctx.fillStyle = "#fff";
-          ctx.beginPath();
-          ctx.arc(ic[0] - d * 0.5, ic[1] - 0.6, 0.35, 0, TAU);
-          ctx.fill();
-        }
-
-        return top;
-      };
-
-      // Faint eye shadows.
-      if (!F) {
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-
-        pathOf(
-          ctx,
-          [
-            Hp(0.26, -0.34),
-            Hp(0.68, -0.38),
-            Hp(0.72, -0.18),
-            Hp(0.35, -0.12),
-          ]
-        );
-
-        ctx.fillStyle = "#65545F";
-        ctx.fill();
-
-        pathOf(
-          ctx,
-          [
-            Hp(0.7, -0.34),
-            Hp(1.02, -0.34),
-            Hp(1.02, -0.15),
-            Hp(0.75, -0.12),
-          ]
-        );
-
-        ctx.fillStyle = "#65545F";
-        ctx.fill();
-
-        ctx.restore();
-      }
-
-      eye(0.68, -0.22, 0.25, C.eyeGray, false, "pin");
-      eye(0.34, -0.22, 0.32, C.eyeRed, true, "slit");
-
-      // Eyelids and eyebrows.
-      line(
-        k,
-        [Hp(0.32, -0.3), Hp(0.5, -0.36), Hp(0.68, -0.32)],
-        C.line,
-        1.1,
-        1
-      );
-
-      line(
-        k,
-        [Hp(0.68, -0.29), Hp(0.93, -0.33)],
-        C.line,
-        1.0,
-        1
-      );
-
-      line(
-        k,
-        [Hp(0.2, -0.54), Hp(0.5, -0.64), Hp(0.72, -0.57)],
-        C.hairBlk,
-        2.0,
-        1
-      );
-
-      line(
-        k,
-        [Hp(0.78, -0.57), Hp(1.02, -0.52)],
-        C.hairBlk,
-        1.8,
-        1
-      );
-
-      // Rendering error: faint horizontal scan bands slip across the face now and then, and a few pixel fragments flicker by the red eye.
-      // The face itself never changes expression: only the picture of it is slightly wrong.
-      if (!F) {
-        const tb = Math.floor(now * 9);
-        ctx.save();
-        pathOf(ctx, face);
-        ctx.clip();
-        for (let i = 0; i < 2; i++) {
-          if (hash(tb * 1.7 + i * 4.1) < 0.35) continue;
-          const yy = Hp(0, -0.55 + 1.5 * hash(tb * 2.3 + i * 7.7))[1];
-          const x0 = Hp(0, 0)[0] - 40, hh = Math.max(0.6, hrx * 0.07);
-          ctx.globalAlpha = 0.18;
-          ctx.fillStyle = i ? "#2de2ff" : "#ff2d6a";
-          ctx.fillRect(x0, yy, 80, hh);
-          ctx.globalAlpha = 0.12;
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(x0, yy + hh, 80, hh * 0.6);
-        }
-        ctx.restore();
-        if (hash(tb * 0.9 + 3) > 0.6) {
-          const e = Hp(0.34, -0.22);
-          ctx.save();
-          ctx.globalAlpha = 0.85;
-          for (let j = 0; j < 2; j++) {
-            ctx.fillStyle = j ? "#2de2ff" : "#ff2d6a";
-            ctx.fillRect(e[0] + (hash(tb + j * 3.3) - 0.5) * hrx * 1.2, e[1] + (hash(tb * 2 + j) - 0.2) * hrx * 0.5, Math.max(1, hrx * 0.14), Math.max(0.6, hrx * 0.05));
-          }
-          ctx.restore();
-        }
-      }
-    }
-
-    // ── SPLIT BLACK-AND-WHITE GOTHIC HAIR ────────────────────────────
-    // Drawn after the face so the fringe naturally overlaps the forehead.
-
-    {
-      // Main white hair silhouette.
-      const cap = [
-        Hp(1.0, -0.72),
-        Hp(0.72, -1.22),
-        Hp(0.1, -1.36),
-        Hp(-0.7, -1.18),
-        Hp(-1.14, -0.7),
-        Hp(-1.18, 0.05),
-        Hp(-0.96, 0.52),
-        Hp(-0.62, 0.5),
-        Hp(-0.44, 0.1),
-        Hp(-0.1, -0.4),
-        Hp(0.5, -0.66),
-      ];
-
-      fillPoly(k, cap, C.hair, C.hairSh, 1.0);
-
-      // Large irregular black section.
-      fillPoly(
-        k,
-        [
-          Hp(-0.05, -1.34),
-          Hp(-0.7, -1.18),
-          Hp(-1.14, -0.7),
-          Hp(-1.18, 0.05),
-          Hp(-0.96, 0.52),
-          Hp(-0.62, 0.5),
-          Hp(-0.44, 0.1),
-          Hp(-0.55, -0.18),
-          Hp(-0.32, -0.42),
-          Hp(-0.48, -0.65),
-          Hp(-0.12, -0.83),
-        ],
-        C.hairBlk,
-        C.hairBlk2,
-        0.8
-      );
-
-      // Dark underlayer.
-      fillPoly(
-        k,
-        [
-          Hp(-1.08, -0.35),
-          Hp(-0.88, 0.05),
-          Hp(-0.68, 0.28),
-          Hp(-0.76, 0.58),
-          Hp(-1.0, 0.42),
-          Hp(-1.18, 0.05),
-        ],
-        C.hairBlk2,
-        C.hairBlk,
-        0.6
-      );
-
-      // White highlights.
-      line(
-        k,
-        [
-          Hp(0.7, -1.12),
-          Hp(0.25, -1.18),
-          Hp(-0.05, -1.02),
-        ],
-        "#FFFFFF",
-        1.0,
-        0.8
-      );
-
-      line(
-        k,
-        [
-          Hp(0.2, -0.98),
-          Hp(0.5, -0.88),
-          Hp(0.82, -0.85),
-        ],
-        "#FFFFFF",
-        0.8,
-        0.65
-      );
-
-      // Messy, uneven fringe.
-      const fr = (
-        a0,
-        b0,
-        a1,
-        b1,
-        a2,
-        b2,
-        w,
-        col,
-        ph
-      ) => {
-        const tip = flut(Hp(a2, b2), 0.18, ph);
-
-        taper(
-          k,
-          [
-            Hp(a0, b0),
-            Hp(a1, b1),
-            tip,
-          ],
-          w * u,
-          0.6 * u,
-          col,
-          col === C.hairBlk ? C.hairBlk2 : C.hair2,
-          0.5,
-          4
-        );
-      };
-
-      // White swept bangs.
-      fr(0.1, -1.2, 0.55, -0.9, 0.88, -0.48, 4.2, C.hair, 0.2);
-      fr(0.38, -1.2, 0.85, -0.98, 1.15, -0.62, 3.5, C.hair2, 1.0);
-
-      // Black bangs crossing the opposite side.
-      fr(-0.35, -1.2, -0.05, -0.82, 0.12, -0.35, 4.1, C.hairBlk, 1.8);
-      fr(-0.65, -1.05, -0.45, -0.75, -0.28, -0.25, 3.3, C.hairBlk2, 2.5);
-
-      // Outward-pointing locks.
-      fr(-0.85, -0.92, -1.15, -0.68, -1.4, -0.48, 3.2, C.hairBlk, 3.2);
-      fr(0.7, -1.08, 1.0, -0.9, 1.35, -0.72, 2.8, C.hair, 4.0);
-
-      // Black side lock.
-      taper(
-        k,
-        [
-          Hp(-0.9, -0.45),
-          Hp(-0.82, 0.05),
-          flut(Hp(-0.76, 0.36), 0.12, 0.7),
-        ],
-        3.8 * u,
-        0.8 * u,
-        C.hairBlk,
-        C.hairBlk2,
-        0.5,
-        4
-      );
-
-      // White side lock.
-      taper(
-        k,
-        [
-          Hp(0.05, -0.65),
-          Hp(0.0, -0.05),
-          flut(Hp(0.1, 0.28), 0.12, 1.5),
-        ],
-        3.0 * u,
-        0.7 * u,
-        C.hair,
-        C.hair2,
-        0.5,
-        4
-      );
-    }
-
-    // ── COLLAR ──────────────────────────────────────────────────────
-
-    fillPoly(
-      k,
-      [
-        J(nb, -2, sw * 0.3),
-        J(nb, 5 * u, sw * 0.24),
-        J(nb, 7 * u, sw * 0.08),
-        J(nb, 0.6, sw * 0.0),
-      ],
-      C.coat,
-      C.line,
-      1
-    );
-
-    stitch(
-      k,
-      [
-        J(nb, 0.4, sw * 0.26),
-        J(nb, 5.4 * u, sw * 0.2),
-        J(nb, 6.4 * u, sw * 0.08),
-      ],
       0.6
     );
 
-    return hand;
+    return Gp(5.2, 0);
+  };
+
+  arm(armBw, false);
+
+  // ---------------------------------------------------------------
+  // LEGS: slim tailored trousers and structured boots.
+  // ---------------------------------------------------------------
+
+  const leg = (pts, isBack) => {
+    const [hip, knee, foot] = pts;
+
+    const pants = isBack ? C.pants : C.pants2;
+
+    taper(
+      k,
+      [hip, knee],
+      9.0 * u,
+      6.2 * u,
+      pants,
+      C.line,
+      1.1
+    );
+
+    taper(
+      k,
+      [knee, foot],
+      6.2 * u,
+      4.6 * u,
+      pants,
+      C.line,
+      1.1
+    );
+
+    // Trouser crease.
+    line(
+      k,
+      [mix(hip, knee, 0.2), mix(hip, knee, 0.8)],
+      C.coatHi,
+      0.7,
+      0.45
+    );
+
+    const ankle = mix(knee, foot, 0.58);
+
+    taper(
+      k,
+      [ankle, foot],
+      5.0 * u,
+      4.8 * u,
+      C.boot,
+      C.line,
+      1.1
+    );
+
+    // Simple pointed boot silhouette.
+    fillPoly(
+      k,
+      [
+        [foot[0] - d * 4.0 * u, foot[1] - 5.0 * u],
+        [foot[0] + d * 4.0 * u, foot[1] - 5.0 * u],
+        [foot[0] + d * 5.0 * u, foot[1] - 2.0 * u],
+        [foot[0] + d * 12.0 * u, foot[1] - 0.2 * u],
+        [foot[0] + d * 11.0 * u, foot[1] + 1.0 * u],
+        [foot[0] - d * 4.5 * u, foot[1] + 1.0 * u]
+      ],
+      C.boot,
+      C.line,
+      1.0
+    );
+
+    line(
+      k,
+      [
+        [foot[0] + d * 4.5 * u, foot[1] - 2.8 * u],
+        [foot[0] + d * 10.5 * u, foot[1] - 0.8 * u]
+      ],
+      C.bootHi,
+      0.9,
+      0.75
+    );
+
+    line(
+      k,
+      [
+        [foot[0] - d * 3.0 * u, foot[1] - 6.0 * u],
+        [foot[0] + d * 3.0 * u, foot[1] - 6.0 * u]
+      ],
+      C.bootHi,
+      1.0,
+      0.7
+    );
+  };
+
+  leg(k.MP(k.legB), true);
+
+  // ---------------------------------------------------------------
+  // TORSO: fitted waist, strong shoulder line.
+  // ---------------------------------------------------------------
+
+  fillPoly(
+    k,
+    [
+      T(torL * 0.98, -sw * 0.34),
+      T(torL * 0.98, sw * 0.34),
+      T(torL * 0.72, sw * 0.4),
+      T(2, hw * 0.42),
+      T(2, -hw * 0.42),
+      T(torL * 0.65, -sw * 0.38)
+    ],
+    C.coat2,
+    C.line,
+    1.2
+  );
+
+  // Ivory shoulder and chest panel.
+  fillPoly(
+    k,
+    [
+      T(torL * 0.98, -sw * 0.34),
+      T(torL * 0.94, -sw * 0.05),
+      T(torL * 0.55, -hw * 0.05),
+      T(torL * 0.35, -hw * 0.25),
+      T(torL * 0.62, -sw * 0.36)
+    ],
+    C.ivory,
+    C.line,
+    1.0
+  );
+
+  // Main black coat front.
+  fillPoly(
+    k,
+    [
+      T(torL * 0.98, -sw * 0.05),
+      T(torL * 1.0, sw * 0.34),
+      T(torL * 0.7, sw * 0.4),
+      T(2, hw * 0.48),
+      T(2, -hw * 0.12),
+      T(torL * 0.55, -hw * 0.05)
+    ],
+    C.coat,
+    C.line,
+    1.2
+  );
+
+  // Long, elegant lapel.
+  fillPoly(
+    k,
+    [
+      T(torL * 0.98, sw * 0.02),
+      T(torL * 0.72, sw * 0.18),
+      T(torL * 0.48, hw * 0.05),
+      T(torL * 0.62, -hw * 0.04),
+      T(torL * 0.84, -sw * 0.04)
+    ],
+    C.coat2,
+    C.line,
+    0.8
+  );
+
+  // One restrained crimson seam.
+  stitch(
+    k,
+    [
+      T(torL * 0.92, sw * 0.28),
+      T(torL * 0.62, sw * 0.34),
+      T(4, hw * 0.4)
+    ],
+    0.9
+  );
+
+  // Small metallic buttons.
+  for (let i = 0; i < 2; i++) {
+    const p = T(torL * (0.68 - i * 0.13), sw * 0.16);
+
+    ctx.save();
+    ctx.fillStyle = C.ivory2;
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 0.9 * u, 0, TAU);
+    ctx.fill();
+    ctx.restore();
   }
+
+  // Waist belt.
+  fillPoly(
+    k,
+    [
+      T(8, -hw * 0.53),
+      T(8, hw * 0.53),
+      T(3, hw * 0.53),
+      T(3, -hw * 0.53)
+    ],
+    C.coat2,
+    C.line,
+    0.8
+  );
+
+  // Small buckle.
+  fillPoly(
+    k,
+    [
+      J(T(5, 0), 1.4, -1.8),
+      J(T(5, 0), 1.4, 1.8),
+      J(T(5, 0), -1.4, 1.8),
+      J(T(5, 0), -1.4, -1.8)
+    ],
+    C.ivory2,
+    C.line,
+    0.7
+  );
+
+  // ---------------------------------------------------------------
+  // FRONT LEG AND LONG COAT TAIL.
+  // ---------------------------------------------------------------
+
+  leg(k.MP(k.legF), false);
+
+  {
+    const pts = [
+      T(7, -hw * 0.12),
+      T(7, hw * 0.55),
+      flut(T(-legL * 0.12, hw * 0.82), 0.25, 0.8),
+      flut(T(-legL * 0.42, hw * 0.7), 0.5, 1.5),
+      flut(T(-legL * 0.48, hw * 0.1), 0.7, 2.4),
+      T(-legL * 0.18, -hw * 0.16)
+    ];
+
+    fillPoly(k, pts, C.coat, C.line, 1.2);
+
+    line(
+      k,
+      [pts[0], pts[2], pts[3]],
+      C.coatHi,
+      1.0,
+      0.65
+    );
+
+    stitch(k, [pts[2], pts[3], pts[4]], 0.8);
+  }
+
+  // Front arm drawn over the coat.
+  const hand = arm(armFw, true);
+
+  // ---------------------------------------------------------------
+  // NECK AND COLLAR.
+  // ---------------------------------------------------------------
+
+  const nb = T(torL * 0.98, 0);
+
+  fillPoly(
+    k,
+    [
+      Hp(-0.25, 0.35),
+      Hp(0.45, 0.38),
+      Hp(0.5, 1.35),
+      Hp(-0.35, 1.35)
+    ],
+    C.skinSh,
+    C.line,
+    0.9
+  );
+
+  fillPoly(
+    k,
+    [
+      J(nb, -2, -sw * 0.34),
+      J(nb, 7 * u, -sw * 0.32),
+      J(nb, 9 * u, -sw * 0.08),
+      J(nb, 3 * u, sw * 0.02),
+      J(nb, -2, sw * 0.02)
+    ],
+    C.ivory,
+    C.line,
+    1.0
+  );
+
+  // ---------------------------------------------------------------
+  // FACE: clean profile, defined jaw, restrained expression.
+  // ---------------------------------------------------------------
+
+const face = [
+  Hp(-0.48, -0.96),
+  Hp(0.28, -1.02),
+  Hp(0.78, -0.78),
+  Hp(0.96, -0.42),
+  Hp(1.00, -0.08),
+
+  // Nose and front of face.
+  Hp(1.17, 0.18),
+  Hp(1.02, 0.29),
+
+  // Mouth and lower cheek.
+  Hp(1.04, 0.47),
+  Hp(0.98, 0.67),
+
+  // Strong jaw angle.
+  Hp(0.83, 0.91),
+  Hp(0.55, 1.12),
+
+  // Defined chin tip.
+  Hp(0.19, 1.22),
+  Hp(-0.08, 1.15),
+
+  // Back jaw and cheek.
+  Hp(-0.38, 0.91),
+  Hp(-0.58, 0.55),
+  Hp(-0.65, 0.12),
+  Hp(-0.62, -0.45)
+];
+
+  // ---------------------------------------------------------------
+  // EYES: one crimson, one cold silver.
+  // ---------------------------------------------------------------
+
+  const eye = (a, b, w, iris, red) => {
+    const p0 = Hp(a, b);
+    const p1 = Hp(a + w, b - 0.015);
+    const top = Hp(a + w * 0.5, b - 0.14);
+    const bot = Hp(a + w * 0.5, b + 0.09);
+
+    pathOf(ctx, [p0, top, p1, bot]);
+
+    ctx.fillStyle = C.sclera;
+    ctx.fill();
+    edge(k, C.line, 0.7);
+
+    if (F) return;
+
+    const ic = Hp(a + w * 0.57, b - 0.015);
+
+    ctx.save();
+
+    if (red) {
+      ctx.shadowColor = C.eyeRed;
+      ctx.shadowBlur = 7;
+    }
+
+    ctx.fillStyle = iris;
+    ctx.beginPath();
+    ctx.ellipse(
+      ic[0],
+      ic[1],
+      Math.max(0.8, hrx * 0.105),
+      Math.max(1.0, hrx * 0.15),
+      0,
+      0,
+      TAU
+    );
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = C.line;
+
+    ctx.beginPath();
+    ctx.ellipse(
+      ic[0],
+      ic[1],
+      Math.max(0.3, hrx * 0.028),
+      Math.max(1.0, hrx * 0.12),
+      0,
+      0,
+      TAU
+    );
+    ctx.fill();
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(ic[0] - d * 0.35, ic[1] - 0.5, 0.35, 0, TAU);
+    ctx.fill();
+
+    ctx.restore();
+  };
+
+  if (!F) {
+    // Light eye shadows.
+    line(
+      k,
+      [Hp(0.28, -0.35), Hp(0.5, -0.39), Hp(0.7, -0.32)],
+      "#65545F",
+      1.2,
+      0.65
+    );
+
+    line(
+      k,
+      [Hp(0.7, -0.35), Hp(0.96, -0.34)],
+      "#65545F",
+      1.1,
+      0.55
+    );
+  }
+
+  eye(0.68, -0.21, 0.25, C.eyeGray, false);
+  eye(0.34, -0.21, 0.3, C.eyeRed, true);
+
+  // Heavy, straight eyebrows.
+  line(
+    k,
+    [Hp(0.24, -0.53), Hp(0.46, -0.59), Hp(0.72, -0.54)],
+    C.hairBlk,
+    1.8,
+    1
+  );
+
+  line(
+    k,
+    [Hp(0.75, -0.53), Hp(1.0, -0.49)],
+    C.hairBlk,
+    1.7,
+    1
+  );
+
+  // ---------------------------------------------------------------
+  // HAIR: layered split colour, not a large patchwork helmet.
+  // ---------------------------------------------------------------
+
+  // Back locks.
+  taper(
+    k,
+    [
+      Hp(-0.75, -0.55),
+      Hp(-1.0, -0.1),
+      flut(Hp(-0.9, 0.52), 0.3, 0.4)
+    ],
+    4.5 * u,
+    0.8 * u,
+    C.hairBlk,
+    C.hairBlk2,
+    0.6,
+    4
+  );
+
+  taper(
+    k,
+    [
+      Hp(-0.35, -0.8),
+      Hp(-0.65, -0.2),
+      flut(Hp(-0.55, 0.55), 0.3, 1.3)
+    ],
+    4.0 * u,
+    0.7 * u,
+    C.hair,
+    C.hairSh,
+    0.6,
+    4
+  );
+
+  // Main hair cap.
+  const cap = [
+    Hp(1.02, -0.62),
+    Hp(0.78, -1.12),
+    Hp(0.2, -1.35),
+    Hp(-0.42, -1.26),
+    Hp(-0.92, -0.95),
+    Hp(-1.16, -0.48),
+    Hp(-1.05, 0.0),
+    Hp(-0.72, -0.18),
+    Hp(-0.38, -0.55),
+    Hp(0.12, -0.76),
+    Hp(0.62, -0.72)
+  ];
+
+  fillPoly(k, cap, C.hair, C.hairSh, 1.0);
+
+  // Black half of the hairstyle.
+  fillPoly(
+    k,
+    [
+      Hp(-0.35, -1.28),
+      Hp(-0.85, -1.0),
+      Hp(-1.13, -0.5),
+      Hp(-1.04, -0.05),
+      Hp(-0.76, -0.2),
+      Hp(-0.48, -0.54),
+      Hp(-0.15, -0.78),
+      Hp(0.02, -1.04)
+    ],
+    C.hairBlk,
+    C.hairBlk2,
+    0.7
+  );
+
+  // Soft white hair highlights.
+  line(
+    k,
+    [Hp(0.7, -1.02), Hp(0.36, -1.16), Hp(0.05, -1.08)],
+    "#FFFFFF",
+    1.0,
+    0.8
+  );
+
+  line(
+    k,
+    [Hp(0.45, -0.94), Hp(0.72, -0.87)],
+    "#FFFFFF",
+    0.7,
+    0.7
+  );
+
+  // Swept white fringe.
+  taper(
+    k,
+    [
+      Hp(0.05, -1.23),
+      Hp(0.5, -1.03),
+      Hp(0.88, -0.72),
+      Hp(0.96, -0.43)
+    ],
+    4.0 * u,
+    0.6 * u,
+    C.hair,
+    C.hairSh,
+    0.5,
+    4
+  );
+
+  taper(
+    k,
+    [
+      Hp(0.35, -1.2),
+      Hp(0.76, -1.0),
+      Hp(1.05, -0.76),
+      Hp(1.14, -0.55)
+    ],
+    3.0 * u,
+    0.5 * u,
+    C.hair2,
+    C.hairSh,
+    0.5,
+    4
+  );
+
+  // Black fringe crossing the forehead.
+  taper(
+    k,
+    [
+      Hp(-0.52, -1.16),
+      Hp(-0.22, -0.94),
+      Hp(0.02, -0.65),
+      Hp(0.12, -0.37)
+    ],
+    4.0 * u,
+    0.55 * u,
+    C.hairBlk,
+    C.hairBlk2,
+    0.5,
+    4
+  );
+
+  taper(
+    k,
+    [
+      Hp(-0.82, -0.9),
+      Hp(-0.55, -0.75),
+      Hp(-0.35, -0.47),
+      Hp(-0.3, -0.22)
+    ],
+    3.0 * u,
+    0.5 * u,
+    C.hairBlk2,
+    C.hairBlk,
+    0.5,
+    4
+  );
+
+  // Small side strands.
+  taper(
+    k,
+    [
+      Hp(-0.94, -0.35),
+      Hp(-0.85, 0.02),
+      flut(Hp(-0.78, 0.35), 0.15, 2.0)
+    ],
+    3.0 * u,
+    0.5 * u,
+    C.hairBlk,
+    C.hairBlk2,
+    0.5,
+    4
+  );
+
+  taper(
+    k,
+    [
+      Hp(0.1, -0.62),
+      Hp(0.02, -0.12),
+      flut(Hp(0.1, 0.24), 0.12, 2.8)
+    ],
+    2.6 * u,
+    0.5 * u,
+    C.hair,
+    C.hairSh,
+    0.5,
+    4
+  );
+
+  // Final collar edge.
+  fillPoly(
+    k,
+    [
+      J(nb, -2, sw * 0.28),
+      J(nb, 5 * u, sw * 0.23),
+      J(nb, 7 * u, sw * 0.08),
+      J(nb, 0.5, 0)
+    ],
+    C.coat,
+    C.line,
+    0.9
+  );
+
+  stitch(
+    k,
+    [
+      J(nb, 0.5, sw * 0.24),
+      J(nb, 5 * u, sw * 0.19),
+      J(nb, 6.4 * u, sw * 0.08)
+    ],
+    0.6
+  );
+
+  return hand;
+}
+
 
   // ═══════════════════════════════════════════════════════════════════
   // GLITCH SCHEDULER
