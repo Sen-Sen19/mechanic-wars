@@ -721,6 +721,14 @@
       clone.chargeReleased = true;
       clone._art = errataCloneArt[key] || null;
 
+      // glitch-hop trail: earlier hop positions fade out behind the copy (the rush reads as stuttering jumps)
+      if (cp.trail && cp.trail.length) {
+        for (let ti = 0; ti < cp.trail.length; ti++) {
+          const tr = cp.trail[ti], c2 = Object.create(clone);
+          c2.x = tr.x; c2.y = tr.y; c2.px = tr.x; c2.py = tr.y;
+          ctx.save(); ctx.globalAlpha = 0.12 + 0.1 * ti; MW.CharacterArt.draw(ctx, c2, false, null); ctx.restore();
+        }
+      }
       // Draw faint chromatic trail behind the mirror
       ctx.save();
       ctx.globalAlpha = 0.45;
@@ -1085,6 +1093,34 @@
       spawnBurst(ev.x, ev.y, ERR, 14, 5);
       spawnBurst(ev.x, ev.y, "#ffffff", 10, 4);
       addShake(2.5);
+    } else if (ev.kind === "reloc_emerge") { // Ultimate: tendrils start rising under the enemy
+      addRing(ev.x, ev.y, 6, 80, 22, ERR, 3, 1);
+      spawnBurst(ev.x, ev.y, "#0a0a14", 10, 3); spawnBurst(ev.x, ev.y, ERR, 8, 3);
+      addShake(2);
+    } else if (ev.kind === "reloc_grab") { // tendrils seize him
+      addRing(ev.x, ev.y - 30, 10, 110, 16, "#ffffff", 4, 1);
+      spawnBurst(ev.x, ev.y - 30, ERR, 14, 5);
+      addShake(5); addFlash(0.12, "#ffffff");
+    } else if (ev.kind === "reloc_miss") { // he got out: the tendrils sink back
+      spawnBurst(ev.x, ev.y, "#0a0a14", 10, 3);
+      addRing(ev.x, ev.y, 50, 8, 16, ERR, 2, 1);
+    } else if (ev.kind === "reloc_fragment") { // the enemy shatters into data
+      addRing(ev.x, ev.y, 10, 150, 20, "#ffffff", 5, 1);
+      addRing(ev.x + 4, ev.y, 10, 120, 18, ERR, 4, 1);
+      spawnBurst(ev.x, ev.y, ERR, 24, 7); spawnBurst(ev.x, ev.y, "#ffffff", 18, 6); spawnBurst(ev.x, ev.y, "#000000", 16, 5);
+      addShake(8); addFlash(0.28, "#ffffff");
+    } else if (ev.kind === "reloc_land") { // the data arrives at the new spot
+      addRing(ev.x, ev.y, 130, 10, 22, ERR, 3, 1);
+      addRing(ev.x, ev.y, 90, 6, 20, "#ffffff", 2, 1);
+      addShake(2);
+    } else if (ev.kind === "reloc_release") {
+      addRing(ev.x, ev.y, 8, 60, 14, ERR, 2, 1);
+    } else if (ev.kind === "reloc_explode") { // reconstruction explosion
+      addRing(ev.x, ev.y, 10, 220, 26, "#ffffff", 6, 1);
+      addRing(ev.x + 3, ev.y, 10, 180, 22, ERR, 5, 1);
+      addRing(ev.x, ev.y, 10, 130, 18, "#000000", 6, 1);
+      spawnBurst(ev.x, ev.y, ERR, 36, 10); spawnBurst(ev.x, ev.y, "#ffffff", 28, 9); spawnBurst(ev.x, ev.y, "#000000", 24, 7);
+      addShake(14); addFlash(0.4, "#ffffff");
     } else if (ev.kind === "data_corrupt_proc") { // Skill 4: 3-second recurring damage tick & interrupt
       addRing(ev.x, ev.y, 6, 65, 14, ERR, 3, 1);
       addRing(ev.x, ev.y, 4, 50, 12, "#ffffff", 2, 1);
@@ -1270,6 +1306,7 @@
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
+    if (f.stats && f.stats.look === "miette") return; // Miette's swing effect is a rainbow paint trail + splash at the brush tip (miette_art.js)
     if (h.puppet || h.fxStyle || h.hook || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
     const s = f.stats;
     const e = f.meleeShape();
@@ -1504,7 +1541,7 @@
     }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "frost") { drawFrostShard(ctx, p); ctx.restore(); return; }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "codebreaker") { drawCodeBreakerShot(ctx, p); ctx.restore(); return; } // Errata Code Breaker
-    if (p.hit && p.hit.projectile && p.hit.projectile.style === "datacorruption") { drawDataCorruptionWave(ctx, p); ctx.restore(); return; } // Errata Skill 4: Data Corruption
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "datacorruption") { if (MW.ErrataWave) MW.ErrataWave.drawWave(ctx, p); else drawDataCorruptionWave(ctx, p); ctx.restore(); return; } // Errata Skill 4: Data Corruption
     const r = p.size / 2;
     const [cr, cg, cb] = hexToRgb(p.color);
 
@@ -2710,7 +2747,7 @@
           if (s.id === "errata") { drawErrataAfterimages(c, f); drawErrataGhosts(c, f); drawErrataRecursionCopies(c, f); drawErrataAura(c, f); drawErrataCharge(c, f); } // afterimages (hold key) + ghost copy (Phantom Input) + recursion decoys + full-stack glow + charge
           // draw the full character body
           const ucp = s.id === "errata" && f.unstableCharge ? f.unstableCharge() : -1;
-          if (ucp >= 0) { // charging Unstable Rendering: the body shakes and drops out for a frame more and more often
+          if (f.fragmented) { /* shattered into data (Errata ultimate): errata_ult_fx.js draws the fragments instead */ } else if (ucp >= 0) { // charging Unstable Rendering: the body shakes and drops out for a frame more and more often
             const flick = Math.floor(sim.tick * (0.15 + 0.9 * ucp)) % 2 === 0 && Math.random() < ucp * 0.7;
             c.save(); c.translate((Math.random() - 0.5) * 8 * ucp, 0);
             if (flick) c.globalAlpha *= 0.35;
@@ -2731,6 +2768,8 @@
 
         ctx.globalAlpha = 1;
         drawAttack(ctx, f, sim);
+        if (s.id === "errata" && MW.ErrataUlt) MW.ErrataUlt.draw(ctx, f, sim.tick); // ultimate: capture mark, tendrils, data fragments
+        if (s.id === "errata" && MW.ErrataWave) MW.ErrataWave.drawCast(ctx, f, sim.tick); // skill 4 cast tell
         if (s.id === "hitter" && f.gunnerBomb) {
           const b = f.gunnerBomb, pulse = 0.75 + 0.25 * Math.sin(sim.tick * 0.18);
           ctx.save(); ctx.shadowColor = "#ff7b24"; ctx.shadowBlur = 12 * pulse;
@@ -2758,6 +2797,7 @@
       for (const p of sim.projectiles) {
         drawProjectile(ctx, p, alpha);
       }
+      if (MW.ErrataWave) MW.ErrataWave.drawLingering(ctx); // Errata Skill 4: the wake keeps fading after the wave is gone
 
       // HUD (screen space)
       ctx.setTransform(1, 0, 0, 1, 0, 0);

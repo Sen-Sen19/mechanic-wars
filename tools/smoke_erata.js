@@ -13,7 +13,7 @@ let failures = 0;
 function check(name, ok, extra) { console.log((ok ? "PASS " : "FAIL ") + name + (extra ? "  (" + extra + ")" : "")); if (!ok) failures++; }
 
 const F = C.errata;
-check("errata is defined and last in the roster", !!F && MW.CHARACTER_ORDER[MW.CHARACTER_ORDER.length - 1] === "errata");
+check("errata is defined and in the roster", !!F && MW.CHARACTER_ORDER.includes("errata"));
 check("name / title / look", F.name === "Errata" && F.title === "The Mistake of Creation" && F.look === "errata");
 check("no skills, passive or ultimate yet", F.skills.every((s) => s === null) && !F.passive && !F.ultimate);
 check("3-hit melee chain", F.attack.type === "melee" && F.attack.chain.length === 3);

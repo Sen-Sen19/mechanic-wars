@@ -18,7 +18,7 @@ const arena = MW.makeArena ? MW.makeArena(() => 0.5) : MW.ARENA;
 function duel(a, b, gap) {
   const sim = new MW.Sim(arena, [C[a], C[b]]);
   const [A, B] = sim.fighters;
-  for (const f of sim.fighters) f.invuln = 0;
+ for (const f of sim.fighters) { f.invuln = 0; f.holyDeflectionCooldown = 1e9; }
   B.x = A.x + A.stats.width + (gap === undefined ? 10 : gap);
   B.y = A.y; A.facing = 1; B.facing = -1;
   return { sim, A, B };
@@ -79,7 +79,7 @@ check("Vanguard starts faster than the old Fighter (4 < 6 ticks)", C.fighter.att
 // Bash is slow and punishable
 {
   const a = C.tank.attack;
-  check("bash is slow (startup 18, recovery 34)", a.startup === 18 && a.recovery === 34);
+check("bash is slow (startup 17, recovery 36)", a.startup === 17 && a.recovery === 36);
   check("bash has super armor flag", a.superArmor === true);
 }
 

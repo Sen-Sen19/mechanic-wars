@@ -411,6 +411,7 @@
       // BASIC ATTACK - Quick Blade Combo: three fast slashes (the third is a heavier finisher that knocks back).
       attack: {
         type: "melee", damage: 5.2, startup: 3, active: 3, recovery: 3, knockback: 3.2, range: 54, fxStyle: "blood",
+        comboWindow: 24, // ticks (60 = 1 s) after a hit ends in which the next tap still continues the 1 -> 2 -> 3 chain (0 / missing = the chain resets as soon as the swing ends)
         chain: [
           {},
           { startup: 2, damage: 5.6, knockback: 3.6 },
@@ -778,7 +779,7 @@
     }),
 
     // ERRATA (internal id "errata"): the Mistake of Creation (looks: errata_art.js, design doc "Errata - The Mistake of Creation").
-    // PASSIVE: Error Accumulation (see errata.passive below). HOLD KEY: Unstable Rendering (five glitch teleports). SKILL 1: Code Breaker (movement corruption). Skills 2-4 and the ultimate are not built yet.
+    // PASSIVE: Error Accumulation (see errata.passive below). HOLD KEY: Unstable Rendering (five glitch teleports). SKILL 1: Code Breaker, SKILL 2: Frame Skip, SKILL 3: Phantom Recursion, SKILL 4: Data Corruption, ULTIMATE: SYSTEM: RELOCATION ERROR.
     // He fights with a quick 3-hit melee chain (keep tapping attack): 1 Slash, 2 Backhand, 3 Rift Cut (the finisher: a longer, harder cut).
     // Tall and elegant with a little more reach than Fulminar; his whole-body glitch is visual only and never touches the hit box,
     // physics or timing. Numbers are a first guess to feel him out in the arena. Hit box = width x height below.
@@ -843,29 +844,25 @@
             frameSkip: { snapRange: 56, edgeMargin: 90, flickerEvery: 4, flickerLife: 10 },
           },
         },
-        // SKILL 3 - Phantom Recursion: Errata splits into three corrupted copies around the enemy.
-        // One randomly-chosen copy (the real Errata) delivers the actual strike; the other two are
-        // visual decoys. Each copy attacks at a slightly different time, forcing the opponent to guess.
-        // The real Errata teleports to the real copy's position at the start of the sequence (so the
-        // hitbox is correct); the two decoys are purely visual fx events for the renderer.
-        // copies: dx/dy = offset from the enemy's centre-feet (px), hitAt = ticks after sequence start,
-        // pose = art variant index used by errata_art.js for each copy.
-        // collapse = ticks after all strikes before the copies dissolve and recovery begins.
+        // SKILL 3 - Phantom Recursion (three-way dash): after a short startup (he flickers) Errata splits into THREE copies that appear
+        // around the enemy - one to his LEFT, one to his RIGHT, one ABOVE him - and hold for `windup` ticks while a crimson lane shows each
+        // dash. Then each copy dashes in a STRAIGHT line (left one dashes right, right one dashes left, top one dives down) through the point
+        // where the enemy stood when the copies appeared. Nothing homes or locks on: step out of the crossing point and every dash misses.
+        // Only one copy is real (random each cast): it hits on contact, the other two pass through harmlessly (visual only).
+        // rush: windup = hold at the spawn spots, ticks = duration of one dash, hops = glitch steps per dash, delays = per-copy dash
+        // start delays (shuffled each cast), reachX / reachY = spawn distance from the enemy, overshoot = how far past the crossing point the
+        // dash keeps going, pad = extra hit margin around Errata's body. A whiff has a longer recovery (missRecovery).
         {
           id: "phantom_recursion", name: "Phantom", icon: "PHR", cooldown: 720, // 12 s
           attack: {
             id: "phantom_recursion", type: "melee", isSkill: true, corruptible: true, utility: true, pose: 0,
-            damage: 28, startup: 14, active: 2, recovery: 36,
-            knockback: 6, launchH: 1.0, launchV: 0.3, stun: 32,
+            damage: 30, startup: 14, active: 2, recovery: 36,
+            knockback: 7, launchH: 1.0, launchV: 0.3, stun: 32,
             range: 80, boxH: 0.9, advance: 0, manaGain: 16,
             recursion: {
-              copies: [
-                { dx: -120, dy: 0,   hitAt: 18, pose: 0 }, // left   copy: attacks first
-                { dx:    0, dy: -90, hitAt: 21, pose: 1 }, // above  copy: attacks second
-                { dx:  120, dy: 0,   hitAt: 24, pose: 2 }, // right  copy: attacks third
-              ],
-              collapse: 14,   // ticks after all copies attacked before they dissolve
-              endRecovery: 36,
+              rush: { windup: 18, ticks: 11, hops: 6, delays: [0, 4, 8], reachX: 250, reachY: 210, overshoot: 90, pad: 8 },
+              collapse: 10,
+              endRecovery: 34, missRecovery: 58,
             },
           },
         },
@@ -894,6 +891,30 @@
           },
         },
       ],
+      // ULTIMATE - SYSTEM: RELOCATION ERROR (needs a full mana bar). Single target, NOT corruptible by the Error stacks.
+      // Sequence: startup (he raises a hand, a crimson capture mark is drawn under the enemy; he can still be interrupted) ->
+      // emerge (tendrils rise under the enemy; MOVE OUT of grabRX / grabRY before this ends = clean miss) -> lift -> suspend
+      // (held helplessly, cannot move or attack) -> fragment (instant shatter, enemy hidden + untargetable) -> travel (the data
+      // flies to a random VALID spot: on a platform, inside the arena, clear of obstacles, at least minDistance from Errata) ->
+      // rebuild (fragments converge, the spot is telegraphed) -> reconstruction explosion (massive damage). All numbers in ticks (60 = 1 s) / px.
+      ultimate: {
+        id: "relocation_error", name: "SYSTEM: RELOCATION ERROR", icon: "ULT",
+        attack: {
+          id: "relocation_error", type: "melee", isSkill: true, utility: true, pose: 0,
+          damage: 0, startup: 40, active: 1, recovery: 50, knockback: 0, range: 1, advance: 0, manaGain: 0, momentumGain: 0,
+          relocation: {
+            range: 560,                                   // lock-on distance when the startup ends (nobody in range = pure miss)
+            emergeTicks: 30, grabRX: 56, grabRY: 48, track: 0.6, // dodge window; tendrils drift `track` px/tick toward the target
+            liftTicks: 22, liftSpeed: 3.2, suspendTicks: 26, // lifted ~70 px, then held in mid-air
+            fragmentTicks: 8, travelTicks: 34, rebuildTicks: 22,
+            grabDamage: 6, grabStun: 8,                   // tendrils seizing him
+            damage: 64, knockback: 11, launchH: 1.0, launchV: 0.55, stun: 50, // the reconstruction explosion
+            minDistance: 280, minFromOrigin: 140,         // destination must be this far from Errata / from where the enemy was held
+            edgeMargin: 56, arenaMargin: 140,             // keep off platform edges and away from the blast-zone sides
+            missTicks: 18, missRecovery: 70, endRecovery: 50,
+          },
+        },
+      },
       // HOLD KEY - Unstable Rendering (no skill slot): TAP the attack button = basic attack, HOLD it (on the ground) = he starts to glitch,
       // faster and faster. Charge is full `chargeTime` ticks after the press (48 = 0.8 s). Let go before that = cancelled (nothing is spent).
       // When full he teleports `hops` times, one every `hopTicks` ticks (5 x 6 = 30 ticks = 0.5 s), and leaves a corrupted afterimage at every
@@ -923,7 +944,37 @@
         ],
       },
     }),
+
+    // MIETTE (internal id "miette"): the Living Color (looks: miette_art.js, redesigned from the "Paintbrush Battle Artist" reference: beret, brown hair with an orange streak, cream coat, mustard pants, flaming brush).
+    // TRIAL ENTRY: looks, stats and the basic attack only. No skills, passive or ultimate yet: every slot is empty. Her planned unique mechanic from the
+    // sheet, "Unfinished Canvas" (she paints temporary platforms, hazards and illusions on the field), is NOT built yet.
+    // She fights with her giant paint brush: a 3-hit melee chain (keep tapping attack): 1 Brush Swipe, 2 Reverse Stroke, 3 Splash (the finisher:
+    // a big overhand slam that launches). The brush gives her a little more reach than Errata but she is slightly slower to start; numbers are a first guess.
+    // Stats from the sheet: HP 220, ARM 10, SPD 6, MELEE. Hit box = width x height below (the ears, hair and brush are drawn on top of it).
+    miette: define({
+      id: "miette",
+      name: "Miette",
+      title: "The Living Color",
+      color: "#9B5CF0", // paint violet: select card, chips, HUD
+      look: "miette",
+      width: 36,
+      height: 72,
+      maxHP: 220,
+      armor: 10,
+      weight: 74,
+      runSpeed: 6,
+      jumpStrength: 13,
+      airJumpStrength: 11.8,
+      attack: {
+        type: "melee", damage: 4, startup: 8, active: 3, recovery: 9, knockback: 2, range: 62, advance: 2, fxShape: "hook",
+        chain: [
+          {},                                                                                                       // 1 Brush Swipe: the brush swings up from low
+          { startup: 7, damage: 5, knockback: 2.4, fxShape: "jab" },                                                // 2 Reverse Stroke: a quick chop back down across
+          { startup: 12, damage: 8, active: 5, recovery: 20, knockback: 6.5, range: 70, launchH: 0.95, launchV: 0.4, boxH: 0.95, fxShape: "hook", stun: 22 }, // 3 Splash: overhead slam, the finisher
+        ],
+      },
+    }),
   };
 
-  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata"];
+  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata", "miette"];
 })(globalThis);

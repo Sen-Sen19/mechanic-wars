@@ -116,7 +116,7 @@
     const { ctx, d, now } = k;
     const F = k.isFlash;
     const { shW, hipW, hcw, armBw, armFw, windU, strike, pulse, stunned, armorOn, spark } = e;
-    const torL = k.torL, sw = k.sw, hw = k.hw, aw = k.aw * 0.64, lw = k.lw * 0.68, hr = k.hr, legL = k.legL; // aw/lw scaled so the heavy parts sit right on the rig
+    const torL = k.torL, sw = k.sw, hw = k.hw, aw = k.aw * 0.64, lw = k.lw * 0.55, hr = k.hr, legL = k.legL; // aw/lw scaled so the heavy parts sit right on the rig
     const H = k.H;
     // energy level: faint at rest, bright while super armor is on or a hit is absorbed
     const en = clamp(0.28 + 0.1 * pulse + (armorOn ? 0.55 : 0) + (spark ? 0.5 : 0) + (strike ? 0.2 : 0), 0, 1);
@@ -180,9 +180,7 @@
       }
     };
 
-    const aB = arm(armBw, false);
-    gauntlet(aB);
-    pauldron(armBw[0], 0.55, false);
+    // (the gauntlet arm is drawn after the torso, see step 4b, so it is not hidden behind the body)
 
     // ── 2) legs: thick thighs, big knee guards, greaves, heavy sabatons ──
     const leg = (pts, isBack) => {
@@ -191,7 +189,7 @@
       taper(k, [h, kn], lw * 1.75, lw * 1.3, fl, C.rim, 1.4);
       taper(k, [kn, ft], lw * 1.3, lw * 0.95, fl, C.rim, 1.4);
       // greave (shin armor) with a center ridge
-      taper(k, [[lerp(kn[0], ft[0], 0.18), lerp(kn[1], ft[1], 0.18)], [lerp(kn[0], ft[0], 0.86), lerp(kn[1], ft[1], 0.86)]], lw * 1.5, lw * 1.15, isBack ? C.gun : C.gun2, C.silverDim, 1.4);
+      taper(k, [[lerp(kn[0], ft[0], 0.18), lerp(kn[1], ft[1], 0.18)], [lerp(kn[0], ft[0], 0.86), lerp(kn[1], ft[1], 0.86)]], lw * 1.5, lw * 1.15, isBack ? C.obs3 : C.gun2, C.silverDim, 1.4);
       line(k, [[lerp(kn[0], ft[0], 0.25) + d * lw * 0.25, lerp(kn[1], ft[1], 0.25)], [lerp(kn[0], ft[0], 0.8) + d * lw * 0.15, lerp(kn[1], ft[1], 0.8)]], C.silver, 0.9, 0.55);
       // big knee guard: layered dome with a gold rim and a small spike
       fillPoly(k, [[kn[0] - d * lw * 0.9, kn[1] - lw * 0.9], [kn[0] + d * lw * 0.2, kn[1] - lw * 1.45], [kn[0] + d * lw * 1.5, kn[1] - lw * 0.7], [kn[0] + d * lw * 1.8, kn[1] + lw * 0.2], [kn[0] + d * lw * 0.9, kn[1] + lw * 1.25], [kn[0] - d * lw * 0.7, kn[1] + lw * 1.0]], isBack ? C.gun : C.gun2, C.silver, 1.6);
@@ -213,8 +211,8 @@
     const sway = Math.sin(now * 2.2) * 1.2 - clamp(k.vx, -6, 6) * 0.4;
     fillPoly(k, [T(torL * 0.3, -hw * 0.62), T(torL * 0.3, hw * 0.58), T(-legL * 0.2, hw * 0.52), T(-legL * 0.2, -hw * 0.56)], C.obs2, C.rim, 1.4);
     // ivory cloth tabard with gold trim hanging from the belt
-    fillPoly(k, [T(2, hw * 0.28), T(2, -hw * 0.26), [hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.72], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.74]], C.ivory2, C.silverDim, 1.3);
-    line(k, [[hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.72], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.74]], C.gold, 1.6, 0.95);
+    fillPoly(k, [T(2, hw * 0.28), T(2, -hw * 0.26), [hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.5], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.52]], C.ivory2, C.silverDim, 1.3);
+    line(k, [[hipW[0] - d * hw * 0.2 + sway, hipW[1] + legL * 0.5], [hipW[0] + d * hw * 0.28 + sway, hipW[1] + legL * 0.52]], C.gold, 1.6, 0.95);
     // tassets: three overlapping plates, front and back
     for (let i = 2; i >= 0; i--) {
       const a0 = -i * 3.4;
@@ -253,6 +251,10 @@
     scratch(k, ...T(torL * 0.7, sw * 0.3), 1.9, 6, 0.4);
     scratch(k, ...T(torL * 0.45, sw * 0.2), 0.3, 6, 0.35);
 
+    // ── 4b) gauntlet arm: drawn IN FRONT of the torso (it guards across the chest), behind the helm and shield ──
+    const aB = arm(armBw, false);
+    gauntlet(aB);
+    pauldron(armBw[0], 0.55, false);
     // ── 5) gorget + closed great helm with a halo, a crest fin and a narrow glowing eye slit ──
     fillPoly(k, [T(torL * 0.96, -sw * 0.32), T(torL + hr * 0.8, -sw * 0.28), T(torL + hr * 0.9, sw * 0.24), T(torL * 0.94, sw * 0.32)], C.gun, C.silver, 1.5);
     line(k, [T(torL + hr * 0.6, -sw * 0.26), T(torL + hr * 0.7, sw * 0.22)], C.goldHi, 1.2, 0.9);

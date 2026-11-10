@@ -64,18 +64,35 @@
     if (ev.type === "swing" && owner && owner.hit && owner.hit.id === "charged_slash") return; // dash slash draws its own arcs
     if (ev.type === "swing") {
       const n = (swingCount[ev.ownerId] = (swingCount[ev.ownerId] || 0) + 1);
-      slashes.push({ x: ev.x, y: ev.y, dir: ev.dir, range: ev.range || 54, up: n % 2 === 0, age: 0, life: TUNE.slashLife });
+      // basic combo: each hit has its own slash shape: 0 rising diagonal, 1 descending cross cut, 2 big overhead cleave (skills keep the old alternating arc)
+      const ch = ev.chain === undefined ? -1 : ev.chain;
+      const sl = { x: ev.x, y: ev.y, dir: ev.dir, range: ev.range || 54, up: n % 2 === 0, age: 0, life: TUNE.slashLife };
+      for (const o of slashes) if (o.owner === ev.ownerId && o.age >= 0) o.life = Math.min(o.life, o.age + 3); // the previous cut clears fast so the three never smear into one
+      sl.owner = ev.ownerId;
+      if (ch === 0) { // HIT 1 - RISING SLASH: one clean crescent sweeping up from low to high in front of him (matches the lead-blade upswing)
+        sl.kind = "rise"; sl.life = 10; sl.a0 = 1.3; sl.a1 = -1.0; sl.wide = 0.85; sl.range = (ev.range || 54) * 0.95;
+        for (let i = 0; i < 5; i++) add({ kind: "spark", x: ev.x + ev.dir * rnd(0, 26), y: ev.y - rnd(0, 28), vx: ev.dir * rnd(1, 5), vy: rnd(-6, -2), life: 10, size: rnd(1.2, 2), drag: 0.95 });
+      } else if (ch === 1) { // HIT 2 - SPIN CUT: the rear blade whips round, a flat horizontal sweep (a thin line with an echo) plus a swirl of motion lines around the body
+        sl.kind = "slice"; sl.life = 11; sl.scale = 0.62;
+        for (let i = 0; i < 6; i++) add({ kind: "spark", x: ev.x - ev.dir * rnd(10, 46), y: ev.y + rnd(-14, 14), vx: ev.dir * rnd(9, 15), vy: 0, life: 7, size: rnd(1.2, 2.2), drag: 0.97 });
+      } else if (ch === 2) { // HIT 3 - OVERHEAD CLEAVE: one heavy vertical chop from above head to the ground, then a ground shockwave
+        sl.kind = "chop"; sl.life = 16; sl.scale = 0.56;
+        add({ kind: "flare", x: ev.x + ev.dir * 30, y: ev.y + 22, life: 8, size: 30, drag: 1 });
+        for (let i = 0; i < 8; i++) add({ kind: "spark", x: ev.x + ev.dir * rnd(26, 44), y: ev.y + 26, vx: ev.dir * rnd(1, 6), vy: rnd(-5, -1), life: 14, size: rnd(1.4, 2.4), g: 0.2, drag: 0.94 });
+      }
+      slashes.push(sl);
       if (slashes.length > 12) slashes.shift();
     } else if (ev.type === "hit") {
       const { x, y, dir } = ev;
       frenzy[ev.ownerId] = Math.min(1, (frenzy[ev.ownerId] || 0) + TUNE.frenzyPerHit);
       if (frenzy[ev.targetId]) frenzy[ev.targetId] *= TUNE.frenzyHurtMult;
       // cut marks: two crossing gashes
-      const a = rnd(-0.5, 0.5);
-      for (const k of [0, 1]) {
-        const ang = (k ? 0.9 : -0.9) + a;
-        add({ kind: "gash", x, y, ang, len: 30 + k * 8, life: 14, drag: 1 });
-      }
+      const a = rnd(-0.3, 0.3), ch = ev.chain === undefined ? -1 : ev.chain;
+      // the cut mark on the victim matches the slash that made it: rising diagonal / two flat lines / one big vertical chop
+      const marks = ch === 0 ? [[-0.95, 44]] : ch === 1 ? [[0, 50], [0.08, 38]] : ch === 2 ? [[1.45, 64]] : [[-0.9, 30], [0.9, 38]];
+      for (const [ang0, len] of marks) add({ kind: "gash", x, y, ang: ang0 + a, len, life: 14, drag: 1 });
+      if (ch === 2) { ringFx(x, y, 6, 56, 12, HOT, 3); ringFx(x, y, 4, 96, 18, RED, 4); shake(4); } // finisher: shockwave
+      else if (ch === 0) for (let i = 0; i < 6; i++) add({ kind: "drop", x, y, vx: dir * rnd(0, 3), vy: rnd(-7, -2), life: 26, size: rnd(2, 3.6), g: 0.28, drag: 0.97 }); // the upswing throws blood up
       add({ kind: "flare", x, y, life: 7, size: 26, drag: 1 });
       for (let i = 0; i < 3; i++) add({ kind: "smoke", x, y, vx: dir * rnd(0.3, 1.6), vy: rnd(-1.2, -0.2), life: 22 + (Math.random() * 10 | 0), size: rnd(5, 8), drag: 0.95 });
       // red sparks (streaks) fly forward, droplets fall
@@ -477,12 +494,79 @@
   }
 
   // Crescent slash: sweeps in 3 frames, then fades.
+  function drawCross(ctx, s) { // chain hit 2: a straight diagonal cut, two parallel streaks, no crescent
+    const age = s.age;
+    const sweep = clamp((age + 1) / 3, 0, 1), fade = age < 3 ? 1 : clamp(1 - (age - 3) / (s.life - 3), 0, 1);
+    const R = s.range + 20, d = s.dir;
+    const tail = Math.min(sweep, clamp((age - 1) / 6, 0, 1) * 0.8);
+    if (sweep - tail < 0.02) return;
+    ctx.save(); ctx.globalAlpha = fade; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (const [ox, oy, th, aa] of [[0, 0, 12, 1], [-d * 9, 7, 5, 0.75]]) {
+      const A = [s.x - d * R * 0.35 + ox, s.y - R * 0.85 + oy], B = [s.x + d * R * 0.95 + ox, s.y + R * 0.55 + oy];
+      const N = 12, pts = [], L = [], Rr = [];
+      const nx = -(B[1] - A[1]), ny = B[0] - A[0], nl = Math.hypot(nx, ny) || 1;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N, t = tail + (sweep - tail) * u, w = th * Math.sin(Math.PI * u) + 0.8;
+        const px = A[0] + (B[0] - A[0]) * t, py = A[1] + (B[1] - A[1]) * t;
+        L.push([px + nx / nl * w, py + ny / nl * w]); Rr.push([px - nx / nl * w, py - ny / nl * w]); pts.push([px, py]);
+      }
+      ctx.globalAlpha = fade * aa;
+      ctx.beginPath(); ctx.moveTo(L[0][0], L[0][1]);
+      for (let i = 1; i <= N; i++) ctx.lineTo(L[i][0], L[i][1]);
+      for (let i = N; i >= 0; i--) ctx.lineTo(Rr[i][0], Rr[i][1]);
+      ctx.closePath(); ctx.fillStyle = "rgba(214,20,48,0.95)"; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = DARK; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pts[1][0], pts[1][1]); for (let i = 2; i < N; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.strokeStyle = HOT; ctx.lineWidth = 1.8; ctx.stroke();
+      if (age < 3 && aa === 1 && Math.random() < 0.9) add({ kind: "spark", x: pts[N][0], y: pts[N][1], vx: d * rnd(0.5, 3), vy: rnd(0, 2.5), life: 10, size: 1.8, g: 0.1, drag: 0.93 });
+    }
+    ctx.restore();
+  }
+
+  // Streak-style slashes (slice / claw / xcut): each streak = [x0,y0,x1,y1 (offsets in units of R, x mirrored by facing), thickness, delay (frames), alpha]
+  function drawStreaks(ctx, s) {
+    const R = (s.range * 1.5 + 24) * (s.scale || 1), d = s.dir;
+    let defs;
+    if (s.kind === "slice") defs = [[-0.4, -0.02, 1.25, 0.05, 13, 0, 1], [-0.1, 0.17, 1.1, 0.2, 5, 1, 0.7], [0.1, -0.16, 1.15, -0.1, 4, 1, 0.6]];
+    else if (s.kind === "chop") defs = [[0.35, -1.15, 0.7, 0.8, 19, 0, 1], [0.6, -0.95, 0.88, 0.85, 8, 2, 0.6]];
+    else if (s.kind === "claw") defs = [[-0.1, 0.75, 0.75, -0.95, 9, 0, 1], [0.1, 0.85, 0.95, -0.85, 9, 2, 1], [0.3, 0.95, 1.15, -0.75, 9, 4, 1]];
+    else defs = [[-0.5, -1.0, 1.2, 0.85, 18, 0, 1], [-0.5, 0.85, 1.2, -1.0, 18, 5, 1]];
+    for (const [ax, ay, bx, by, th0, delay, aa] of defs) {
+      const th = th0 * Math.min(1, (s.scale || 1) * 1.25); // thinner streaks on the smaller cuts
+      const age = s.age - delay;
+      if (age < 0) continue;
+      const life = s.life - delay;
+      const sweep = clamp((age + 1) / 3, 0, 1), fade = age < 5 ? 1 : clamp(1 - (age - 5) / Math.max(1, life - 5), 0, 1);
+      const tail = Math.min(sweep, clamp((age - 3) / 8, 0, 1) * 0.7);
+      if (sweep - tail < 0.02) continue;
+      const A = [s.x + d * ax * R, s.y + ay * R], B = [s.x + d * bx * R, s.y + by * R];
+      const nx = -(B[1] - A[1]), ny = B[0] - A[0], nl = Math.hypot(nx, ny) || 1;
+      const N = 12, pts = [], L = [], Rr = [];
+      for (let i = 0; i <= N; i++) {
+        const u = i / N, t = tail + (sweep - tail) * u, w = th * Math.pow(Math.sin(Math.PI * u), 0.8) + 0.6;
+        const px = A[0] + (B[0] - A[0]) * t, py = A[1] + (B[1] - A[1]) * t;
+        L.push([px + nx / nl * w, py + ny / nl * w]); Rr.push([px - nx / nl * w, py - ny / nl * w]); pts.push([px, py]);
+      }
+      ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.globalAlpha = fade * aa;
+      ctx.beginPath(); ctx.moveTo(L[0][0], L[0][1]);
+      for (let i = 1; i <= N; i++) ctx.lineTo(L[i][0], L[i][1]);
+      for (let i = N; i >= 0; i--) ctx.lineTo(Rr[i][0], Rr[i][1]);
+      ctx.closePath(); ctx.fillStyle = "rgba(214,20,48,0.95)"; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = DARK; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pts[1][0], pts[1][1]); for (let i = 2; i < N; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.strokeStyle = HOT; ctx.lineWidth = 1.8; ctx.stroke();
+      ctx.restore();
+      if (age < 3 && Math.random() < 0.9) add({ kind: "spark", x: pts[N][0], y: pts[N][1], vx: d * rnd(0.5, 3), vy: rnd(-1.5, 2.5), life: 10, size: 1.8, g: 0.1, drag: 0.93 });
+      if (s.kind === "xcut" && delay === 5 && age === 0) add({ kind: "flare", x: s.x + d * R * 0.45, y: s.y, life: 7, size: 34, drag: 1 });
+    }
+  }
+
   function drawSlash(ctx, s) {
+    if (s.kind === "slice" || s.kind === "claw" || s.kind === "xcut" || s.kind === "chop") return drawStreaks(ctx, s);
+    if (s.kind === "cross") return drawCross(ctx, s);
     const age = s.age;
     const sweep = clamp((age + 1) / 3, 0, 1);
     const fade = age < 3 ? 1 : clamp(1 - (age - 3) / (s.life - 3), 0, 1);
     const R = s.range + 8;
-    const a0 = s.up ? 1.05 : -1.15, a1 = s.up ? -0.75 : 0.6;
+    const a0 = s.a0 !== undefined ? s.a0 : s.up ? 1.05 : -1.15, a1 = s.a1 !== undefined ? s.a1 : s.up ? -0.75 : 0.6;
     const head = sweep;
     const tail = Math.min(head, clamp((age - 1) / 7, 0, 1) * 0.85);
     if (head - tail < 0.02) return;
@@ -491,7 +575,7 @@
     for (let i = 0; i <= N; i++) {
       const u = i / N;
       const th = a0 + (a1 - a0) * (tail + (head - tail) * u);
-      const thick = 16 * Math.sin(Math.PI * u) + 1;
+      const thick = 16 * (s.wide || 1) * Math.sin(Math.PI * u) + 1;
       outer.push([cx + s.dir * Math.cos(th) * R, cy + Math.sin(th) * R]);
       inner.push([cx + s.dir * Math.cos(th) * (R - thick), cy + Math.sin(th) * (R - thick)]);
     }

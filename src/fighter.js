@@ -135,9 +135,12 @@
       this.ghostShots = []; // Errata Phantom Input: projectiles fired by a ghost { x, y, facing, hit } (the Sim turns them into Projectiles)
       this.nullFrame = 0; // Errata Null Frame: ticks of untargetable left
       this.recursion = null; // Errata Phantom Recursion in progress: { id, target, t, cfg, copies, realIdx, collapsing, collapseAt }
+      this.relocation = null; // Errata ultimate (SYSTEM: RELOCATION ERROR) in progress (caster side): { phase, p, rx, ry, dest, seed ... }
+      this.fragmented = null; // victim side: { p, x, y } while shattered into data (body hidden by the renderer, untargetable)
       this.others = []; // every other fighter (set by Sim.step)
       this.chainIndex = 0;
       this.comboQueued = false;
+      this.comboNext = 0; this.comboWin = 0; // combo window (attack.comboWindow): ticks left in which the next tap continues the chain at hit comboNext
       this.hitTargets = new Set(); // fighter ids already hit by the current swing
       this.pendingProjectile = null; // attack data to fire this tick (Sim turns it into a Projectile)
       // Void Mage state (everything transient: cleared on every respawn)
@@ -220,6 +223,8 @@
       this.nullFrame = 0;
       this.untargetable = false;
       this.recursion = null;
+      this.relocation = null;
+      this.fragmented = null;
       this.respawn(arena);
     }
 
@@ -232,6 +237,7 @@
     startAttack(index) {
       this.breakCloak();
       const a = this.stats.attack;
+      this.comboWin = 0; // a new swing uses up the window
       this.chainIndex = index;
       this.hit = a.chain && a.chain[index] ? Object.assign({}, a, a.chain[index]) : Object.assign({}, a);
       if (this.stats.id === "hitter" && this.hit.gunnerBasic) this.hit.damage *= 1 + this.gunnerStacks * this.stats.passive.damagePerStack;
@@ -277,6 +283,8 @@
         const next = this.chainIndex + 1;
         this.startAttack(next < this.chainLength() ? next : 0);
       } else {
+        const CW = this.stats.attack.comboWindow;
+        if (CW && this.hit && !this.hit.isSkill && this.chainIndex + 1 < this.chainLength()) { this.comboNext = this.chainIndex + 1; this.comboWin = CW; } // keep the chain alive for a normal tapping pace
         this.chainIndex = 0;
         this.hit = null;
         this.state = STATE.FALLING; // fixed to the right locomotion state at the end of step()
@@ -285,6 +293,7 @@
 
     // Advance timed states (attack phases, hitstun). Runs at the start of each tick.
     advanceState() {
+      if (this.comboWin > 0 && (--this.comboWin, this.state === STATE.HITSTUN || this.state === STATE.KO)) this.comboWin = 0; // being hit breaks the chain
       if (this.flash > 0) this.flash--;
       if (this.armorHit > 0) this.armorHit--;
       switch (this.state) {
@@ -356,6 +365,7 @@
             if (this.hit.judgment) this.beginJudgment();
             if (this.hit.taunt) this.beginTaunt(this.hit.taunt);
             if (this.hit.recursion) this.beginRecursion();
+            if (this.hit.relocation) this.beginRelocation();
             if (this.hit.id === "unrelenting_wrath" && this.foe) this.hitTargets.add(this.foe.id); // the first slam is the first beat, not a free extra hit
             if (this.hit.heal) {
                 this.hp = Math.min(this.stats.maxHP, this.hp + (this.hit.healPct ? this.stats.maxHP * this.hit.healPct : this.hit.heal));
@@ -1355,7 +1365,7 @@
 
     errataStep() {
       const S = STATE;
-      if (this.state === S.KO) { this.errataQ.length = 0; this.nullFrame = 0; this.untargetable = false; this.unstable = null; this.recursion = null; this.afterimages.length = 0; return; }
+      if (this.state === S.KO) { this.errataQ.length = 0; this.nullFrame = 0; this.untargetable = false; this.unstable = null; this.recursion = null; this.relocation = null; this.afterimages.length = 0; return; }
       for (let i = this.afterimages.length - 1; i >= 0; i--) if (++this.afterimages[i].age >= this.afterimages[i].life) this.afterimages.splice(i, 1);
       if (this.nullFrame > 0 && --this.nullFrame <= 0) this.untargetable = false;
       const q = this.errataQ;
@@ -1455,141 +1465,247 @@
     // Errata splits into three corrupted versions around the target.
     // Each copy attacks at a different tick, but only ONE randomly selected copy
     // deals actual damage. When all strikes finish, the copies collapse into the real Errata.
+    // ══════════ ERRATA Skill 3: Phantom Recursion (three-way dash) ══════════
+    // Three copies appear LEFT / RIGHT / ABOVE the enemy and each dashes in a straight, non-homing line through the spot where he stood.
+    // Only the real copy hits (on contact); the other two pass through. Numbers: characters.js errata skill 3.
     beginRecursion() {
       const C = this.hit && this.hit.recursion, s = this.stats, v = this.foe;
-      if (!C || !v || v.state === STATE.KO) return;
-      const rnd = this.rand || Math.random;
-      const copiesDef = C.copies || [
-        { dx: -120, dy: 0, hitAt: 18, pose: 0 },
-        { dx: 0, dy: -90, hitAt: 21, pose: 1 },
-        { dx: 120, dy: 0, hitAt: 24, pose: 2 }
+      this.recursion = null;
+      if (!C) return;
+      const rnd = this.rand || Math.random, RU = C.rush;
+      const A = this.arenaRef || MW.ARENA, bz = A.blastZone;
+      const plat = v && v.grounded && v.standingOn ? v.standingOn : null;
+      const minX = plat ? plat.x + 8 : bz.left + 80, maxX = plat ? plat.x + plat.w - s.width - 8 : bz.right - 80 - s.width;
+      const clampX = (x) => Math.max(minX, Math.min(maxX, x));
+      // the crossing point (body top-left of Errata when standing exactly where the enemy stands now)
+      const lx = v ? v.x + v.stats.width / 2 - s.width / 2 : this.x + this.facing * 220;
+      const ly = v ? v.y + v.stats.height - s.height : this.y;
+      const groundTop = plat ? plat.y - s.height : ly + RU.overshoot;
+      const defs = [
+        { name: "left", sx: clampX(lx - RU.reachX), sy: ly, dx: 1, dy: 0 },
+        { name: "right", sx: clampX(lx + RU.reachX), sy: ly, dx: -1, dy: 0 },
+        { name: "top", sx: clampX(lx), sy: Math.max(bz.top + 60, ly - RU.reachY), dx: 0, dy: 1 },
       ];
-      const realIdx = Math.floor(rnd() * copiesDef.length);
-      const vcx = v.x + v.stats.width / 2;
-      const vFeet = v.y + v.stats.height;
-      const bz = (this.arenaRef && this.arenaRef.blastZone) || MW.ARENA.blastZone;
-
-      const copies = copiesDef.map((cp, idx) => {
-        let cx = vcx + cp.dx - s.width / 2;
-        cx = Math.max(bz.left + 80, Math.min(bz.right - 80 - s.width, cx));
-        let cy = vFeet - s.height + (cp.dy || 0);
-        const facing = vcx >= cx + s.width / 2 ? 1 : -1;
-        return {
-          id: idx,
-          dx: cp.dx,
-          dy: cp.dy || 0,
-          hitAt: cp.hitAt,
-          pose: cp.pose,
-          x: cx,
-          y: cy,
-          facing: facing,
-          isReal: idx === realIdx,
-          done: false
-        };
+      const n = defs.length;
+      const realIdx = Math.floor(rnd() * n);
+      const delays = RU.delays.slice();
+      for (let i = delays.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = delays[i]; delays[i] = delays[j]; delays[j] = t; } // who dashes first is random
+      const copies = defs.map((d, i) => {
+        let ex, ey;
+        if (d.dy) { ex = d.sx; ey = Math.min(groundTop, ly + RU.overshoot); if (ey < d.sy + 40) ey = d.sy + 40; }
+        else { ex = clampX(lx + d.dx * RU.overshoot); ey = d.sy; }
+        const facing = d.dx !== 0 ? d.dx : (lx >= d.sx ? 1 : -1);
+        return { id: i, name: d.name, isReal: i === realIdx, pose: i % 3, delay: delays[i], sx: d.sx, sy: d.sy, ex: ex, ey: ey,
+          x: d.sx, y: d.sy, facing: facing, done: false, passed: false, trail: [] };
       });
-
-      const maxHitAt = Math.max(...copies.map(c => c.hitAt));
-      const collapseAt = maxHitAt + (C.collapse || 14);
-
-      // Place real Errata at the chosen copy position immediately
-      const realCopy = copies[realIdx];
-      this.x = realCopy.x;
-      this.y = realCopy.y;
-      this.px = this.x;
-      this.py = this.y;
-      this.facing = realCopy.facing;
-      this.vx = 0;
-      this.vy = 0;
-
+      const real = copies[realIdx];
+      this.afterimages.push({ x: this.x, y: this.y, facing: this.facing, age: 0, life: 14 }); // he leaves the spot he cast from
+      this.x = real.sx; this.y = real.sy; this.px = this.x; this.py = this.y; this.vx = 0; this.vy = 0; this.facing = real.facing;
       this.recursion = {
-        id: this.hit.id,
-        target: v,
-        t: 0,
-        cfg: C,
-        copies: copies,
-        realIdx: realIdx,
-        collapseAt: collapseAt,
-        collapsing: false,
-        hitSpec: Object.assign({}, this.hit, { isSkill: true, noError: false })
+        id: this.hit.id, target: v, t: 0, cfg: C, copies: copies, realIdx: realIdx, lx: lx, ly: ly, hit: false,
+        collapseAt: RU.windup + Math.max.apply(null, copies.map((c) => c.delay)) + RU.ticks + (C.collapse || 10),
+        hitSpec: Object.assign({}, this.hit, { isSkill: true, noError: false }),
       };
-
       this.fxOut.push({
-        type: "errata",
-        kind: "recursion_split",
-        x: vcx,
-        y: v.y + v.stats.height * 0.5,
-        copies: copies.map(c => ({ x: c.x, y: c.y, facing: c.facing, pose: c.pose, isReal: c.isReal }))
+        type: "errata", kind: "recursion_split", x: lx + s.width / 2, y: ly + s.height * 0.5,
+        copies: copies.map((c) => ({ x: c.x, y: c.y, facing: c.facing, pose: c.pose, isReal: c.isReal, name: c.name })),
       });
     }
 
     recursionStep() {
       const R = this.recursion, v = R && R.target;
-      if (!R || !this.hit || this.hit.id !== R.id || this.state === STATE.HITSTUN || this.state === STATE.KO || !v || v.state === STATE.KO) {
+      if (!R || !this.hit || this.hit.id !== R.id || this.state === STATE.HITSTUN || this.state === STATE.KO) { this.recursion = null; return; }
+      const s = this.stats, C = R.cfg, RU = C.rush;
+      this.state = STATE.ATTACK_ACTIVE;
+      this.stateTimer = 3;
+      this.vx = 0; this.vy = 0; // glides along its dash line: gravity must not pull him off it
+      R.t++;
+      for (const cp of R.copies) {
+        if (cp.done) continue;
+        const prog = Math.max(0, Math.min(1, (R.t - RU.windup - cp.delay) / RU.ticks));
+        if (prog <= 0) continue; // still holding at the spawn spot (the lane is shown)
+        if (cp.isReal && R.hit) continue;
+        const q = Math.ceil(prog * RU.hops) / RU.hops; // glitchy dash: quantized hops
+        const nx = cp.sx + (cp.ex - cp.sx) * q, ny = cp.sy + (cp.ey - cp.sy) * q;
+        if (nx !== cp.x || ny !== cp.y) { cp.trail.push({ x: cp.x, y: cp.y }); if (cp.trail.length > 4) cp.trail.shift(); }
+        cp.x = nx; cp.y = ny;
+        if (cp.isReal) {
+          if (this.x !== cp.x || this.y !== cp.y) this.afterimages.push({ x: this.x, y: this.y, facing: cp.facing, age: 0, life: 8 });
+          this.x = cp.x; this.y = cp.y; this.px = this.x; this.py = this.y;
+          if (v && v.state !== STATE.KO && !v.untouchable()) { // contact: his body (plus a small pad) touches the enemy
+            const pd = RU.pad || 0;
+            if (this.x - pd < v.x + v.stats.width && this.x + s.width + pd > v.x && this.y - pd < v.y + v.stats.height && this.y + s.height + pd > v.y) {
+              R.hit = true; cp.done = true;
+              this.strikeHit(v, Object.assign({}, R.hitSpec, { damage: this.hit.damage, knockback: this.hit.knockback, launchH: this.hit.launchH, launchV: this.hit.launchV, stun: this.hit.stun }), cp.facing);
+              this.fxOut.push({ type: "errata", kind: "recursion_strike", isReal: true, x: this.x + s.width / 2, y: this.y + s.height * 0.5,
+                targetX: v.x + v.stats.width / 2, targetY: v.y + v.stats.height * 0.5, facing: cp.facing, pose: cp.pose });
+            }
+          }
+        } else if (!cp.passed && v && Math.abs(cp.x + s.width / 2 - (v.x + v.stats.width / 2)) < 30 && Math.abs(cp.y + s.height / 2 - (v.y + v.stats.height / 2)) < 50) {
+          cp.passed = true; // a decoy runs through him: it shows, but does nothing
+          this.fxOut.push({ type: "errata", kind: "recursion_strike", isReal: false, x: cp.x + s.width / 2, y: cp.y + s.height * 0.5,
+            targetX: v.x + v.stats.width / 2, targetY: v.y + v.stats.height * 0.5, facing: cp.facing, pose: cp.pose });
+        }
+        if (prog >= 1) cp.done = true;
+      }
+      if (R.t >= R.collapseAt) {
+        this.fxOut.push({ type: "errata", kind: "recursion_collapse", x: this.x + s.width / 2, y: this.y + s.height * 0.5 });
         this.recursion = null;
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = R.hit ? (C.endRecovery || 34) : (C.missRecovery || 58); // a whiff is punishable
+      }
+    }
+
+    // ══════════ ERRATA ultimate: SYSTEM: RELOCATION ERROR ══════════
+    // Capture -> suspend -> fragment -> forced relocation -> reconstruction explosion. All numbers: characters.js errata.ultimate.attack.relocation.
+    // Caster side: this.relocation steers the victim through holdVictim + victim.ctl; the victim only carries the visual / safety flag `fragmented`.
+    relocGround(x, y) { // top of the platform under (x, y) (where the tendrils come from); falls back to y
+      const A = this.arenaRef || MW.ARENA;
+      let best = null;
+      for (const p of A.platforms) if (x >= p.x - 8 && x <= p.x + p.w + 8 && p.y >= y - 24 && (best === null || p.y < best)) best = p.y;
+      return best === null ? y : best;
+    }
+
+    // Random VALID destination for the victim: on a platform, inside the arena, no overlap with any platform body, far enough from
+    // Errata and from where the victim was. Returns { x (centre), feet }. Falls back to the farthest obstacle-free spot, then to the origin.
+    pickRelocation(v, C) {
+      const A = this.arenaRef || MW.ARENA, bz = A.blastZone, rnd = this.rand || Math.random;
+      const vw = v.stats.width, vh = v.stats.height;
+      const ex = this.x + this.stats.width / 2, ey = this.y + this.stats.height / 2;
+      const ox = v.x + vw / 2, oy = v.y + vh;
+      const clear = (cx, feet) => {
+        const r = { x: cx - vw / 2, y: feet - vh - 2, w: vw, h: vh + 2 };
+        for (const p of A.platforms) {
+          if (r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y + 3) return false; // would sit inside a platform (standing on its top is fine)
+        }
+        return true;
+      };
+      const inside = (cx, feet) => cx - vw / 2 > bz.left + C.arenaMargin && cx + vw / 2 < bz.right - C.arenaMargin && feet - vh > bz.top + 60 && feet < bz.bottom - 60;
+      const cands = [];
+      for (let i = 0; i < 80; i++) {
+        const p = A.platforms[Math.floor(rnd() * A.platforms.length)];
+        const m = Math.min(C.edgeMargin, Math.max(0, (p.w - vw) / 2 - 1));
+        const cx = p.x + m + vw / 2 + rnd() * Math.max(0, p.w - 2 * m - vw);
+        if (!inside(cx, p.y) || !clear(cx, p.y)) continue;
+        cands.push({ x: cx, feet: p.y, dE: Math.hypot(cx - ex, p.y - vh / 2 - ey), dO: Math.hypot(cx - ox, p.y - oy) });
+      }
+      const good = cands.filter((c) => c.dE >= C.minDistance && c.dO >= C.minFromOrigin);
+      if (good.length) return good[Math.floor(rnd() * good.length)];
+      if (cands.length) return cands.reduce((a, b) => (b.dE > a.dE ? b : a)); // nothing far enough: the farthest valid spot
+      return { x: ox, feet: oy, dE: 0, dO: 0 };
+    }
+
+    // victim back to normal (used on every exit: finished, cancelled, victim died)
+    relocRelease(v, X) {
+      if (v) {
+        v.fragmented = null;
+        v.untargetable = (v.nullFrame || 0) > 0;
+        if (v.ctl) v.ctl = null;
+      }
+      if (X) X.released = true;
+    }
+
+    beginRelocation() {
+      const C = this.hit.relocation, s = this.stats, v = this.foe;
+      this.relocation = null;
+      for (const o of [v].concat(this.others || [])) if (o) this.hitTargets.add(o.id); // the cast itself has no hit box
+      if (!v || v.state === STATE.KO || v.untouchable()) return;
+      const dx = v.x + v.stats.width / 2 - (this.x + s.width / 2), dy = v.y + v.stats.height / 2 - (this.y + s.height / 2);
+      if (Math.hypot(dx, dy) > C.range) return; // nobody in range: a pure miss with the full recovery
+      this.facing = dx >= 0 ? 1 : -1;
+      const rx = v.x + v.stats.width / 2, ry = v.y + v.stats.height;
+      this.relocation = {
+        id: this.hit.id, cfg: C, target: v, phase: "emerge", t: 0, p: 0, rx: rx, ry: ry, gy: this.relocGround(rx, ry),
+        dest: null, ox: 0, oy: 0, seed: Math.floor((this.rand || Math.random)() * 100000) + 1, released: false,
+      };
+      this.fxOut.push({ type: "errata", kind: "reloc_emerge", x: rx, y: this.relocation.gy });
+    }
+
+    relocationStep() {
+      const X = this.relocation, C = X.cfg, v = X.target;
+      const stop = (recovery) => {
+        this.relocRelease(v, X);
+        this.relocation = null;
+        this.state = STATE.ATTACK_RECOVERY;
+        this.stateTimer = recovery;
+      };
+      if (!this.hit || this.hit.id !== X.id || this.state === STATE.HITSTUN || this.state === STATE.KO) { // Errata was knocked out of it
+        this.relocRelease(v, X);
+        this.relocation = null;
         return;
       }
-
       this.state = STATE.ATTACK_ACTIVE;
       this.stateTimer = 3;
       this.vx = 0;
-      this.vy = 0;
-      this.holdVictim(v);
-      R.t++;
+      this.hitTargets.add(v.id);
+      X.t++;
+      const vcx = v.x + v.stats.width / 2, vcy = v.y + v.stats.height * 0.5;
+      const hidden = X.phase === "fragment" || X.phase === "travel" || X.phase === "rebuild";
+      if (v.state === STATE.KO || (X.phase !== "emerge" && X.phase !== "retreat" && !hidden && v.invuln > 0)) {
+        // the victim died (or respawned) mid-sequence: let go cleanly, no more damage
+        this.relocRelease(v, X);
+        if (X.phase === "emerge") { X.phase = "retreat"; X.p = 0; }
+        else { this.fxOut.push({ type: "errata", kind: "reloc_release", x: vcx, y: vcy }); stop(C.endRecovery); return; }
+      }
+      if (hidden) { v.untargetable = true; this.holdVictim(v); v.ctl = { vx: 0, vy: 0, left: 2 }; }
 
-      for (const cp of R.copies) {
-        if (!cp.done && R.t >= cp.hitAt) {
-          cp.done = true;
-          if (cp.isReal) {
-            // Real strike connects!
-            const hitSpec = Object.assign({}, R.hitSpec, {
-              damage: this.hit.damage,
-              knockback: this.hit.knockback,
-              launchH: this.hit.launchH,
-              launchV: this.hit.launchV,
-              stun: this.hit.stun
-            });
-            this.strikeHit(v, hitSpec, cp.facing);
-            this.holdVictim(v);
-            this.fxOut.push({
-              type: "errata",
-              kind: "recursion_strike",
-              isReal: true,
-              x: cp.x + this.stats.width / 2,
-              y: cp.y + this.stats.height * 0.5,
-              targetX: v.x + v.stats.width / 2,
-              targetY: v.y + v.stats.height * 0.5,
-              facing: cp.facing,
-              pose: cp.pose
-            });
-          } else {
-            // Decoy strike: pure visual effect, no damage
-            this.fxOut.push({
-              type: "errata",
-              kind: "recursion_strike",
-              isReal: false,
-              x: cp.x + this.stats.width / 2,
-              y: cp.y + this.stats.height * 0.5,
-              targetX: v.x + v.stats.width / 2,
-              targetY: v.y + v.stats.height * 0.5,
-              facing: cp.facing,
-              pose: cp.pose
-            });
+      if (X.phase === "emerge") {
+        const dir = vcx > X.rx ? 1 : -1;
+        if (!v.untouchable() && Math.abs(vcx - X.rx) <= C.grabRX * 3) X.rx += dir * Math.min(Math.abs(vcx - X.rx), C.track || 0); // the tendrils lean toward him a little
+        X.gy = this.relocGround(X.rx, X.ry);
+        if (X.t >= C.emergeTicks) {
+          const grabbed = !v.untouchable() && Math.abs(vcx - X.rx) <= C.grabRX && Math.abs(v.y + v.stats.height - X.ry) <= C.grabRY;
+          X.phase = grabbed ? "lift" : "retreat";
+          X.p = 0;
+          this.fxOut.push({ type: "errata", kind: grabbed ? "reloc_grab" : "reloc_miss", x: X.rx, y: X.gy });
+          if (grabbed) {
+            v.hit = null; v.pendingProjectile = null; v.comboQueued = false; // whatever he was doing is cancelled
+            this.strikeHit(v, { id: "relocation_error", isSkill: true, noError: true, noMark: true, damage: C.grabDamage, knockback: 0, launchH: 0, launchV: 0, stun: C.grabStun, manaGain: 0 }, this.facing);
+            if (v.state === STATE.KO) { this.relocRelease(v, X); X.phase = "retreat"; return; }
+            this.holdVictim(v); v.ctl = { vx: (X.rx - vcx) * 0.25, vy: 0, left: 2 };
           }
         }
-      }
-
-      if (R.t >= R.collapseAt) {
-        // All copies collapse back into the real Errata
-        this.fxOut.push({
-          type: "errata",
-          kind: "recursion_collapse",
-          x: this.x + this.stats.width / 2,
-          y: this.y + this.stats.height * 0.5
-        });
-        const recov = R.cfg.endRecovery || this.hit.recovery || 36;
-        this.recursion = null;
-        this.state = STATE.ATTACK_RECOVERY;
-        this.stateTimer = recov;
+      } else if (X.phase === "retreat") {
+        if (++X.p >= C.missTicks) stop(C.missRecovery);
+      } else if (X.phase === "lift") {
+        this.holdVictim(v);
+        v.ctl = { vx: (X.rx - vcx) * 0.25, vy: -C.liftSpeed, left: 2 };
+        if (++X.p >= C.liftTicks) { X.phase = "suspend"; X.p = 0; }
+      } else if (X.phase === "suspend") {
+        this.holdVictim(v);
+        v.ctl = { vx: 0, vy: 0, left: 2 };
+        if (++X.p >= C.suspendTicks) {
+          X.phase = "fragment"; X.p = 0;
+          X.ox = vcx; X.oy = vcy;
+          X.dest = this.pickRelocation(v, C);
+          v.untargetable = true;
+          v.fragmented = { p: 0, x: vcx, y: vcy };
+          this.fxOut.push({ type: "errata", kind: "reloc_fragment", x: vcx, y: vcy, dx: X.dest.x, dy: X.dest.feet - v.stats.height * 0.5 });
+        }
+      } else if (X.phase === "fragment") {
+        v.fragmented.p = 0;
+        if (++X.p >= C.fragmentTicks) { X.phase = "travel"; X.p = 0; }
+      } else if (X.phase === "travel") {
+        v.fragmented.p = ++X.p / Math.max(1, C.travelTicks);
+        if (X.p >= C.travelTicks) {
+          // the data lands: the enemy is rebuilt at the chosen spot (still hidden until the explosion)
+          v.x = X.dest.x - v.stats.width / 2; v.y = X.dest.feet - v.stats.height - 1; v.px = v.x; v.py = v.y;
+          v.vx = 0; v.vy = 0;
+          X.phase = "rebuild"; X.p = 0;
+          this.fxOut.push({ type: "errata", kind: "reloc_land", x: X.dest.x, y: X.dest.feet });
+        }
+      } else if (X.phase === "rebuild") {
+        v.fragmented.p = ++X.p / Math.max(1, C.rebuildTicks);
+        if (X.p >= C.rebuildTicks) {
+          const bx = v.x + v.stats.width / 2, by = v.y + v.stats.height * 0.5;
+          this.relocRelease(v, X); // body back, hittable again
+          this.holdVictim(v);
+          const dir = bx >= this.x + this.stats.width / 2 ? 1 : -1;
+          v.ctl = null;
+          this.strikeHit(v, { id: "relocation_error", isSkill: true, noMark: true, empowered: true, damage: C.damage, knockback: C.knockback, launchH: C.launchH, launchV: C.launchV, stun: C.stun, manaGain: 0 }, dir);
+          this.fxOut.push({ type: "errata", kind: "reloc_explode", x: bx, y: by, big: true });
+          stop(C.endRecovery);
+        }
       }
     }
 
@@ -2017,6 +2133,7 @@
       if (this.transit) this.transitStep(arena);
       if (this.unstable) this.unstableStep();
       if (this.recursion) this.recursionStep();
+      if (this.relocation) this.relocationStep();
       if (this.wraiths) this.wraithStep();
       if (this.gravSlam) this.gravSlamStep();
       if (this.execution) this.executionStep();
@@ -2084,7 +2201,7 @@
         if (LOCOMOTION.has(this.state)) {
           const m = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
           if (m !== 0) this.facing = m;
-          this.startAttack(0);
+          this.startAttack(this.comboWin > 0 ? this.comboNext : 0); // inside the combo window the tap continues the chain
           this.atkBuf = 0;
         } else if (ATTACKING.has(this.state) && !(this.hit && this.hit.isSkill)) {
           // (a skill cannot be chained into a basic attack)

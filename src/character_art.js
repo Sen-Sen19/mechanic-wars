@@ -27,24 +27,35 @@
     marionettist: { main: "#11101B", dark: "#080710", light: "#7955A8", accent: "#C5A5FF", skin: "#e4ddea", hair: "#211B2C", pants: "#11101B", boot: "#0b0a12", glow: "#C5A5FF" },
     fulminar: { main: "#14243D", dark: "#080E1B", light: "#397FD1", accent: "#43DFFF", skin: "#e6ecf5", hair: "#E5EDF7", pants: "#14243D", boot: "#14243D", glow: "#43DFFF" },
     mochi: { main: "#C9B6E8", dark: "#5B4A86", light: "#E3D7F5", accent: "#F3B9CB", skin: "#FCE3D6", hair: "#A8E6CF", pants: "#9D8CB9", boot: "#F5F1F7", glow: "#FFF0D5" },
+    miette: { main: "#EADFC4", dark: "#2A1B4A", light: "#FFF6DC", accent: "#A050E0", skin: "#FCE3D8", hair: "#3B2320", pants: "#D9A02E", boot: "#1D1826", glow: "#2EC8C8" },
     errata: { main: "#101019", dark: "#080810", light: "#EEE6D2", accent: "#FF315A", skin: "#EEDDD4", hair: "#EAEDF4", pants: "#252534", boot: "#0b0b13", glow: "#00E5FF" },
     tank: { main: "#c9a032", dark: "#5a3d12", light: "#f2d46e", accent: "#fff0a6", skin: "#b08c74", hair: "#d9a92a", pants: "#7a5518", boot: "#c9a032", glow: "#fff4c2", glowHi: "#ffffff" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
   const BUILD = {
     fighter: { leg: 0.45, tor: 0.29, hr: 0.115, sw: 0.62, hw: 0.52, lw: 0.21, aw: 0.23, arm: 0.34, stride: 0.5 }, // heavyweight: wide shoulders, thick limbs
-    mage: { leg: 0.40, tor: 0.33, hr: 0.10, sw: 0.58, hw: 0.42, lw: 0.15, aw: 0.105, arm: 0.40, stride: 0.34 },
-    assassin: { leg: 0.47, tor: 0.27, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.17, aw: 0.17, arm: 0.36, stride: 0.58 }, // Bloodlust: lean, broad-ish shoulders, narrow waist, strong legs, long limbs
+    mage: { leg: 0.40, tor: 0.33, hr: 0.10, sw: 0.58, hw: 0.42, lw: 0.15, aw: 0.105, arm: 0.40, stride: 0.34, shx: 0.26 },
+    assassin: { leg: 0.47, tor: 0.27, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.17, aw: 0.17, arm: 0.36, stride: 0.58, shx: 0.36 }, // Bloodlust: lean, broad-ish shoulders, narrow waist, strong legs, long limbs
     hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.19, arm: 0.32, stride: 0.42 },
     monarch: { leg: 0.43, tor: 0.31, hr: 0.10, sw: 0.80, hw: 0.46, lw: 0.22, aw: 0.20, arm: 0.37, stride: 0.40 }, // from the design document: tall, V-shaped, long slim legs
     marionettist: { leg: 0.45, tor: 0.30, hr: 0.10, sw: 0.62, hw: 0.40, lw: 0.16, aw: 0.11, arm: 0.42, stride: 0.40 }, // tall, slender, narrow shoulders, long limbs
     fulminar: { leg: 0.46, tor: 0.30, hr: 0.105, sw: 0.56, hw: 0.42, lw: 0.17, aw: 0.12, arm: 0.38, stride: 0.52 }, // athletic: narrow waist, strong long legs, a long stride
     mochi: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.58, hw: 0.50, lw: 0.17, aw: 0.13, arm: 0.36, stride: 0.34 }, // petite adult: head 1/4 of her height, slim limbs under a huge hoodie
+    miette: { leg: 0.45, tor: 0.30, hr: 0.108, sw: 0.50, hw: 0.42, lw: 0.15, aw: 0.10, arm: 0.40, stride: 0.46 }, // petite painter: big head, cropped coat, a brush taller than she is
     errata: { leg: 0.46, tor: 0.31, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.16, aw: 0.11, arm: 0.39, stride: 0.45 }, // tall, slender, elegant
-    tank: { leg: 0.36, tor: 0.33, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
+    tank: { leg: 0.41, tor: 0.30, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
   const kf = (fh, bh, lean, lunge, crouch) => ({ fh, bh, lean, lunge: lunge || 0, crouch: crouch || 0 });
+  // Noctis basic combo: sample a cut's wind -> mid -> strike path at u (0..1). The mid key is reached at 35% of the time (fast), the rest settles.
+  const NSW_MID = 0.4;
+  function nswPath(K, u) {
+    const lp = (p, q, t) => p + (q - p) * t;
+    let a, b, t;
+    if (u < NSW_MID) { a = K.wind; b = K.mid; t = 1 - Math.pow(1 - u / NSW_MID, 2); }
+    else { a = K.mid; b = K.strike; const q = (u - NSW_MID) / (1 - NSW_MID); t = q * q * (3 - 2 * q); }
+    return { fh: [lp(a.fh[0], b.fh[0], t), lp(a.fh[1], b.fh[1], t)], bh: [lp(a.bh[0], b.bh[0], t), lp(a.bh[1], b.bh[1], t)], lean: lp(a.lean, b.lean, t), lunge: lp(a.lunge, b.lunge, t), crouch: lp(a.crouch, b.crouch, t) };
+  }
   // Unrelenting Wrath: raised ("up") and slammed ("dn") hand / body positions for each of the four slams (the 5th beat is the leap)
   const WRATH_POSES = [
     { up: { fh: [0.25, -1.0], bh: [-0.1, -0.75], lean: -0.22, crouch: 0.02 }, dn: { fh: [0.9, 0.66], bh: [0.4, 0.5], lean: 0.34, crouch: 0.1 } },     // 0 overhead
@@ -52,6 +63,7 @@
     { up: { fh: [0.12, -1.22], bh: [0.22, -1.05], lean: -0.4, crouch: 0.0 }, dn: { fh: [0.95, 0.78], bh: [0.7, 0.62], lean: 0.45, crouch: 0.14 } }, // 2 two-handed crush
     { up: { fh: [0.75, -0.55], bh: [0.3, -0.2], lean: -0.1, crouch: 0.04 }, dn: { fh: [1.05, 0.8], bh: [0.45, 0.55], lean: 0.5, crouch: 0.12 } },   // 3 diagonal hammer
   ];
+  const FIGHTER_LEFT_HITS = [1]; // Titan normal combo: which hits (0 = first, 1 = second, 2 = third) are punched with the LEFT hand; the others use the right. [1] = right, left, right
   const ATK = {
     fighter: [
       { wind: kf([-0.35, 0.35], [0.2, 0.6], -0.12, -3, 0.01), strike: kf([1.05, -0.02], [0.1, 0.6], 0.22, 7, 0.02) },
@@ -71,13 +83,17 @@
       // 8 = Hundred Fists (skill 4): planted stance, fists alternate (animated in the pose code below)
       { wind: kf([1.0, 0.0], [0.3, 0.3], 0.3, 5, 0.05), strike: kf([1.18, 0.0], [0.3, 0.3], 0.3, 6, 0.05) },
       // 9 = Charged Punch: fist drawn far back and held low while charging, then a heavy straight punch
-      { wind: kf([-0.7, 0.25], [0.3, 0.6], -0.38, -9, 0.1), strike: kf([1.3, 0.0], [-0.1, 0.65], 0.6, 17, 0.12) },
+      { wind: kf([0.62, 0.08], [-0.25, 0.48], -0.3, -12, 0.08), strike: kf([1.3, 0.0], [-0.1, 0.65], 0.6, 17, 0.12) },
     ],
     assassin: [
-      { wind: kf([-0.3, -0.45], [0.1, 0.6], -0.2, -3, 0.07), strike: kf([1.08, 0.05], [0.1, 0.5], 0.46, 11, 0.09) },
-      { wind: kf([-0.3, 0.6], [0.1, 0.6], -0.2, -3, 0.09), strike: kf([1.08, 0.38], [0.1, 0.5], 0.48, 11, 0.11) },
-      // 2 = third hit of the combo: wide heavy finisher
-      { wind: kf([-0.4, -0.3], [0.1, 0.6], -0.28, -5, 0.09), strike: kf([1.1, 0.25], [0.2, 0.5], 0.52, 13, 0.11) },
+      // Basic combo, three DIFFERENT cuts. Each has THREE keyframes (wind -> mid -> strike) and its own visual timing: `sw` = seconds the swing takes (it lands inside the sim's active window), `hold` = seconds the finished cut is held before easing back.
+      // The body plays that path on its own clock (it keeps going after the sim state has ended), so each cut reads as a full motion.
+      // 0 = RISING SLASH: lead blade starts low behind the hip and sweeps up and forward in a diagonal arc.
+      { sw: 0.11, hold: 0.12, wind: kf([-0.3, 0.95], [0.1, 0.5], -0.2, -5, 0.12), mid: kf([0.55, 0.45], [-0.05, 0.5], 0.14, 5, 0.09), strike: kf([0.98, -0.9], [-0.2, 0.42], 0.34, 11, 0.03) },
+      // 1 = REAR-BLADE SPIN CUT: the lead hand is pulled in, the BACK blade whips from high behind across the body to low in front (a backhand), body twists into it.
+      { sw: 0.11, hold: 0.12, wind: kf([0.05, 0.2], [-0.5, -0.95], -0.42, -6, 0.04), mid: kf([0.1, 0.35], [0.4, -0.3], 0.2, 5, 0.1), strike: kf([-0.1, 0.45], [1.1, 0.75], 0.46, 10, 0.1) },
+      // 2 = FINISHER, OVERHEAD CLEAVE: both blades raised high behind the head, a deep crouch, then both slam down together in a lunging chop.
+      { sw: 0.12, hold: 0.2, wind: kf([0.0, -1.3], [-0.1, -1.15], -0.55, -9, 0.0), mid: kf([0.6, -0.6], [0.4, -0.55], 0.05, 7, 0.06), strike: kf([1.08, 0.95], [0.75, 0.8], 0.5, 12, 0.13) },
       // 3 = Charged Slash: blades pulled far back and low while charging, then one long lunging slash
       { wind: kf([-0.65, 0.2], [-0.2, 0.5], -0.36, -8, 0.1), strike: kf([1.28, 0.1], [0.2, 0.5], 0.62, 16, 0.11) },
       // 4 = Chained Scythe: arm cocked back, then thrown straight out and held while the chain drags the enemy in
@@ -118,6 +134,13 @@
       { wind: kf([0.05, 0.5], [0.1, 0.9], -0.1, -1, 0.02), strike: kf([1.1, 0.0], [0.1, 0.9], 0.16, 4, 0.03) },
       { wind: kf([0.5, 0.2], [-0.15, 0.1], -0.14, -2, 0.03), strike: kf([0.3, 0.3], [1.1, 0.05], 0.24, 5, 0.04) },
       { wind: kf([0.3, -1.0], [0.1, -0.95], -0.3, -3, 0.0), strike: kf([0.95, 0.6], [0.8, 0.6], 0.42, 8, 0.08) },
+    ],
+    // Miette: the brush runs from her back hand through her front hand (the bristles are past the front hand), so these hand pairs ARE the brush angle.
+    // 0 swipe = brush cocked low behind her, then swung forward and up, 1 reverse stroke = raised forward, then chopped down across, 2 splash = hauled up overhead behind her, then slammed down and forward.
+    miette: [
+      { wind: kf([0.0, 0.85], [0.5, 0.45], -0.1, -2, 0.03), strike: kf([1.12, 0.05], [0.55, 0.42], 0.16, 5, 0.02) },
+      { wind: kf([0.85, -0.55], [0.42, 0.05], -0.08, -1, 0.02), strike: kf([1.08, 0.55], [0.5, 0.18], 0.22, 6, 0.04) },
+      { wind: kf([-0.05, -0.95], [0.32, -0.42], -0.3, -4, 0.04), strike: kf([1.1, 0.5], [0.58, 0.1], 0.5, 12, 0.08) },
     ],
     // Errata: clean, elegant cuts. 0 slash = lead hand, 1 backhand = the other hand cuts back, 2 rift cut = a lunging two-handed sweep.
     errata: [
@@ -257,6 +280,7 @@
     }
     A.ko = ko ? A.ko + 1 : 0;
     if (st === S.ATTACK_STARTUP && A.pst !== S.ATTACK_STARTUP) A.atkN++;
+    if (id === "assassin" && f.hit && f.hit.pose === undefined && (st === S.ATTACK_ACTIVE || st === S.ATTACK_RECOVERY) && A.nsHit !== f.hit) { A.nsHit = f.hit; A.nsT = now; A.nsKey = f.chainIndex || 0; } // Noctis combo: each cut's own animation clock starts with its swing (once per hit)
     A.pst = st;
 
     // --- pose ---
@@ -270,28 +294,41 @@
 
     if (ko) {
       lean = -0.5; fh = [-0.3, -0.7]; bh = [-0.5, -0.4]; tilt = -0.4;
+      if (id === "assassin") { fh = [0.6, 0.5]; bh = [0.1, 0.65]; } // arms hang forward-low, clear of the face (his head leans back)
+      if (id === "mage") { fh = [0.45, 0.8]; bh = [-0.1, 0.85]; } // Umbra: arms hang loose and low (his head leans back, so the arms stay clear of the face)
     } else if (stunned) {
       lean = -0.5; tilt = -0.35; sx = 0.93; sy = 1.05; fh = [-0.2, -0.75]; bh = [-0.45, -0.55];
+      if (id === "assassin") { fh = [0.6, 0.5]; bh = [0.1, 0.65]; } // arms hang forward-low, clear of the face
+      if (id === "mage") { fh = [0.5, 0.75]; bh = [-0.05, 0.8]; } // Umbra: arms hang loose and low, clear of the face
       jit = Math.sin(now * 90) * 1.6;
       ff = airborne ? [Wd * 0.3, -H * 0.08] : [Wd * 0.28, 0]; bf = airborne ? [-Wd * 0.25, -H * 0.04] : [-Wd * 0.3, 0];
     } else if (attacking && f.hit) {
       const seq = ATK[id] || ATK.fighter;
-      let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "errata" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
+      let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "errata" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.5], [0.5, 0.42], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "miette" ? kf([0.38, -0.15], [0.34, 0.72], 0.05, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.64], [0.5, 0.56], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
         const wind0 = f.hit.chargeHold && !f.chargeReleased ? f.chargeTicks / Math.max(1, f.hit.chargeTime) : 1 - f.stateTimer / Math.max(1, f.hit.startup);
         t = ease(clamp(wind0, 0, 1)); a = guard; b = K.wind;
+        if (id === "assassin" && f.hit.pose === undefined && A.nFollow && now - A.nFollow.t < 0.15) a = A.nFollow; // combo: the next cut winds up from where the last one ended, not from the guard
       } else if (st === S.ATTACK_ACTIVE) {
         t = easeOut(clamp(0.55 + 0.45 * (1 - f.stateTimer / Math.max(1, f.hit.active || 1)), 0, 1)); a = K.wind; b = K.strike;
       } else {
         t = ease(clamp((1 - f.stateTimer / Math.max(1, f.hit.recovery) - 0.2) / 0.8, 0, 1)); a = K.strike; b = guard;
+        if (id === "assassin" && f.hit.pose === undefined) t = 0; // Noctis basic combo: the cut stays visible through the recovery
       }
       fh = [lerp(a.fh[0], b.fh[0], t), lerp(a.fh[1], b.fh[1], t)];
       bh = [lerp(a.bh[0], b.bh[0], t), lerp(a.bh[1], b.bh[1], t)];
       lean = lerp(a.lean, b.lean, t); lunge = lerp(a.lunge, b.lunge, t); crouch = lerp(a.crouch, b.crouch, t) * H;
+      if (id === "fighter" && FIGHTER_LEFT_HITS.includes(f.chainIndex || 0) && f.hit.pose === undefined && !f.hit.isSkill && !f.hit.chargeHold) { bh = fh; fh = [0.15, 0.3]; lunge += 9; lean += 0.16; } // normal combo alternates hands: this hit is thrown by the LEFT (back) hand (it uses the punch path of the keyframe), the right hand is pulled in as a guard, and the body leans / lunges a little more because the back arm sits further from the target
+      if (id === "assassin" && f.hit.pose === undefined && st !== S.ATTACK_STARTUP && seq[A.nsKey] && seq[A.nsKey].mid) { // the cut plays its own 3-key path
+        const NK = seq[A.nsKey], NP = nswPath(NK, clamp((now - A.nsT) / NK.sw, 0, 1));
+        fh = NP.fh; bh = NP.bh; lean = NP.lean; lunge = NP.lunge; crouch = NP.crouch * H;
+      }
+      if (id === "assassin" && f.hit.pose === undefined && st !== S.ATTACK_STARTUP) A.nFollow = { fh: fh.slice(), bh: bh.slice(), lean, lunge, crouch: crouch / H, t: now };
+      if (id === "fighter" && f.hit.chargeHold && !f.chargeReleased && st === S.ATTACK_STARTUP) { fh = guard.fh.slice(); } // charge: the right (front) arm just holds its guard; the left (back) arm gains momentum by drawing back along its wind-up pose
       if (f.hit.id === "hundred_fists" && st === S.ATTACK_ACTIVE) { // barrage: a different punch every beat
         const beat = Math.max(1, f.hit.multiHit || 6), rem = f.stateTimer % beat;
         const ext = easeOut(clamp(1 - ((beat - rem) % beat) / beat, 0, 1)); // peaks on the hit tick, then pulls back
@@ -334,7 +371,8 @@
       bf = rising ? [-Wd * 0.1, -H * 0.1] : [-Wd * 0.22, -H * 0.04];
       fh = rising ? [0.7, -0.5] : [0.55, -0.6]; bh = rising ? [-0.3, -0.4] : [-0.15, -0.65];
       if (id === "tank") { fh = [0.55, 0.1]; bh = [0.2, 0.2]; } // shield stays up in the air
-      if (id === "hitter") { fh = [0.85, 0.12]; bh = [0.52, 0.06]; } // rifle held ready in the air
+      if (id === "miette") { fh = rising ? [0.46, -0.2] : [0.4, -0.08]; bh = rising ? [0.36, 0.62] : [0.34, 0.68]; } // the brush stays held upright in the air
+      if (id === "hitter") { fh = [0.85, 0.3]; bh = [0.52, 0.24]; } // rifle held ready in the air (chest height, not chin height)
       if (id === "fighter") { fh = rising ? [0.72, -0.3] : [0.58, -0.05]; bh = rising ? [0.4, -0.2] : [0.3, 0.1]; } // fists stay up in a guard while jumping
       sy = 1 + 0.08 * A.jump + (rising ? 0.02 : 0.03); sx = 1 - 0.05 * A.jump;
     } else if (st === S.RUN && vxa > 0.4) {
@@ -353,11 +391,12 @@
       fh = [sw1 * 0.72, 0.66 - 0.2 * Math.abs(sw1)]; bh = [sw2 * 0.72, 0.66 - 0.2 * Math.abs(sw2)];
       if (id === "mage") { fh = [0.25 + sw1 * 0.4, 0.66 - 0.2 * Math.abs(sw1)]; bh = [0.05 + sw2 * 0.4, 0.7 - 0.2 * Math.abs(sw2)]; } // long arms, small swing
       if (id === "tank") { fh = [0.55 + sw1 * 0.02, 0.2]; bh = [0.25 + sw2 * 0.25, 0.5 - 0.1 * Math.abs(sw2)]; lean += 0.03; } // shield held steady, gauntlet arm swings
-      if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.42]; bh = [0.5, 0.36 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
+      if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.6]; bh = [0.5, 0.54 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
       if (id === "errata") { fh = [0.3 + sw1 * 0.45, 0.55 - 0.18 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.45, 0.58 - 0.18 * Math.abs(sw2)]; lean += 0.02; } // long easy strides, arms swinging loosely
+      if (id === "miette") { lean += 0.05; fh = [0.38 + sw1 * 0.05, -0.12 + 0.03 * Math.abs(sw1)]; bh = [0.34 + sw2 * 0.05, 0.72 - 0.03 * Math.abs(sw2)]; } // the brush is carried upright, only bobbing a little
       if (id === "mochi") { lean += 0.07; fh = [0.1 + sw1 * 0.22, 0.92 - 0.07 * Math.abs(sw1)]; bh = [0.02 + sw2 * 0.22, 0.94 - 0.07 * Math.abs(sw2)]; } // a sleepy shuffle: long sleeves just dangle and swing a little
       if (id === "fulminar") { lean += 0.0; fh = [0.3 + sw1 * 0.5, 0.5 - 0.2 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.5, 0.52 - 0.2 * Math.abs(sw2)]; } // sprinter's lean, arms pumping
-      if (id === "fighter") { fh = [0.5 + sw1 * 0.26, 0.14 + 0.1 * (1 - Math.abs(sw1))]; bh = [0.3 + sw2 * 0.22, 0.24 + 0.1 * (1 - Math.abs(sw2))]; lean += 0.04; } // guard up, fists pump with each step
+      if (id === "fighter") { fh = [0.5 + sw1 * 0.26, 0.14 + 0.1 * (1 - Math.abs(sw1))]; bh = [0.3 + sw2 * 0.22, 0.34 - 0.1 * (1 - Math.abs(sw2))]; lean += 0.04; } // guard up, fists pump with each step (back/left fist lifts as it passes the body instead of dipping)
     } else {
       bob = idle * H * 0.008;
       crouch = H * 0.012 * (1 + idle);
@@ -373,10 +412,12 @@
       if (id === "tank") { // grounded fortress stance: wide, heavy, shield raised in a natural guard, barely moves
         fh = [0.55, 0.2 + 0.01 * idle]; bh = [0.25, 0.5 - 0.01 * idle];
         bob = idle * H * 0.004; crouch = H * 0.025; lean = 0.03; tilt = 0;
+        ff = [Wd * 0.22, 0]; bf = [-Wd * 0.2, 0]; // wider stance so both legs show
         ff = [Wd * 0.24, 0]; bf = [-Wd * 0.28, 0];
       }
+      if (id === "mage") { ff = [Wd * 0.26, 0]; bf = [-Wd * 0.28, 0]; } // Umbra: feet a little wider apart so both legs show
       if (id === "hitter") { // calm low-ready: rifle across the body, muzzle slightly down, almost no sway
-        fh = [0.85, 0.5 + 0.015 * idle]; bh = [0.5, 0.42 + 0.015 * idle];
+        fh = [0.85, 0.64 + 0.015 * idle]; bh = [0.5, 0.56 + 0.015 * idle];
         bob = idle * H * 0.005; crouch = H * 0.02; lean = 0.05; tilt = idle * 0.01;
         ff = [Wd * 0.2, 0]; bf = [-Wd * 0.24, 0];
       }
@@ -400,6 +441,13 @@
         bob = Math.abs(Math.sin(now * 2.0)) * H * 0.005; crouch = H * 0.008;
         ff = [Wd * 0.17, 0]; bf = [-Wd * 0.2, 0];
       }
+      if (id === "miette") { // dreamy and a little off-balance: the brush stands upright beside her, a slow sway, head tilted
+        const sl = Math.sin(now * 1.4);
+        fh = [0.38 + 0.02 * sl, -0.15 + 0.02 * idle]; bh = [0.34 + 0.01 * sl, 0.72 - 0.02 * idle];
+        lean = 0.03 + 0.012 * sl; tilt = 0.05 + idle * 0.015;
+        bob = idle * H * 0.006; crouch = H * 0.01;
+        ff = [Wd * 0.17, 0]; bf = [-Wd * 0.19, 0];
+      }
       if (id === "mochi") { // dozing on her feet: slouched, head tilted, sleeves dangling, feet close together, a slow sway
         const sl = Math.sin(now * 1.3);
         fh = [0.06 + 0.02 * sl, 0.93 + 0.01 * idle]; bh = [-0.02, 0.95 - 0.01 * idle];
@@ -415,12 +463,21 @@
         ff = [Wd * 0.18, 0]; bf = [-Wd * 0.2, 0];
       }
     }
+    if (id === "assassin" && A.nsT && !attacking && !stunned && !ko && !airborne && ATK.assassin[A.nsKey] && now - A.nsT < ATK.assassin[A.nsKey].sw + ATK.assassin[A.nsKey].hold) { // the cut is still sweeping after the sim state ended
+      const NK = ATK.assassin[A.nsKey], NP = nswPath(NK, clamp((now - A.nsT) / NK.sw, 0, 1));
+      fh = NP.fh; bh = NP.bh; lean = NP.lean; lunge = NP.lunge; crouch = NP.crouch * H;
+      A.nFollow = { fh: fh.slice(), bh: bh.slice(), lean, lunge, crouch: NP.crouch, t: now }; // the ease back to the stance starts from wherever the cut ends
+    } else if (id === "assassin" && A.nFollow && !attacking && !stunned && !ko && !airborne && now - A.nFollow.t < 0.22) { // follow-through: the cut eases back to the stance instead of snapping
+      const q = (now - A.nFollow.t) / 0.22, e = q * q * (3 - 2 * q), n = A.nFollow;
+      fh = [lerp(n.fh[0], fh[0], e), lerp(n.fh[1], fh[1], e)]; bh = [lerp(n.bh[0], bh[0], e), lerp(n.bh[1], bh[1], e)];
+      lean = lerp(n.lean, lean, e); lunge = lerp(n.lunge, lunge, e); crouch = lerp(n.crouch * H, crouch, e);
+    }
     if (A.land > 0 && !attacking && !stunned) {
       crouch += A.land * H * 0.09; sx *= 1 + 0.14 * A.land; sy *= 1 - 0.13 * A.land;
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
     }
 
-    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
       if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
       else {
         A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
@@ -436,14 +493,17 @@
     const hl = hr + hr * (id === "fulminar" ? 0.85 : 0.3); // (Fulminar: a longer neck so she stands tall and upright, not hunched)
     const hc = [sh[0] + Math.sin(lean * 1.2 + tilt) * hl, sh[1] - Math.cos(lean * 1.2 + tilt) * hl];
     const perp = [Math.cos(lean), Math.sin(lean)];
-    const shF = [sh[0] + perp[0] * sw * 0.45, sh[1] + perp[1] * sw * 0.45];
-    const shB = [sh[0] - perp[0] * sw * 0.45, sh[1] - perp[1] * sw * 0.45];
+    const shx = B.shx || 0.45; // how far the shoulder joints sit from the spine (fraction of sw). Umbra uses a smaller value so his arms start on his torso.
+    const shF = [sh[0] + perp[0] * sw * shx, sh[1] + perp[1] * sw * shx];
+    const shB = [sh[0] - perp[0] * sw * shx, sh[1] - perp[1] * sw * shx];
+    const shF0 = [sh[0] + perp[0] * sw * 0.45, sh[1] + perp[1] * sw * 0.45]; // hands are still aimed from the old shoulder spot, so poses and fx anchors do not move
+    const shB0 = [sh[0] - perp[0] * sw * 0.45, sh[1] - perp[1] * sw * 0.45];
     const hF = [hip[0] + hw * 0.2, hip[1]], hB = [hip[0] - hw * 0.2, hip[1]];
     const legSeg = legL * 0.52, armSeg = armL * 0.52;
     const legF = ik(hF[0], hF[1], ff[0], ff[1], legSeg, legSeg, -1);
     const legB = ik(hB[0], hB[1], bf[0], bf[1], legSeg, legSeg, -1);
-    const armF = ik(shF[0], shF[1], shF[0] + fh[0] * armL, shF[1] + fh[1] * armL, armSeg, armSeg, 1);
-    const armB = ik(shB[0], shB[1], shB[0] + bh[0] * armL, shB[1] + bh[1] * armL, armSeg, armSeg, 1);
+    const armF = ik(shF[0], shF[1], shF0[0] + fh[0] * armL, shF0[1] + fh[1] * armL, armSeg, armSeg, 1);
+    const armB = ik(shB[0], shB[1], shB0[0] + bh[0] * armL, shB0[1] + bh[1] * armL, armSeg, armSeg, 1);
 
     // --- draw ---
     ctx.save();
@@ -522,7 +582,7 @@
 
   // ───────────── VANGUARD (id "fighter") ─────────────
   // Bare-chested gladiator-brawler. Heavy engraved gauntlets with kinetic energy channels,
-  // one asymmetrical pauldron, dark combat trousers, layered waist cloth, heavy boots.
+  // two pauldrons (big front, smaller back), dark combat trousers, layered waist cloth, heavy boots.
   // His power is physical: energy gathers at the knuckles on wind-up and shows as ripples on impact.
   // Gradients fall back to a flat colour if the context cannot make one (test mocks, odd browsers).
   function gradFill(g, stops) {
@@ -557,11 +617,13 @@
     const { ctx, M, d, P, col, hr, A, f, now, isFlash, st } = k;
     const S = MW.STATE;
     const { shW, hipW, hcw, armBw, armFw, strike, attackingNow, stunned } = e;
-    const heat = f._heat || 0;
+const heat = Math.max(f._heat || 0, (f.momentum || 0) / (f.stats.passive.max || 5));
     const blocking = !!(f.hit && f.hit.id === "iron_guard" && attackingNow);
+    const leftHit = !!(f.hit && FIGHTER_LEFT_HITS.includes(f.chainIndex || 0) && f.hit.pose === undefined && !f.hit.isSkill && !f.hit.chargeHold); // this normal hit is thrown by the left (back) hand
     const heavy = !!(f.hit && (f.hit.isSkill || f.chainIndex === 2));
-    const charge = st === S.ATTACK_STARTUP ? e.windU * (heavy ? 1 : 0.5) : 0; // 0..1 energy gathering at the knuckles
-    const energy = clamp(0.3 + 0.45 * heat + 0.5 * charge + (strike ? 0.55 : 0) + (blocking ? 0.3 : 0), 0, 1.3);
+    const holdCharge = !!(f.hit && f.hit.chargeHold && !f.chargeReleased && st === S.ATTACK_STARTUP); // Charged Punch button held
+    const charge = holdCharge ? clamp(f.chargeTicks / Math.max(1, f.hit.chargeTime), 0, 1) : st === S.ATTACK_STARTUP ? e.windU * (heavy ? 1 : 0.5) : 0; // 0..1 energy gathering at the knuckles
+    const energy = clamp(0.08 + 0.8 * heat + 0.5 * charge + (strike ? 0.55 : 0), 0, 1.3);
     const lin = (x0, y0, x1, y1, stops) => {
       if (isFlash) return "#fff";
       return gradFill(ctx.createLinearGradient(x0, y0, x1, y1), stops);
@@ -579,6 +641,7 @@
 
     // ── gauntlet: engraved iron sleeve + knuckle block; the front one carries a mechanical reinforcement ──
     const gauntlet = (pt, elbow, mech, power) => {
+      const chg = holdCharge && mech ? 0 : charge, eng = holdCharge && mech ? clamp(energy - 0.5 * charge, 0, 1.3) : energy; // charge hold: only the back (left) fist gathers energy
       const dx = pt[0] - elbow[0], dy = pt[1] - elbow[1];
       const len = Math.hypot(dx, dy) || 1, ang = Math.atan2(dy, dx);
       const r = k.aw * 0.78;
@@ -610,12 +673,12 @@
         for (const sgn of [-1, 1]) for (const u of [0.28, 0.34, 0.5]) { const x = x0 + len * u; ctx.moveTo(x, sgn * r * 0.7); ctx.lineTo(x + 1.4, sgn * r * 0.84); }
         ctx.stroke();
         ctx.globalAlpha = 1;
-        // kinetic energy channels running up the forearm into the knuckle block
-        const ea = clamp(0.5 + 0.5 * energy, 0, 1);
+        // kinetic eng channels running up the forearm into the knuckle block
+        const ea = clamp(0.5 + 0.5 * eng, 0, 1);
         ctx.save();
         ctx.lineCap = "round";
-        ctx.shadowColor = P.energy; ctx.shadowBlur = 5 + 7 * energy;
-        ctx.strokeStyle = energy > 0.95 ? P.energyHi : P.energy; ctx.globalAlpha = ea; ctx.lineWidth = 1.7;
+        ctx.shadowColor = P.eng; ctx.shadowBlur = 5 + 7 * eng;
+        ctx.strokeStyle = eng > 0.95 ? P.energyHi : P.eng; ctx.globalAlpha = ea; ctx.lineWidth = 1.7;
         for (const sgn of [-1, 1]) {
           ctx.beginPath();
           ctx.moveTo(x0 + len * 0.16, sgn * r * 0.55);
@@ -634,7 +697,7 @@
         for (const u of [0.18, 0.66]) { rr(ctx, x0 + len * u, -r * 1.06, 2.4, r * 0.2, 0.6); fillOut(ctx, col(P.ironDark), 1.2); }
         ctx.beginPath(); ctx.arc(x0 + len * 0.5, r * 0.5, r * 0.34, 0, 7); fillOut(ctx, col(P.bronze), 1.8);
         if (!isFlash) {
-          ctx.save(); ctx.translate(x0 + len * 0.5, r * 0.5); ctx.rotate(now * 1.2 * (0.4 + energy));
+          ctx.save(); ctx.translate(x0 + len * 0.5, r * 0.5); ctx.rotate(now * 1.2 * (0.4 + eng));
           ctx.strokeStyle = P.bronzeDark; ctx.lineWidth = 1.3;
           ctx.beginPath(); for (let i = 0; i < 3; i++) { const a = (i * Math.PI) / 3; ctx.moveTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3); ctx.lineTo(-Math.cos(a) * r * 0.3, -Math.sin(a) * r * 0.3); }
           ctx.stroke(); ctx.restore();
@@ -654,22 +717,22 @@
       ctx.fillStyle = col(P.bronzeLight);
       for (const sy of [-0.62, 0, 0.62]) { ctx.beginPath(); ctx.arc(r * 1.04, sy * r, r * 0.17, 0, 7); fillOut(ctx, col(P.bronzeLight), 1.2); }
       ctx.beginPath(); ctx.ellipse(r * 0.1, -r * 1.03, r * 0.52, r * 0.26, -0.08, 0, 7); fillOut(ctx, col("#6b6e75"), 1.8); // thumb guard
-      // energy source in the wrist plate
+      // eng source in the wrist plate
       if (!isFlash) {
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const cxn = -r * 0.1, rad = r * (0.55 + 0.35 * energy);
-        ctx.fillStyle = gradFill(ctx.createRadialGradient(cxn, 0, 0.5, cxn, 0, rad), [[0, "rgba(255,200,110," + (0.55 * energy).toFixed(3) + ")"], [1, "rgba(217,97,26,0)"]]); ctx.beginPath(); ctx.arc(cxn, 0, rad, 0, 7); ctx.fill();
+        const cxn = -r * 0.1, rad = r * (0.55 + 0.35 * eng);
+        ctx.fillStyle = gradFill(ctx.createRadialGradient(cxn, 0, 0.5, cxn, 0, rad), [[0, "rgba(255,200,110," + (0.55 * eng).toFixed(3) + ")"], [1, "rgba(217,97,26,0)"]]); ctx.beginPath(); ctx.arc(cxn, 0, rad, 0, 7); ctx.fill();
         // glow gathering around the knuckles
-        const kr = r * (1.0 + 1.9 * charge + 0.7 * energy + (strike ? 0.8 : 0));
-        ctx.fillStyle = gradFill(ctx.createRadialGradient(r * 1.3, 0, 1, r * 1.3, 0, kr), [[0, "rgba(255,214,140," + clamp(0.18 + 0.5 * energy + 0.3 * charge, 0, 0.95).toFixed(3) + ")"], [0.5, "rgba(230,120,40," + (0.22 * energy + 0.2 * charge).toFixed(3) + ")"], [1, "rgba(180,60,10,0)"]]); ctx.beginPath(); ctx.arc(r * 1.3, 0, kr, 0, 7); ctx.fill();
-        // sparks of kinetic energy spiralling in
-        if (charge > 0.05) {
+        const kr = r * (1.0 + 1.9 * chg + 0.7 * eng + (strike ? 0.8 : 0));
+        ctx.fillStyle = gradFill(ctx.createRadialGradient(r * 1.3, 0, 1, r * 1.3, 0, kr), [[0, "rgba(255,214,140," + clamp(0.18 + 0.5 * eng + 0.3 * chg, 0, 0.95).toFixed(3) + ")"], [0.5, "rgba(230,120,40," + (0.22 * eng + 0.2 * chg).toFixed(3) + ")"], [1, "rgba(180,60,10,0)"]]); ctx.beginPath(); ctx.arc(r * 1.3, 0, kr, 0, 7); ctx.fill();
+        // sparks of kinetic eng spiralling in
+        if (chg > 0.05) {
           ctx.fillStyle = P.energyHi;
           for (let i = 0; i < 7; i++) {
-            const a = now * 7 + i * 0.9, dist = r * (0.9 + (1 - charge) * 3.4) * (0.75 + 0.25 * Math.sin(i * 2.1 + now * 5));
-            ctx.globalAlpha = 0.35 + 0.6 * charge;
-            ctx.beginPath(); ctx.arc(r * 1.3 + Math.cos(a) * dist, Math.sin(a) * dist * 0.8, 1.1 + 0.8 * charge, 0, 7); ctx.fill();
+            const a = now * 7 + i * 0.9, dist = r * (0.9 + (1 - chg) * 3.4) * (0.75 + 0.25 * Math.sin(i * 2.1 + now * 5));
+            ctx.globalAlpha = 0.35 + 0.6 * chg;
+            ctx.beginPath(); ctx.arc(r * 1.3 + Math.cos(a) * dist, Math.sin(a) * dist * 0.8, 1.1 + 0.8 * chg, 0, 7); ctx.fill();
           }
           ctx.globalAlpha = 1;
         }
@@ -691,9 +754,26 @@
       ctx.restore();
     };
 
-    // ═════ BACK ARM (behind the body) ═════
-    upperArm(armBw, false);
-    gauntlet(armBw[2], armBw[1], false, 0);
+    // ── pauldron: three overlapping plates over a shoulder. front = big (facing side), back = a bit smaller and darker (far side) ──
+    const pauldron = (sP, front) => {
+      const sg = front ? 1 : -1; // the back plate mirrors the front one (tilts and offsets away from the facing side)
+      const sc = front ? 1 : 0.9;
+      const pw = k.aw * 0.86 * sc, ph = k.aw * 0.46 * sc;
+      const top = front ? "#6d7077" : "#5a5d64", mid = front ? "#54575e" : "#45484e", low = front ? "#2b2d32" : "#222428";
+      for (let i = 2; i >= 0; i--) {
+        ctx.save();
+        ctx.translate(sP[0] + sg * d * (0.8 - i * 0.5), sP[1] - 2.2 + i * ph * 0.7);
+        ctx.rotate(-sg * d * 0.28);
+        ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12), ph, 0, 0, 7);
+        fillOut(ctx, lin(0, -ph, 0, ph, [[0, i === 0 ? top : mid], [1, low]]), 2);
+        if (!isFlash) { ctx.strokeStyle = P.bronze; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12) - 1, ph - 1, 0, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke(); }
+        ctx.restore();
+      }
+      ctx.beginPath(); ctx.arc(sP[0] - sg * d * 0.4, sP[1] - 3.4, 1.2, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
+      ctx.beginPath(); ctx.arc(sP[0] + sg * d * 4.2, sP[1] - 2.4, 1, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
+    };
+
+    // (back arm is drawn after the belt, before the head, so the rear fist shows in front of the chest)
 
     // ═════ CLOTH BEHIND THE LEGS (long dark layer + leather side tail) ═════
     const vxw = clamp(k.vx || 0, -9, 9), vyw = clamp(k.vy || 0, -8, 8);
@@ -744,6 +824,7 @@
     poly(ctx, [[hp[0] - k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.68, hy + k.legL * 0.17], [hp[0] - k.hw * 0.68, hy + k.legL * 0.17]]);
     fillOut(ctx, lin(hp[0] - k.hw * 0.6, 0, hp[0] + k.hw * 0.6, 0, [[0, P.pantsDark], [0.6, P.pants], [1, "#2d2c31"]]), 2);
 
+    if (holdCharge) { upperArm(armFw, true); gauntlet(armFw[2], armFw[1], true, 0); } // charge hold: the right arm is tucked UNDER the body, so it no longer overlaps the chest
     // ═════ NECK + TORSO (bare chest) ═════
     limb(ctx, [[sh[0], sh[1] - 3], [hcw[0], hcw[1] + hr * 0.5]], hr * 1.2, col(shade(P.skin, -8)));
     const wT = k.sw * 0.5, wM = k.sw * 0.47, wB = k.hw * 0.5;
@@ -809,12 +890,16 @@
     if (!isFlash) {
       ctx.strokeStyle = P.bronzeDark; ctx.lineWidth = 1; ctx.beginPath();
       ctx.moveTo(hp[0] + buc - 3.4, hy - 9); ctx.lineTo(hp[0] + buc + 3.4, hy - 9); ctx.moveTo(hp[0] + buc, hy - 11.5); ctx.lineTo(hp[0] + buc, hy - 2.5); ctx.stroke();
-      ctx.save(); ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = gradFill(ctx.createRadialGradient(hp[0] + buc, hy - 6.5, 0, hp[0] + buc, hy - 6.5, 6), [[0, "rgba(255,170,70," + (0.5 * energy).toFixed(3) + ")"], [1, "rgba(217,97,26,0)"]]); ctx.beginPath(); ctx.arc(hp[0] + buc, hy - 6.5, 6, 0, 7); ctx.fill(); ctx.restore();
+    
     }
     ctx.beginPath(); ctx.arc(hp[0] + buc, hy - 6.5, 1.9, 0, 7); ctx.fillStyle = isFlash ? "#fff" : P.energyHi; ctx.fill();
     // front layers of cloth: dark trouser flap with bronze hem, plus a short leather tassel
     cloth(hp[0] + d * k.hw * 0.26, hy - 2, k.hw * 0.5, k.hw * 0.56, k.legL * 0.52, -vxw * 0.9 + wave, "#1d1c20", P.bronze, 3);
+
+    // ═════ BACK ARM (in front of the chest, behind the head and the front arm) ═════
+    upperArm(armBw, false);
+    gauntlet(armBw[2], armBw[1], false, leftHit && strike && !blocking ? 1 : 0);
+    pauldron(M(k.shB), false); // back shoulder pad (smaller than the front one)
 
     // ═════ HEAD ═════
     const hx = hcw[0], hyy = hcw[1];
@@ -857,28 +942,15 @@
     ctx.beginPath(); ctx.moveTo(nx0 - d * hr * 0.2, ny0 - hr * 0.3); ctx.quadraticCurveTo(nx0 + d * hr * 0.3, ny0 - hr * 0.1, nx0 + d * hr * 0.12, ny0 + hr * 0.16); ctx.lineTo(nx0 - d * hr * 0.2, ny0 + hr * 0.2); ctx.closePath(); fillOut(ctx, col(shade(P.skin, -6)), 1.2);
 
     // ═════ FRONT ARM, PAULDRON, GAUNTLET ═════
-    upperArm(armFw, true);
-    const shF = M(k.shF);
-    {
-      // one asymmetrical pauldron: three overlapping plates over the front shoulder (the back shoulder stays bare)
-      const pw = k.aw * 0.86, ph = k.aw * 0.46;
-      for (let i = 2; i >= 0; i--) {
-        ctx.save();
-        ctx.translate(shF[0] + d * (0.8 - i * 0.5), shF[1] - 2.2 + i * ph * 0.7);
-        ctx.rotate(-d * 0.28);
-        ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12), ph, 0, 0, 7);
-        fillOut(ctx, lin(0, -ph, 0, ph, [[0, i === 0 ? "#6d7077" : "#54575e"], [1, "#2b2d32"]]), 2);
-        if (!isFlash) { ctx.strokeStyle = P.bronze; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(0, 0, pw * (1 - i * 0.12) - 1, ph - 1, 0, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke(); }
-        ctx.restore();
-      }
-      ctx.beginPath(); ctx.arc(shF[0] - d * 0.4, shF[1] - 3.4, 1.2, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
-      ctx.beginPath(); ctx.arc(shF[0] + d * 4.2, shF[1] - 2.4, 1, 0, 7); fillOut(ctx, col(P.bronzeLight), 1);
-    }
-    const G = gauntlet(armFw[2], armFw[1], true, strike && !blocking ? 1 : 0);
+    if (!holdCharge) upperArm(armFw, true);
+    pauldron(M(k.shF), true); // front shoulder pad (the big one)
+    let G;
+    if (holdCharge) G = { ang: Math.atan2(armFw[2][1] - armFw[1][1], armFw[2][0] - armFw[1][0]), r: k.aw * 0.78 }; // already drawn under the torso
+    else G = gauntlet(armFw[2], armFw[1], true, strike && !blocking && !leftHit ? 1 : 0);
     // knuckle anchors used by brawler_fx.js (glow, embers, ghosts)
     A.fist = [A.ox + armFw[2][0] + Math.cos(G.ang) * G.r * 0.9, A.oy + armFw[2][1] + Math.sin(G.ang) * G.r * 0.9];
     A.fistB = [A.ox + armBw[2][0], A.oy + armBw[2][1]];
-
+A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw[2][1]) / 2], [A.ox + (armBw[1][0] + armBw[2][0]) / 2, A.oy + (armBw[1][1] + armBw[2][1]) / 2]];
     // ═════ Iron Guard: a kinetic energy barrier (no equipment) held out from the gauntlets ═════
     if (blocking) {
       const g = armFw[2];
@@ -902,7 +974,7 @@
       ctx.restore();
     } else if (strike) {
       // kinetic distortion: ripples of displaced air ahead of the fist and a smeared streak behind it
-      const g = A.fist ? [A.fist[0] - A.ox, A.fist[1] - A.oy] : armFw[2];
+      const g = leftHit ? armBw[2] : A.fist ? [A.fist[0] - A.ox, A.fist[1] - A.oy] : armFw[2];
       const up = f.chainIndex === 2 || (f.hit && f.hit.id === "rising_fist");
       const prog = f.hit ? clamp(1 - f.stateTimer / Math.max(1, f.hit.active || 1), 0, 1) : 0;
       const dir = up ? -Math.PI / 2 : (d > 0 ? 0 : Math.PI);
@@ -972,6 +1044,13 @@
     // Drawn in errata_art.js (elegant man in a black-and-ivory coat whose whole body glitches as one picture).
     if (id === "errata" && MW.Errata) {
       MW.Errata.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
+    // ───────────── MIETTE ─────────────
+    // Drawn in miette_art.js (dreamy painter: paint-splattered lavender coat, bunny-ear cap with a black X hairpin, a giant paint brush).
+    if (id === "miette" && MW.Miette) {
+      MW.Miette.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
       return;
     }
 
@@ -1133,27 +1212,18 @@
         ctx.restore();
       }
 
-      // back arm: bare toned arm, dark steel bracer with claw spike, glove, reverse-grip fang blade
-      limb(ctx, armBw, k.aw, col(P.skin));
-      limb(ctx, [mid(armBw[1], armBw[2], 0.3), mid(armBw[1], armBw[2], 0.85)], k.aw * 1.3, col(P.steel));
-      {
-        const e = armBw[1], h = armBw[2], bp = mid(e, h, 0.2);
-        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) - 0.35 * d, k.aw * 2.2, k.aw * 0.9, P.steel);
-        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
-      }
-      const bhd = armBw[2];
-      hand(k, bhd, k.aw * 0.8, P.main);
-      {
-        const ax = bhd[0] - armBw[1][0], ay = bhd[1] - armBw[1][1], al = Math.hypot(ax, ay) || 1;
-        const rx = -ax / al, ry = (-ay + al * 0.6) / al, rl = Math.hypot(rx, ry) || 1; // reverse grip: trails behind the fist
-        fang(bhd[0], bhd[1], rx / rl, ry / rl, k.H * 0.24, 0.3, 4.6, -1);
-      }
+      // back arm, part 1 (BEHIND the body): bare upper arm only. The forearm, bracer, hand and blade are drawn after the torso (see "back arm, part 2").
+      limb(ctx, [armBw[0], armBw[1]], k.aw, col(P.skin));
 
       // legs: black trousers, dark steel shin guards with a fang at the knee, one armored thigh plate
-      legsAndFeet(k, P.pants, P.boot, k.lw * 1.5);
+      // (the two legs get different shades so they never melt into one dark block)
       for (const [leg, front] of [[k.legB, false], [k.legF, true]]) {
         const lp = MP(leg);
-        limb(ctx, [mid(lp[1], lp[2], 0.2), mid(lp[1], lp[2], 0.8)], k.lw * 0.98, col(P.steel));
+        limb(ctx, lp, k.lw, col(front ? "#22252f" : "#07060a"));
+        const bl = k.lw * 1.5;
+        ctx.beginPath(); ctx.ellipse(lp[2][0] + d * bl * 0.18, lp[2][1] - k.lw * 0.18, bl * 0.62, k.lw * 0.5, 0, 0, Math.PI * 2);
+        fillOut(ctx, col(front ? "#2c3040" : "#050408"), 2);
+        limb(ctx, [mid(lp[1], lp[2], 0.2), mid(lp[1], lp[2], 0.8)], k.lw * 0.98, col(front ? P.steel : shade(P.steel, -45)));
         spike(lp[1][0] + d, lp[1][1] - 1, Math.atan2(-0.5, d), k.lw * (front ? 1.15 : 0.85), k.lw * 0.75, P.steel);
         if (front) {
           limb(ctx, [mid(lp[0], lp[1], 0.12), mid(lp[0], lp[1], 0.7)], k.lw * 1.12, col(P.dark));
@@ -1186,6 +1256,56 @@
       const sf0 = ribbon(A, "fsash", hipW[0] + d * k.hw * 0.3, hipW[1] - 2, 4, 3.6, -d * 0.4 - k.vx * d * 0.1, 0.9);
       drawRibbon(ctx, sf0, 3.2, col(P.scarf));
 
+      // back arm, part 2 (OVER the torso, so a hand held in front of the chest is not hidden): elbow, forearm, steel bracer with claw spike, glove, reverse-grip fang blade
+      circle(ctx, armBw[1][0], armBw[1][1], k.aw * 0.55, col(P.skin), 1.2); // elbow cap hides the seam
+      limb(ctx, [armBw[1], armBw[2]], k.aw, col(P.skin));
+      limb(ctx, [mid(armBw[1], armBw[2], 0.3), mid(armBw[1], armBw[2], 0.85)], k.aw * 1.3, col(P.steel));
+      {
+        const e = armBw[1], h = armBw[2], bp = mid(e, h, 0.2);
+        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) - 0.35 * d, k.aw * 2.2, k.aw * 0.9, P.steel);
+        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
+      }
+      const bhd = armBw[2];
+      hand(k, bhd, k.aw * 0.8, P.main);
+      {
+        const ax = bhd[0] - armBw[1][0], ay = bhd[1] - armBw[1][1], al = Math.hypot(ax, ay) || 1;
+        const rx = -ax / al, ry = (-ay + al * 0.6) / al, rl = Math.hypot(rx, ry) || 1; // reverse grip: trails behind the fist
+        fang(bhd[0], bhd[1], rx / rl, ry / rl, k.H * 0.24, 0.3, 4.6, -1);
+      }
+
+      // front arm: bare arm -> big asymmetrical fang pauldron -> steel bracer -> glove -> fang blade
+      limb(ctx, armFw, k.aw, col(P.skin));
+      {
+        const sf = M(k.shF), r = k.sw * 0.21;
+        // lower plate, then the main plate
+        poly(ctx, [[sf[0] - d * r * 0.9, sf[1] - r * 0.1], [sf[0] + d * r * 1.1, sf[1] - r * 0.2], [sf[0] + d * r * 1.2, sf[1] + r * 1.15], [sf[0] - d * r * 0.2, sf[1] + r * 1.4], [sf[0] - d * r * 0.8, sf[1] + r * 0.8]]);
+        fillOut(ctx, col(P.dark), 1.8);
+        poly(ctx, [[sf[0] - d * r * 1.1, sf[1] - r * 0.75], [sf[0] + d * r * 0.6, sf[1] - r * 1.0], [sf[0] + d * r * 1.25, sf[1] + r * 0.35], [sf[0] - d * r * 0.1, sf[1] + r * 0.6], [sf[0] - d * r * 0.95, sf[1] + r * 0.2]]);
+        fillOut(ctx, col(P.main), 1.8);
+        // two upswept fangs make the silhouette
+        spike(sf[0] - d * r * 0.7, sf[1] - r * 0.75, Math.atan2(-1, -d * 0.9), r * 1.5, r * 0.8, P.steel);
+        spike(sf[0] + d * r * 0.15, sf[1] - r * 0.95, Math.atan2(-1, d * 0.25), r * 1.0, r * 0.7, P.steel);
+        veinLine([[sf[0] - d * r * 0.8, sf[1] - r * 0.1], [sf[0] + d * r * 0.1, sf[1] + r * 0.05], [sf[0] + d * r * 0.95, sf[1] + r * 0.45]], 1.1);
+      }
+      {
+        const e = armFw[1], h = armFw[2], bp = mid(e, h, 0.2);
+        limb(ctx, [mid(e, h, 0.3), mid(e, h, 0.85)], k.aw * 1.3, col(P.steel));
+        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) + 0.35 * d, k.aw * 2.4, k.aw * 0.9, P.steel);
+        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
+      }
+      const fhd = armFw[2];
+      hand(k, fhd, k.aw * 0.8, P.main);
+      {
+        const ax = fhd[0] - armFw[1][0], ay = fhd[1] - armFw[1][1], al = Math.hypot(ax, ay) || 1;
+        const tr = prowl * 0.05; // blade tip trembles while he waits
+        const ca = Math.cos(tr), sa = Math.sin(tr);
+        const ux = (ax / al) * ca - (ay / al) * sa, uy = (ax / al) * sa + (ay / al) * ca;
+        const tip = fang(fhd[0], fhd[1], ux, uy, k.H * 0.31, 0.34, 5.4, 1);
+        // small guard bar on the fist
+        ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 2 - uy * 3.5, fhd[1] + uy * 2 + ux * 3.5); ctx.lineTo(fhd[0] + ux * 2 + uy * 3.5, fhd[1] + uy * 2 - ux * 3.5);
+        ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke(); ctx.strokeStyle = col(P.silver); ctx.lineWidth = 1.4; ctx.stroke();
+      }
+      // head is drawn LAST so the front pauldron fangs, arm and blade never cover the face
       // head: pale face, swept-back spiked hair, slanted burning eyes
       const hcx = hcw[0] + (prowl > 0.85 ? d * 0.8 : 0);
       circle(ctx, hcx, hcw[1], hr * 1.0, col(P.skin), 2.4);
@@ -1244,38 +1364,6 @@
         ctx.restore();
       }
 
-      // front arm: bare arm -> big asymmetrical fang pauldron -> steel bracer -> glove -> fang blade
-      limb(ctx, armFw, k.aw, col(P.skin));
-      {
-        const sf = M(k.shF), r = k.sw * 0.21;
-        // lower plate, then the main plate
-        poly(ctx, [[sf[0] - d * r * 0.9, sf[1] - r * 0.1], [sf[0] + d * r * 1.1, sf[1] - r * 0.2], [sf[0] + d * r * 1.2, sf[1] + r * 1.15], [sf[0] - d * r * 0.2, sf[1] + r * 1.4], [sf[0] - d * r * 0.8, sf[1] + r * 0.8]]);
-        fillOut(ctx, col(P.dark), 1.8);
-        poly(ctx, [[sf[0] - d * r * 1.1, sf[1] - r * 0.75], [sf[0] + d * r * 0.6, sf[1] - r * 1.0], [sf[0] + d * r * 1.25, sf[1] + r * 0.35], [sf[0] - d * r * 0.1, sf[1] + r * 0.6], [sf[0] - d * r * 0.95, sf[1] + r * 0.2]]);
-        fillOut(ctx, col(P.main), 1.8);
-        // two upswept fangs make the silhouette
-        spike(sf[0] - d * r * 0.7, sf[1] - r * 0.75, Math.atan2(-1, -d * 0.9), r * 1.5, r * 0.8, P.steel);
-        spike(sf[0] + d * r * 0.15, sf[1] - r * 0.95, Math.atan2(-1, d * 0.25), r * 1.0, r * 0.7, P.steel);
-        veinLine([[sf[0] - d * r * 0.8, sf[1] - r * 0.1], [sf[0] + d * r * 0.1, sf[1] + r * 0.05], [sf[0] + d * r * 0.95, sf[1] + r * 0.45]], 1.1);
-      }
-      {
-        const e = armFw[1], h = armFw[2], bp = mid(e, h, 0.2);
-        limb(ctx, [mid(e, h, 0.3), mid(e, h, 0.85)], k.aw * 1.3, col(P.steel));
-        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) + 0.35 * d, k.aw * 2.4, k.aw * 0.9, P.steel);
-        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
-      }
-      const fhd = armFw[2];
-      hand(k, fhd, k.aw * 0.8, P.main);
-      {
-        const ax = fhd[0] - armFw[1][0], ay = fhd[1] - armFw[1][1], al = Math.hypot(ax, ay) || 1;
-        const tr = prowl * 0.05; // blade tip trembles while he waits
-        const ca = Math.cos(tr), sa = Math.sin(tr);
-        const ux = (ax / al) * ca - (ay / al) * sa, uy = (ax / al) * sa + (ay / al) * ca;
-        const tip = fang(fhd[0], fhd[1], ux, uy, k.H * 0.31, 0.34, 5.4, 1);
-        // small guard bar on the fist
-        ctx.beginPath(); ctx.moveTo(fhd[0] + ux * 2 - uy * 3.5, fhd[1] + uy * 2 + ux * 3.5); ctx.lineTo(fhd[0] + ux * 2 + uy * 3.5, fhd[1] + uy * 2 - ux * 3.5);
-        ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke(); ctx.strokeStyle = col(P.silver); ctx.lineWidth = 1.4; ctx.stroke();
-      }
       return;
     }
 

@@ -550,7 +550,7 @@
       const s = a.stats;
       const x = type === "hit" ? (a.facing > 0 ? t.x : t.x + t.stats.width) : a.x + (a.facing > 0 ? s.width : 0);
       const y = type === "hit" ? t.y + t.stats.height * 0.4 : a.y + s.height * 0.42;
-      this.fx.push({ type: type, style: a.hit.fxStyle, x: x, y: y, dir: a.facing, ownerId: a.id, targetId: t ? t.id : -1, range: a.hit.range });
+      this.fx.push({ type: type, style: a.hit.fxStyle, x: x, y: y, dir: a.facing, ownerId: a.id, targetId: t ? t.id : -1, range: a.hit.range, chain: a.hit.isSkill ? -1 : a.chainIndex || 0 });
     }
 
     // HP zero is the only KO: the other fighter scores, then a short pause and both reset.

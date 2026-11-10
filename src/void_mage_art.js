@@ -211,34 +211,34 @@
 
     // ── 3) back arm + back shoulder shard ──
     taper(k, [armBw[0], armBw[1]], aw * 1.05, aw * 0.85, C.obs, C.rim, 1.3);
-    taper(k, [armBw[1], armBw[2]], aw * 0.85, aw * 0.6, C.obs, C.rim, 1.3);
-    bracer(armBw, false);
-    claws(armBw, windU * 0.6, false);
+    // (the back forearm + hand are drawn later, AFTER the torso, so a hand held in front of the chest is not hidden - see step 6b)
     fillPoly(k, [J(armBw[0], -1.2, 1.6), J(armBw[0], -1.9, -2.2), J(armBw[0], 1.9, -3.4), J(armBw[0], 5.9, -5.3), J(armBw[0], 2.5, 0.3)], C.obs, C.rim, 1.4);
 
     // ── 4) legs: lean obsidian limbs, softened knee guards, taloned feet ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
-      taper(k, [h, kn], lw * 1.55, lw * 1.1, isBack ? C.obs : C.obs2, C.rim, 1.3);
-      taper(k, [kn, ft], lw * 1.1, lw * 0.62, isBack ? C.obs : C.obs2, C.rim, 1.3);
+      // the two legs get different shades + edge lights so they never melt into one dark block
+      const fill = isBack ? "#05030b" : "#241b44", rim = isBack ? "#35197a" : "#7a4de0";
+      taper(k, [h, kn], lw * 1.55, lw * 1.1, fill, rim, 1.3);
+      taper(k, [kn, ft], lw * 1.1, lw * 0.62, fill, rim, 1.3);
       // Softened knee guard
       fillPoly(k, [
         [kn[0] - d * lw * 0.2, kn[1] - lw * 0.9],
         [kn[0] + d * lw * 1.5, kn[1] - lw * 0.2], // Softened upper point
         [kn[0] + d * lw * 1.2, kn[1] + lw * 0.5], // Softened lower point
         [kn[0] - d * lw * 0.1, kn[1] + lw * 0.9]
-      ], isBack ? C.obs : C.obs2, C.rim, 1.2);
-      glowStroke(k, [[kn[0], kn[1] + lw * 0.8], [lerp(kn[0], ft[0], 0.6), lerp(kn[1], ft[1], 0.6)]], C.elec, 0.8, 4, 0.55);
+      ], fill, rim, 1.2);
+      glowStroke(k, [[kn[0], kn[1] + lw * 0.8], [lerp(kn[0], ft[0], 0.6), lerp(kn[1], ft[1], 0.6)]], C.elec, 0.8, 4, isBack ? 0.3 : 0.55);
       // Taloned feet
-      fillPoly(k, [[ft[0] - d * lw * 0.55, ft[1] - lw * 0.7], [ft[0] + d * lw * 0.55, ft[1] - lw * 0.5], [ft[0] + d * lw * 3.0, ft[1] + lw * 0.05], [ft[0] + d * lw * 0.3, ft[1] + lw * 0.35], [ft[0] - d * lw * 1.4, ft[1] + lw * 0.15]], C.obs, C.rim, 1.2);
+      fillPoly(k, [[ft[0] - d * lw * 0.55, ft[1] - lw * 0.7], [ft[0] + d * lw * 0.55, ft[1] - lw * 0.5], [ft[0] + d * lw * 3.0, ft[1] + lw * 0.05], [ft[0] + d * lw * 0.3, ft[1] + lw * 0.35], [ft[0] - d * lw * 1.4, ft[1] + lw * 0.15]], isBack ? "#05030b" : "#1b1533", rim, 1.2);
     };
     leg(k.MP(k.legB), true);
     leg(k.MP(k.legF), false);
 
     // tattered hip armor: three asymmetrical shards
-    fillPoly(k, [T(3, hw * 0.4), T(3, -hw * 0.1), T(-legL * 0.46, hw * 0.62)], C.obs2, C.rim, 1.3);
-    fillPoly(k, [T(3, -hw * 0.05), T(3, -hw * 0.55), T(-legL * 0.3 + Math.sin(now * 2) * 1.5, -hw * 0.7)], C.obs, C.rim, 1.3);
-    fillPoly(k, [T(3, hw * 0.25), T(3, -hw * 0.3), T(-legL * 0.2, hw * 0.0)], C.obs3, C.rim, 1.2);
+    fillPoly(k, [T(3, hw * 0.4), T(3, -hw * 0.1), T(-legL * 0.3, hw * 0.62)], C.obs2, C.rim, 1.3);
+    fillPoly(k, [T(3, -hw * 0.05), T(3, -hw * 0.55), T(-legL * 0.22 + Math.sin(now * 2) * 1.5, -hw * 0.7)], C.obs, C.rim, 1.3);
+    fillPoly(k, [T(3, hw * 0.25), T(3, -hw * 0.3), T(-legL * 0.14, hw * 0.0)], C.obs3, C.rim, 1.2);
 
     // ── 5) pelvis, floating gap, ribcage ──
     fillPoly(k, [T(torL * 0.2, -hw * 0.32), T(torL * 0.2, hw * 0.32), T(-1, hw * 0.5), T(-1, -hw * 0.5)], C.obs2, C.rim, 1.4);
@@ -300,6 +300,16 @@
       ctx.restore();
     } else { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(core[0], core[1], 3, 0, TAU); ctx.fill(); }
     A.core = [A.ox + core[0], A.oy + core[1]];
+
+    // ── 6b) back forearm + hand, drawn over the torso (the upper arm was drawn behind it in step 3) ──
+    {
+      const el = armBw[1];
+      ctx.beginPath(); ctx.arc(el[0], el[1], aw * 0.85, 0, TAU); // elbow cap, hides the seam where the forearm starts
+      ctx.fillStyle = k.col(C.obs); ctx.fill(); edge(k, C.rim, 1.2);
+      taper(k, [armBw[1], armBw[2]], aw * 0.85, aw * 0.6, C.obs, C.rim, 1.3);
+      bracer(armBw, false);
+      claws(armBw, windU * 0.6, false);
+    }
 
     // ── 7) neck, head (smooth, elongated humanoid with black void face), floating fragments ──
     taper(k, [T(torL * 1.0, 0), [hcw[0], hcw[1] + hr * 0.5]], 4.2, 3.2, C.obs, C.rim, 1.2);

@@ -347,7 +347,7 @@
       const meteorCharge = !!(f.hit && f.hit.id === "meteor_fist" && f.state === S.ATTACK_STARTUP);
       if (chargeHold || meteorCharge) {
         const prog = chargeHold ? f.chargeTicks / f.hit.chargeTime : 1 - f.stateTimer / Math.max(1, f.hit.startup);
-        const pts = fistPoints(f);
+        const pts = chargeHold && f._art && f._art.fistB ? [f._art.fistB] : fistPoints(f); // charge hold: the energy gathers at the LEFT (back) fist, the charging arm
         if (pts.length && frame % 2 === 0) { // energy sucked into the gauntlet
           const p = pts[0], a = rnd(0, TAU), r = rnd(28, 62) * (meteorCharge ? 1.5 : 1) * (1.15 - 0.5 * prog);
           add({ kind: "spark", x: p[0] + Math.cos(a) * r, y: p[1] + Math.sin(a) * r, vx: -Math.cos(a) * r * 0.14, vy: -Math.sin(a) * r * 0.14, life: 8, size: rnd(1.6, 2.8), g: 0, drag: 1, col: prog >= 1 || meteorCharge ? HOT.gold : COOL.mid });
@@ -469,7 +469,7 @@
   // direction, flicker out of phase, and flare while he is attacking. Strength follows momentum.
   function drawAura(ctx, f) {
     const heat = f._heat || 0;
-    if (heat < 0.12 || f.state === MW.STATE.KO) return;
+return; // aura removed: only the glowing gloves remain
     const S = MW.STATE, s = f.stats;
     const cx = f.x + s.width / 2;
     const sp = clamp(f.x - f.px, -8, 8);
@@ -479,8 +479,8 @@
     const t = frame;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const gx = cx - sp * 2.2, gy = f.y + s.height * 0.58;
-    const gr0 = s.height * (0.34 + 0.2 * heat) * (0.94 + 0.06 * Math.sin(t * 0.4)) * (atk ? 1.2 : 1);
+const gx = cx - sp * 2.2, gy = f.y + s.height * 0.92;
+const gr0 = s.height * (0.26 + 0.16 * heat)  * (0.94 + 0.06 * Math.sin(t * 0.4)) * (atk ? 1.2 : 1);
     const gl = ctx.createRadialGradient(gx, gy, 2, gx, gy, gr0);
     gl.addColorStop(0, "rgba(255,200,110," + (0.3 * heat).toFixed(3) + ")");
     gl.addColorStop(1, "rgba(255,90,20,0)");
@@ -489,7 +489,7 @@
     const n = 3 + Math.round(4 * heat);
     for (let i = 0; i < n; i++) {
       const u = (i + 0.5) / n - 0.5;
-      const bx = cx + u * s.width * 1.15 - sp * 1.5, by = f.y + s.height * 0.8 - Math.abs(u) * 12;
+      const bx = cx + u * s.width * 1.15 - sp * 1.5, by = f.y + s.height - 2 - Math.abs(u) * 6;
       const h = s.height * (0.32 + 0.24 * heat) * flare * (0.7 + 0.3 * Math.sin(t * 0.31 + i * 1.9) + 0.15 * Math.sin(t * 0.77 + i * 3.1));
       const lean = -sp * 2.6 + Math.sin(t * 0.22 + i * 1.3) * 5 + u * 16;
       const w = 8 + 6 * heat;
@@ -519,8 +519,8 @@
     if (heat > 0.25) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      for (const p of fistPoints(f)) {
-        const r = 11 + 14 * heat + (full ? 4 * pulse : 0);
+for (const p of (f._art && f._art.armMid) || fistPoints(f)) {
+  const r = 15 + 14 * heat + (full ? 4 * pulse : 0);
         const gr = ctx.createRadialGradient(p[0], p[1], 1, p[0], p[1], r);
         gr.addColorStop(0, "rgba(255,225,160," + (0.38 * heat).toFixed(3) + ")");
         gr.addColorStop(0.55, "rgba(255,140,50," + (0.3 * heat).toFixed(3) + ")");

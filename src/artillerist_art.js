@@ -150,7 +150,7 @@
         [p0[0] + qx * w0, p0[1] + qy * w0], [p1[0] + qx * w1, p1[1] + qy * w1],
         [p1[0] + tx * aw * 0.35, p1[1] + ty * aw * 0.35],
         [p1[0] - qx * w1, p1[1] - qy * w1], [p0[0] - qx * w0, p0[1] - qy * w0],
-      ], front ? C.steel : C.obs3, C.rim, 1.4);
+      ], front ? C.steel2 : C.steel, C.steelHi, 1.6);
       // bronze cuff bands + one yellow/orange rune dot
       for (const u of [0.18, 0.78]) {
         const c = [lerp(p0[0], p1[0], u), lerp(p0[1], p1[1], u)], w = lerp(w0, w1, u);
@@ -161,7 +161,7 @@
     };
     const glove = (pt, ang) => {
       ctx.beginPath(); ctx.ellipse(pt[0], pt[1], aw * 0.62, aw * 0.5, ang, 0, TAU);
-      ctx.fillStyle = k.col(C.obs2); ctx.fill(); edge(k, C.rim, 1.2);
+      ctx.fillStyle = k.col(C.obs3); ctx.fill(); edge(k, C.steelHi, 1.6);
     };
     const pauldron = (sP, big) => {
       const s = big ? 0.62 : 0.48;
@@ -172,8 +172,8 @@
     };
 
     // ── 2) back arm: sleeve, small pauldron, bracer ──
-    taper(k, [armBw[0], armBw[1]], aw * 0.85, aw * 0.7, C.obs, C.rim, 1.3);
-    taper(k, [armBw[1], armBw[2]], aw * 0.7, aw * 0.55, C.obs2, C.rim, 1.3);
+    taper(k, [armBw[0], armBw[1]], aw * 0.85, aw * 0.7, C.obs3, C.steel2, 2);
+    taper(k, [armBw[1], armBw[2]], aw * 0.7, aw * 0.55, C.obs3, C.steel2, 2);
     bracer(armBw, false);
     pauldron(armBw[0], false);
 
@@ -382,8 +382,8 @@
     }
 
     // ── 7) front arm over the handguard: sleeve, big pauldron, bracer, glove ──
-    taper(k, [armFw[0], armFw[1]], aw * 0.88, aw * 0.72, C.obs2, C.rim, 1.3);
-    taper(k, [armFw[1], armFw[2]], aw * 0.72, aw * 0.56, C.obs2, C.rim, 1.3);
+    taper(k, [armFw[0], armFw[1]], aw * 0.88, aw * 0.72, C.steel, C.steelHi, 2);
+    taper(k, [armFw[1], armFw[2]], aw * 0.72, aw * 0.56, C.steel, C.steelHi, 2);
     bracer(armFw, true);
     pauldron(armFw[0], true);
     glove(gF, Math.atan2(ay, ax));
