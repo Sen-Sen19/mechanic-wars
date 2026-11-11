@@ -40,7 +40,7 @@ check("five characters in order list", order.length === 5 && new Set(order).size
 // --- identity relationships (the intended design, encoded as checks) ---
 const f = C.fighter, m = C.mage, a = C.assassin, h = C.hitter, t = C.tank;
 check("assassin is fastest", order.every((id) => id === "assassin" || C[id].runSpeed < a.runSpeed));
-check("tank is slowest", order.every((id) => id === "tank" || C[id].runSpeed > t.runSpeed));
+check("tank is slowest (Foundry, the furnace heavyweight, is slower on purpose: SPD 3.4)", order.every((id) => id === "tank" || id === "foundry" || C[id].runSpeed > t.runSpeed));
 check("tank has most HP", order.every((id) => id === "tank" || C[id].maxHP < t.maxHP));
 check("assassin has least HP and armor", order.every((id) => id === "assassin" || (C[id].maxHP > a.maxHP && C[id].armor > a.armor)));
 check("tank has highest armor and weight", order.every((id) => id === "tank" || (C[id].armor < t.armor && C[id].weight < t.weight)));

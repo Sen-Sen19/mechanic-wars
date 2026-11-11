@@ -1001,7 +1001,58 @@
         projectile: { speed: 14, range: 520, size: 12, style: "card" },
       },
     }),
+
+    // FOUNDRY (internal id "foundry"): The Molten Core (looks: foundry_art.js, design brief "Anvil - The Heavy Hand", renamed Foundry).
+    // TRIAL ENTRY: looks, stats and the basic attack only. No skills, passive or ultimate yet: every slot is empty.
+    // The brief's "Tempered Steel" and ultimate are NOT built yet; the art already gets hotter the more damage he has taken (and f.tempered = true forces full heat).
+    // He fights with one slow, heavy overhead hammer slam: long wind-up and recovery, big damage and knockback, short reach advance. Numbers are a first guess.
+    // Hit box = width x height below (the hammer, shoulders and stacks are drawn on top of it). Stats shown on the select card: HP 560, ARM 38, SPD 3.4.
+    foundry: define({
+      id: "foundry",
+      name: "Foundry",
+      title: "The Molten Core",
+      color: "#E8761C", // molten orange: select card, chips, HUD
+      look: "foundry",
+      previewScale: 1.10, // select screen: stands massive and towering like Paladin
+      width: 72,  // massive furnace juggernaut
+      height: 100, // max platform spawn height
+      maxHP: 560,
+      armor: 38,
+      weight: 155,
+      runSpeed: 3.4,
+      jumpStrength: 12.6, // same as Paladin: enough for the single jump to reach the side platforms
+      airJumpStrength: 11.2,
+      attack: {
+        type: "melee", damage: 13, startup: 22, active: 6, recovery: 34, knockback: 6, range: 86, advance: 2, stopOnContact: true,
+        fxShape: "slam", boxH: 1.05, launchH: 0.8, launchV: 0.3,
+      },
+    }),
+
+    // AFTERTASTE (internal id "aftertaste"): The Flavor of Violence (looks: aftertaste_art.js).
+    // TRIAL ENTRY: looks, stats and the basic attack only. No skills, passive or ultimate yet: every slot is empty.
+    // A huge, cheerful butcher-chef. He fights with one slow, heavy overhead cleaver chop (the fork in his other hand is for skills later).
+    // Big and tough but not as slow as Foundry: HP 400, armor 22, run speed 4.2. Numbers are a first guess to feel him out in the arena.
+    // Hit box = width x height below (the belly, cap and weapons are drawn on top of it).
+    aftertaste: define({
+      id: "aftertaste",
+      name: "Aftertaste",
+      title: "The Flavor of Violence",
+      color: "#B3202F", // blood crimson: select card, chips, HUD
+      look: "aftertaste",
+      width: 62,
+      height: 94,
+      maxHP: 400,
+      armor: 22,
+      weight: 125,
+      runSpeed: 4.2,
+      jumpStrength: 12.6, // same as Paladin and Foundry: enough for the single jump to reach the side platforms
+      airJumpStrength: 11.2,
+      attack: {
+        type: "melee", damage: 10, startup: 18, active: 5, recovery: 28, knockback: 5.5, range: 82, advance: 2,
+        fxShape: "slam", boxH: 1.0, launchH: 0.8, launchV: 0.3,
+      },
+    }),
   };
 
-  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata", "miette", "deuce"];
+  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata", "miette", "deuce", "foundry", "aftertaste"];
 })(globalThis);

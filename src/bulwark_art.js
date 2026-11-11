@@ -307,10 +307,12 @@
     // ── 6) front arm (shield arm): thick sleeve + vambrace, hidden grip behind the shield ──
     const aF = arm(armFw, true);
 
+    // shield-side shoulder plate: drawn BEHIND the shield now, so it can never look like a hand in front of it
+    pauldron([armFw[0][0] - d * aw * 0.55, armFw[0][1] + aw * 0.45], 0.6, false);
     // ── 7) the enormous tower shield ──
     const gp = armFw[2];
     const sW = Math.max(sw * 0.74, 38), sH = H * 0.9;
-    const x0 = gp[0] - d * sW * 0.66, x1 = x0 + d * sW, top = gp[1] - sH * 0.4, xc = (x0 + x1) / 2;
+    const x0 = gp[0] - d * sW * 0.42, x1 = x0 + d * sW, top = gp[1] - sH * 0.4, xc = (x0 + x1) / 2; // x0 offset 0.66 -> 0.42: shield stands further out so the shoulder plate no longer sits on its face
     const mid = top + sH * 0.6;
     const shield = (ox, oy, scale) => {
       const cx = xc, cy = top + sH * 0.5;
@@ -392,8 +394,6 @@
       ctx.restore();
     }
 
-    // ── 8) oversized shoulder plate on the shield side, over everything ──
-    pauldron(armFw[0], 0.82, true);
   }
 
   // ── effects drawn in WORLD space around the Bulwark (render only). render.js calls this right after the body. ──

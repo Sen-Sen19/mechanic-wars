@@ -30,6 +30,8 @@
     miette: { main: "#EADFC4", dark: "#2A1B4A", light: "#FFF6DC", accent: "#A050E0", skin: "#FCE3D8", hair: "#3B2320", pants: "#D9A02E", boot: "#1D1826", glow: "#2EC8C8" },
     deuce: { main: "#17121A", dark: "#0C090E", light: "#F7DA7A", accent: "#8C1230", skin: "#F3D5BE", hair: "#1B1316", pants: "#17121A", boot: "#17121A", glow: "#F7DA7A" },
     errata: { main: "#101019", dark: "#080810", light: "#EEE6D2", accent: "#FF315A", skin: "#EEDDD4", hair: "#EAEDF4", pants: "#252534", boot: "#0b0b13", glow: "#00E5FF" },
+    foundry: { main: "#1E1F24", dark: "#111216", light: "#FF7A1A", accent: "#B8672E", skin: "#4A4D57", hair: "#1E1F24", pants: "#1E1F24", boot: "#1E1F24", glow: "#FF9A2A" },
+    aftertaste: { main: "#4A4048", dark: "#2E282D", light: "#D9D2BF", accent: "#B3202F", skin: "#C58F72", hair: "#2A1D18", pants: "#1C1A1F", boot: "#2B2219", glow: "#B3202F" },
     tank: { main: "#c9a032", dark: "#5a3d12", light: "#f2d46e", accent: "#fff0a6", skin: "#b08c74", hair: "#d9a92a", pants: "#7a5518", boot: "#c9a032", glow: "#fff4c2", glowHi: "#ffffff" },
   };
   // leg/tor/arm = fractions of height; sw/hw/lw/aw = fractions of width; hr = head radius / height.
@@ -45,6 +47,8 @@
     deuce: { leg: 0.47, tor: 0.30, hr: 0.102, sw: 0.46, hw: 0.36, lw: 0.14, aw: 0.11, arm: 0.41, stride: 0.5, shx: 0.3 }, // slim tailored gambler: long legs, narrow shoulders, a hat taller than his head
     miette: { leg: 0.45, tor: 0.30, hr: 0.108, sw: 0.50, hw: 0.42, lw: 0.15, aw: 0.10, arm: 0.40, stride: 0.46 }, // petite painter: big head, cropped coat, a brush taller than she is
     errata: { leg: 0.46, tor: 0.31, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.16, aw: 0.11, arm: 0.39, stride: 0.45 }, // tall, slender, elegant
+    foundry: { leg: 0.42, tor: 0.30, hr: 0.082, sw: 1.04, hw: 0.80, lw: 0.28, aw: 0.35, arm: 0.30, stride: 0.27, shx: 0.32 }, // furnace tank: huge shoulders and chest, a small helmeted head, massive limbs, short heavy steps
+    aftertaste: { leg: 0.36, tor: 0.36, hr: 0.10, sw: 0.95, hw: 0.90, lw: 0.27, aw: 0.30, arm: 0.30, stride: 0.28, shx: 0.30 }, // butcher-chef: short sturdy legs, a huge belly, thick neck, broad shoulders, enormous forearms
     tank: { leg: 0.41, tor: 0.30, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
@@ -65,6 +69,8 @@
     { up: { fh: [0.12, -1.22], bh: [0.22, -1.05], lean: -0.4, crouch: 0.0 }, dn: { fh: [0.95, 0.78], bh: [0.7, 0.62], lean: 0.45, crouch: 0.14 } }, // 2 two-handed crush
     { up: { fh: [0.75, -0.55], bh: [0.3, -0.2], lean: -0.1, crouch: 0.04 }, dn: { fh: [1.05, 0.8], bh: [0.45, 0.55], lean: 0.5, crouch: 0.12 } },   // 3 diagonal hammer
   ];
+  const FIGHTER_REAR_ARM_BEHIND = true; // Titan: true = the left (rear) shoulder pad, arm, forearm and glove are layered BEHIND the torso; false = the rear arm sits in front of the chest with its fist on top of the front arm
+ const FIGHTER_SWAP_ARM_LAYERS = true; // true = right (front) arm behind the torso, left (rear) arm on top
   const FIGHTER_LEFT_HITS = [1]; // Titan normal combo: which hits (0 = first, 1 = second, 2 = third) are punched with the LEFT hand; the others use the right. [1] = right, left, right
   const ATK = {
     fighter: [
@@ -144,6 +150,11 @@
       { wind: kf([0.85, -0.55], [0.42, 0.05], -0.08, -1, 0.02), strike: kf([1.08, 0.55], [0.5, 0.18], 0.22, 6, 0.04) },
       { wind: kf([-0.05, -0.95], [0.32, -0.42], -0.3, -4, 0.04), strike: kf([1.1, 0.5], [0.58, 0.1], 0.5, 12, 0.08) },
     ],
+    // Foundry: one slow overhead hammer slam. The head sits past the front hand, so the front hand goes up and BACK on the wind-up (hammer behind his head)
+    // and forward-down on the strike (hammer slams into the ground in front of him).
+    foundry: [{ wind: kf([-0.89, -0.81], [1.2, -0.2], -0.24, -5, 0.0), strike: kf([0.22, 0.93], [1.1, -0.15], 0.5, 10, 0.07) }],
+    // Aftertaste: one slow overhead cleaver chop. The front hand (cleaver) goes up and back on the wind-up, then chops forward and down; the fork hand stays low.
+    aftertaste: [{ wind: kf([-0.45, -0.95], [0.45, 0.3], -0.3, -4, 0.02), strike: kf([1.0, 0.55], [0.45, 0.3], 0.42, 8, 0.1) }],
     // Deuce: a casual flick of the wrist: the card hand snaps out flat, the other hand stays loose at his side.
     deuce: [{ wind: kf([0.2, -0.15], [0.1, 0.6], -0.1, -2, 0.02), strike: kf([1.12, -0.1], [0.1, 0.6], 0.14, 4, 0.02) }],
     // Errata: clean, elegant cuts. 0 slash = lead hand, 1 backhand = the other hand cuts back, 2 rift cut = a lunging two-handed sweep.
@@ -300,18 +311,22 @@
       lean = -0.5; fh = [-0.3, -0.7]; bh = [-0.5, -0.4]; tilt = -0.4;
       if (id === "assassin") { fh = [0.6, 0.5]; bh = [0.1, 0.65]; } // arms hang forward-low, clear of the face (his head leans back)
       if (id === "mage") { fh = [0.45, 0.8]; bh = [-0.1, 0.85]; } // Umbra: arms hang loose and low (his head leans back, so the arms stay clear of the face)
+      if (id === "aftertaste") { fh = [0.5, 0.75]; bh = [0.4, 0.45]; } // Aftertaste: arms hang low and loose, the weapons point at the floor
+      if (id === "foundry") { lean = -0.3; fh = [0.3, 0.7]; bh = [0.9, 0.5]; tilt = -0.2; } // Foundry: topples slowly, the hammer drops forward
     } else if (stunned) {
       lean = -0.5; tilt = -0.35; sx = 0.93; sy = 1.05; fh = [-0.2, -0.75]; bh = [-0.45, -0.55];
       if (id === "assassin") { fh = [0.6, 0.5]; bh = [0.1, 0.65]; } // arms hang forward-low, clear of the face
       if (id === "mage") { fh = [0.5, 0.75]; bh = [-0.05, 0.8]; } // Umbra: arms hang loose and low, clear of the face
       jit = Math.sin(now * 90) * 1.6;
+      if (id === "aftertaste") { fh = [0.45, 0.7]; bh = [0.4, 0.45]; } // Aftertaste: the belly takes the hit, the arms hang low
+      if (id === "foundry") { lean = -0.12; tilt = -0.08; sx = 0.98; sy = 1.02; fh = [-0.33, -0.55]; bh = [0.92, 0.25]; jit = Math.sin(now * 90) * 0.6; } // Foundry barely reacts: his armor takes the hit, the hammer stays gripped
       ff = airborne ? [Wd * 0.3, -H * 0.08] : [Wd * 0.28, 0]; bf = airborne ? [-Wd * 0.25, -H * 0.04] : [-Wd * 0.3, 0];
     } else if (attacking && f.hit) {
       const seq = ATK[id] || ATK.fighter;
       let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "errata" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = id === "deuce" ? kf([0.5, 0.02], [0.1, 0.62], 0.02, 0, 0) : id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "miette" ? kf([0.38, -0.15], [0.34, 0.72], 0.05, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.64], [0.5, 0.56], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "aftertaste" ? kf([-0.2, -0.55], [0.45, 0.3], 0.1, 0, 0.02) : id === "foundry" ? kf([-0.37, -0.6], [0.96, 0.22], 0.12, 0, 0.02) : id === "deuce" ? kf([0.5, 0.02], [0.1, 0.62], 0.02, 0, 0) : id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "miette" ? kf([0.38, -0.15], [0.34, 0.72], 0.05, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.64], [0.5, 0.56], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
         const wind0 = f.hit.chargeHold && !f.chargeReleased ? f.chargeTicks / Math.max(1, f.hit.chargeTime) : 1 - f.stateTimer / Math.max(1, f.hit.startup);
@@ -326,7 +341,7 @@
       fh = [lerp(a.fh[0], b.fh[0], t), lerp(a.fh[1], b.fh[1], t)];
       bh = [lerp(a.bh[0], b.bh[0], t), lerp(a.bh[1], b.bh[1], t)];
       lean = lerp(a.lean, b.lean, t); lunge = lerp(a.lunge, b.lunge, t); crouch = lerp(a.crouch, b.crouch, t) * H;
-      if (id === "fighter" && FIGHTER_LEFT_HITS.includes(f.chainIndex || 0) && f.hit.pose === undefined && !f.hit.isSkill && !f.hit.chargeHold) { bh = fh; fh = [0.15, 0.3]; lunge += 9; lean += 0.16; } // normal combo alternates hands: this hit is thrown by the LEFT (back) hand (it uses the punch path of the keyframe), the right hand is pulled in as a guard, and the body leans / lunges a little more because the back arm sits further from the target
+      if (id === "fighter" && FIGHTER_LEFT_HITS.includes(f.chainIndex || 0) && f.hit.pose === undefined && !f.hit.isSkill && !f.hit.chargeHold) { bh = fh; fh = [0.1, 0.5]; lunge += 9; lean += 0.16; } // normal combo alternates hands: this hit is thrown by the LEFT (back) hand (it uses the punch path of the keyframe), the right hand is pulled in as a guard, and the body leans / lunges a little more because the back arm sits further from the target
       if (id === "assassin" && f.hit.pose === undefined && st !== S.ATTACK_STARTUP && seq[A.nsKey] && seq[A.nsKey].mid) { // the cut plays its own 3-key path
         const NK = seq[A.nsKey], NP = nswPath(NK, clamp((now - A.nsT) / NK.sw, 0, 1));
         fh = NP.fh; bh = NP.bh; lean = NP.lean; lunge = NP.lunge; crouch = NP.crouch * H;
@@ -376,6 +391,8 @@
       fh = rising ? [0.7, -0.5] : [0.55, -0.6]; bh = rising ? [-0.3, -0.4] : [-0.15, -0.65];
       if (id === "tank") { fh = [0.55, 0.1]; bh = [0.2, 0.2]; } // shield stays up in the air
       if (id === "marionettist") bh = rising ? [0.3, 0.4] : [0.28, 0.62]; // rear arm stays in front of his body in the air instead of trailing behind the back
+      if (id === "foundry") { fh = [-0.37, -0.62]; bh = [0.96, 0.2]; } // hammer carried up and ready in the air
+      if (id === "aftertaste") { fh = [0.55, -0.1]; bh = [0.4, 0.3]; } // cleaver and fork held out in front, ready
       if (id === "deuce") { fh = rising ? [0.6, -0.1] : [0.5, 0.0]; bh = rising ? [0.0, 0.2] : [0.05, 0.3]; } // card hand ready in the air
       if (id === "miette") { fh = rising ? [0.46, -0.2] : [0.4, -0.08]; bh = rising ? [0.36, 0.62] : [0.34, 0.68]; } // the brush stays held upright in the air
       if (id === "hitter") { fh = [0.85, 0.3]; bh = [0.52, 0.24]; } // rifle held ready in the air (chest height, not chin height)
@@ -399,6 +416,8 @@
       if (id === "tank") { fh = [0.55 + sw1 * 0.02, 0.2]; bh = [0.25 + sw2 * 0.25, 0.5 - 0.1 * Math.abs(sw2)]; lean += 0.03; } // shield held steady, gauntlet arm swings
       if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.6]; bh = [0.5, 0.54 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
       if (id === "errata") { fh = [0.3 + sw1 * 0.45, 0.55 - 0.18 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.45, 0.58 - 0.18 * Math.abs(sw2)]; lean += 0.02; } // long easy strides, arms swinging loosely
+      if (id === "foundry") { lean += 0.06; bob *= 1.6; fh = [0.32 + sw1 * 0.02, 0.42 + 0.03 * Math.abs(sw1)]; bh = [0.1 + sw2 * 0.22, 0.72 - 0.08 * Math.abs(sw2)]; } // heavy plod: hammer rests on shoulder steadied by front hand, rear arm swings
+      if (id === "aftertaste") { lean += 0.1; bob *= 1.3; fh = [0.5 + sw1 * 0.04, 0.0 + 0.03 * Math.abs(sw1)]; bh = [0.35 + sw2 * 0.15, 0.4 - 0.06 * Math.abs(sw2)]; } // a heavy waddle: cleaver carried out in front, the fork arm swings
       if (id === "deuce") { lean += 0.03; fh = [0.46 + sw1 * 0.1, 0.12 + 0.06 * Math.abs(sw1)]; bh = [0.1 + sw2 * 0.3, 0.6 - 0.12 * Math.abs(sw2)]; } // a confident stroll-run: the card hand stays up, the other swings
       if (id === "miette") { lean += 0.05; fh = [0.38 + sw1 * 0.05, -0.12 + 0.03 * Math.abs(sw1)]; bh = [0.34 + sw2 * 0.05, 0.72 - 0.03 * Math.abs(sw2)]; } // the brush is carried upright, only bobbing a little
       if (id === "mochi") { lean += 0.07; fh = [0.1 + sw1 * 0.22, 0.92 - 0.07 * Math.abs(sw1)]; bh = [0.02 + sw2 * 0.22, 0.94 - 0.07 * Math.abs(sw2)]; } // a sleepy shuffle: long sleeves just dangle and swing a little
@@ -448,6 +467,18 @@
         bob = Math.abs(Math.sin(now * 2.0)) * H * 0.005; crouch = H * 0.008;
         ff = [Wd * 0.17, 0]; bf = [-Wd * 0.2, 0];
       }
+          if (id === "foundry") { // slightly hunched under his own armor, one hand hangs loose, the other steadies the hammer resting on his shoulder
+        const br = Math.sin(now * 1.6);
+        fh = [0.32 + 0.01 * br, 0.42 + 0.015 * idle]; bh = [0.1, 0.74 - 0.012 * idle];
+        bob = idle * H * 0.004; crouch = H * 0.03 + H * 0.006 * br; lean = 0.2 + 0.012 * br; tilt = 0.03;
+        ff = [Wd * 0.22, 0]; bf = [-Wd * 0.25, 0];
+      }
+      if (id === "aftertaste") { // cheerful and hunched: the cleaver is held out in front, clear of his face, the fork rests low, the belly rises and falls with his breath
+        const br = Math.sin(now * 1.8);
+        fh = [0.6 + 0.01 * br, 0.05 + 0.015 * idle]; bh = [0.45, 0.3 - 0.012 * idle];
+        bob = idle * H * 0.004; crouch = H * 0.02 + H * 0.005 * br; lean = 0.14 + 0.012 * br; tilt = 0.02;
+        ff = [Wd * 0.2, 0]; bf = [-Wd * 0.23, 0];
+      }
       if (id === "deuce") { // relaxed and smug: the card hand floats at chest height as if shuffling, the other hand loose, chin up, weight on one hip
         const sl = Math.sin(now * 1.7), sh2 = Math.sin(now * 3.1);
         fh = [0.5 + 0.04 * sl, 0.0 + 0.05 * sh2 + 0.02 * idle]; bh = [0.1, 0.62 - 0.02 * idle];
@@ -491,7 +522,7 @@
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
     }
 
-    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "deuce" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "deuce" || id === "foundry" || id === "aftertaste" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
       if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
       else {
         A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
@@ -839,8 +870,16 @@ const heat = Math.max(f._heat || 0, (f.momentum || 0) / (f.stats.passive.max || 
     poly(ctx, [[hp[0] - k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.6, hy - 7], [hp[0] + k.hw * 0.68, hy + k.legL * 0.17], [hp[0] - k.hw * 0.68, hy + k.legL * 0.17]]);
     fillOut(ctx, lin(hp[0] - k.hw * 0.6, 0, hp[0] + k.hw * 0.6, 0, [[0, P.pantsDark], [0.6, P.pants], [1, "#2d2c31"]]), 2);
 
-    if (holdCharge) { upperArm(armFw, true); gauntlet(armFw[2], armFw[1], true, 0); } // charge hold: the right arm is tucked UNDER the body, so it no longer overlaps the chest
-    // ═════ NECK + TORSO (bare chest) ═════
+    // back (left) arm: shoulder pad, upper arm, forearm and glove sit BEHIND the torso, like a proper rear limb (only while the left hand is punching does it come forward, see below)
+   let G;
+if (FIGHTER_SWAP_ARM_LAYERS) { // right (front) arm goes BEHIND the torso
+  upperArm(armFw, true);
+  G = gauntlet(armFw[2], armFw[1], true, strike && !blocking && !leftHit ? 1 : 0);
+  pauldron(M(k.shF), true);
+} else {
+  if (FIGHTER_REAR_ARM_BEHIND && !leftHit) { upperArm(armBw, false); gauntlet(armBw[2], armBw[1], false, 0); pauldron(M(k.shB), false); }
+  if (holdCharge) { upperArm(armFw, true); gauntlet(armFw[2], armFw[1], true, 0); }
+}
     limb(ctx, [[sh[0], sh[1] - 3], [hcw[0], hcw[1] + hr * 0.5]], hr * 1.2, col(shade(P.skin, -8)));
     const wT = k.sw * 0.5, wM = k.sw * 0.47, wB = k.hw * 0.5;
     const tp = [T(-0.14, -wT * 0.4), T(0.03, -wT * 1.02), T(0.34, -wM), T(1.0, -wB), T(1.0, wB), T(0.34, wM), T(0.03, wT * 1.02), T(-0.14, wT * 0.4)];
@@ -912,9 +951,7 @@ const heat = Math.max(f._heat || 0, (f.momentum || 0) / (f.stats.passive.max || 
     cloth(hp[0] + d * k.hw * 0.26, hy - 2, k.hw * 0.5, k.hw * 0.56, k.legL * 0.52, -vxw * 0.9 + wave, "#1d1c20", P.bronze, 3);
 
     // ═════ BACK ARM (in front of the chest, behind the head and the front arm) ═════
-    upperArm(armBw, false);
-    gauntlet(armBw[2], armBw[1], false, leftHit && strike && !blocking ? 1 : 0);
-    pauldron(M(k.shB), false); // back shoulder pad (smaller than the front one)
+    if (leftHit || !FIGHTER_REAR_ARM_BEHIND) { upperArm(armBw, false); pauldron(M(k.shB), false); } // left-hand punch (or the flag off): the back arm is in front of the chest
 
     // ═════ HEAD ═════
     const hx = hcw[0], hyy = hcw[1];
@@ -957,15 +994,14 @@ const heat = Math.max(f._heat || 0, (f.momentum || 0) / (f.stats.passive.max || 
     ctx.beginPath(); ctx.moveTo(nx0 - d * hr * 0.2, ny0 - hr * 0.3); ctx.quadraticCurveTo(nx0 + d * hr * 0.3, ny0 - hr * 0.1, nx0 + d * hr * 0.12, ny0 + hr * 0.16); ctx.lineTo(nx0 - d * hr * 0.2, ny0 + hr * 0.2); ctx.closePath(); fillOut(ctx, col(shade(P.skin, -6)), 1.2);
 
     // ═════ FRONT ARM, PAULDRON, GAUNTLET ═════
-    if (!holdCharge) upperArm(armFw, true);
-    pauldron(M(k.shF), true); // front shoulder pad (the big one)
-    let G;
-    if (holdCharge) G = { ang: Math.atan2(armFw[2][1] - armFw[1][1], armFw[2][0] - armFw[1][0]), r: k.aw * 0.78 }; // already drawn under the torso
-    else G = gauntlet(armFw[2], armFw[1], true, strike && !blocking && !leftHit ? 1 : 0);
-    // knuckle anchors used by brawler_fx.js (glow, embers, ghosts)
-    A.fist = [A.ox + armFw[2][0] + Math.cos(G.ang) * G.r * 0.9, A.oy + armFw[2][1] + Math.sin(G.ang) * G.r * 0.9];
-    A.fistB = [A.ox + armBw[2][0], A.oy + armBw[2][1]];
-A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw[2][1]) / 2], [A.ox + (armBw[1][0] + armBw[2][0]) / 2, A.oy + (armBw[1][1] + armBw[2][1]) / 2]];
+   if (!FIGHTER_SWAP_ARM_LAYERS) { if (!holdCharge) upperArm(armFw, true); pauldron(M(k.shF), true); }
+const backPower = leftHit && strike && !blocking ? 1 : 0;
+if (!leftHit && !FIGHTER_REAR_ARM_BEHIND && !FIGHTER_SWAP_ARM_LAYERS) gauntlet(armBw[2], armBw[1], false, backPower);
+if (!FIGHTER_SWAP_ARM_LAYERS) {
+  if (holdCharge) G = { ang: Math.atan2(armFw[2][1] - armFw[1][1], armFw[2][0] - armFw[1][0]), r: k.aw * 0.78 };
+  else G = gauntlet(armFw[2], armFw[1], true, strike && !blocking && !leftHit ? 1 : 0);
+}
+if (leftHit || FIGHTER_SWAP_ARM_LAYERS) gauntlet(armBw[2], armBw[1], false, backPower);
     // ═════ Iron Guard: a kinetic energy barrier (no equipment) held out from the gauntlets ═════
     if (blocking) {
       const g = armFw[2];
@@ -1052,6 +1088,20 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
     // Drawn in fulminar_art.js (silver and electric-blue storm warrior: lightning-edged armor, silver-white ponytail, glowing chest core).
     if (id === "fulminar" && MW.Fulminar) {
       MW.Fulminar.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
+    // ───────────── FOUNDRY ─────────────
+    // Drawn in foundry_art.js (furnace tank: dark iron plate, glowing chest furnace, one big shoulder, a giant blacksmith hammer).
+    if (id === "foundry" && MW.Foundry) {
+      MW.Foundry.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
+    // ───────────── AFTERTASTE ─────────────
+    // Drawn in aftertaste_art.js (huge cheerful butcher-chef: porcelain smile mask, butcher's cap, apron over a big belly, an oversized cleaver and a meat fork).
+    if (id === "aftertaste" && MW.Aftertaste) {
+      MW.Aftertaste.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
       return;
     }
 
@@ -1340,6 +1390,23 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
       ctx.strokeStyle = col(P.dark); ctx.lineWidth = 1.1;
       ctx.beginPath(); ctx.moveTo(hcx + d * hr * 0.35, hcw[1] + hr * 0.55); ctx.lineTo(hcx + d * hr * 0.85, hcw[1] + hr * 0.5); ctx.stroke();
       ctx.restore();
+      // face mask: black cloth over the lower face (nose down) with red lining; the eyes stay uncovered
+      {
+        const M0 = (a, b) => [hcx + d * hr * a, hcw[1] + hr * b];
+        const top = [M0(-0.6, 0.05), M0(0.2, 0.2), M0(0.74, 0.3), M0(1.04, 0.2)]; // upper edge: slopes up toward the nose
+        const bot = [M0(1.0, 0.72), M0(0.62, 1.04), M0(-0.1, 1.06), M0(-0.62, 0.8)];
+        ctx.beginPath();
+        [].concat(top, bot).forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])));
+        ctx.closePath(); fillOut(ctx, col("#0b0a0f"), 2);
+        ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.strokeStyle = col(P.accent); ctx.lineWidth = 1.3; // red lining: top edge, jaw edge and the fold
+        ctx.beginPath(); top.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.stroke();
+        ctx.beginPath(); [M0(1.0, 0.72), M0(0.62, 1.04), M0(-0.1, 1.06)].forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.stroke();
+        ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(M0(0.3, 0.3)[0], M0(0.3, 0.3)[1]); ctx.lineTo(M0(0.2, 0.98)[0], M0(0.2, 0.98)[1]); ctx.stroke(); // center seam
+        for (const v of [0.5, 0.74]) { ctx.beginPath(); ctx.moveTo(M0(v, 0.5)[0], M0(v, 0.5)[1]); ctx.lineTo(M0(v - 0.06, 0.78)[0], M0(v - 0.06, 0.78)[1]); ctx.stroke(); } // breath slits
+        ctx.restore();
+      }
       ctx.save();
       if (glowOn) { // soft red halo around each eye
         ctx.save(); ctx.globalCompositeOperation = "lighter";

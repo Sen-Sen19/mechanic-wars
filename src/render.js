@@ -1304,9 +1304,34 @@
   // Shaped melee effect. It follows the real hit shape (f.meleeShape(): a half-ellipse), so what you
   // see is what hits: no square. fxShape picks the look: jab / hook / upper / slam.
   // Characters with their own fx (Assassin "blood" slashes) are drawn by that file instead.
+  // Foundry: the hammer is driven into the ground in front of him (not swung like a blade). Once per swing: floor shockwave rings,
+  // cracks, flying dust / embers and a shake. Every frame of the active phase: a hot flash on the floor where the head landed.
+  // Purely visual: the real hit shape (f.meleeShape()) is unchanged.
+  function drawFoundrySmash(ctx, f) {
+    const h = f.hit, e = f.meleeShape(), d = e.dir;
+    const gx = e.cx + d * e.rx * 0.95, gy = f.y + f.stats.height - 3;
+    if (f._smashHit !== h) {
+      f._smashHit = h;
+      addRing(gx, gy, 10, 110, 20, "#ffa040", 5, 0.22, true);
+      addRing(gx, gy, 6, 70, 14, "#ffffff", 3, 0.22, true);
+      const lines = [];
+      for (let i = 0; i < 7; i++) lines.push([(i / 6) * Math.PI - Math.PI, 40 + Math.random() * 70, (Math.random() - 0.5) * 0.5]);
+      if (cracks.length < 5) cracks.push({ x: gx, y: gy, life: 50, maxLife: 50, lines, cheap: true });
+      for (let i = 0; i < 16; i++) { const dx = i % 2 ? 1 : -1; spawnParticle(gx + dx * (4 + Math.random() * 30), gy - 2, dx * (1 + Math.random() * 4.5), -2 - Math.random() * 4.5, i % 3 ? "#ffb028" : "#9aa3b4", 20 + (Math.random() * 14 | 0), 2 + Math.random() * 3); }
+      addShake(7);
+    }
+    const t = 1 - f.stateTimer / (h.active || 1);
+    ctx.save();
+    ctx.globalAlpha = 0.9 * (1 - t * 0.6);
+    ctx.fillStyle = safeLinearGrad(ctx, gx - 60, 0, gx + 60, 0, [[0, rgba("#ff7a1a", 0)], [0.5, rgba("#ffe08a", 0.9)], [1, rgba("#ff7a1a", 0)]]);
+    ctx.beginPath(); ctx.ellipse(gx, gy, 60 * (0.7 + 0.5 * t), 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   function drawMeleeShape(ctx, f) {
     const h = f.hit;
     if (f.stats && f.stats.look === "miette") return; // Miette's swing effect is a rainbow paint trail + splash at the brush tip (miette_art.js)
+    if (f.stats && f.stats.look === "foundry") { drawFoundrySmash(ctx, f); return; } // Foundry smashes the hammer into the floor: no crescent slash
     if (h.puppet || h.fxStyle || h.hook || h.holyGuard || h.shockwave || h.id === "unrelenting_wrath") return; // (Bulwark guard / ground shockwave / Wrath slams have no frontal swing arc: they draw their own floor impact)
     const s = f.stats;
     const e = f.meleeShape();

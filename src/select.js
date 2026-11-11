@@ -214,7 +214,7 @@
       grd.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = grd;
       ctx.fillRect(r.x, feet - 200, r.w, 260);
-      const S = Math.min(3.4, 300 / c.height);
+      const S = Math.min(3.4, 300 / c.height) * (c.previewScale || 1); // previewScale < 1 leaves headroom for tall props (Foundry's hammer)
       this.drawFighter(ctx, c, r.x + r.w / 2, feet, S, flip);
 
       ctx.textAlign = "center";
@@ -253,7 +253,7 @@
       roundRect(ctx, r.x, r.y, r.w, r.h, 8);
       ctx.stroke();
 
-      const S = Math.min(1.1, 78 / c.height);
+      const S = Math.min(1.1, 78 / c.height) * (c.previewScale || 1);
       this.drawFighter(ctx, c, r.x + r.w / 2, r.y + 90, S, false);
 
       ctx.textBaseline = "top";
