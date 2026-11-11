@@ -1039,6 +1039,7 @@
       title: "The Flavor of Violence",
       color: "#B3202F", // blood crimson: select card, chips, HUD
       look: "aftertaste",
+      previewScale: 1.10, // select screen: stands massive and imposing like Paladin and Foundry
       width: 62,
       height: 94,
       maxHP: 400,

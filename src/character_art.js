@@ -48,7 +48,7 @@
     miette: { leg: 0.45, tor: 0.30, hr: 0.108, sw: 0.50, hw: 0.42, lw: 0.15, aw: 0.10, arm: 0.40, stride: 0.46 }, // petite painter: big head, cropped coat, a brush taller than she is
     errata: { leg: 0.46, tor: 0.31, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.16, aw: 0.11, arm: 0.39, stride: 0.45 }, // tall, slender, elegant
     foundry: { leg: 0.42, tor: 0.30, hr: 0.082, sw: 1.04, hw: 0.80, lw: 0.28, aw: 0.35, arm: 0.30, stride: 0.27, shx: 0.32 }, // furnace tank: huge shoulders and chest, a small helmeted head, massive limbs, short heavy steps
-    aftertaste: { leg: 0.36, tor: 0.36, hr: 0.10, sw: 0.95, hw: 0.90, lw: 0.27, aw: 0.30, arm: 0.30, stride: 0.28, shx: 0.30 }, // butcher-chef: short sturdy legs, a huge belly, thick neck, broad shoulders, enormous forearms
+    aftertaste: { leg: 0.38, tor: 0.34, hr: 0.088, sw: 1.02, hw: 0.88, lw: 0.28, aw: 0.34, arm: 0.30, stride: 0.28, shx: 0.30 }, // butcher-chef: imposing physique, thick neck, broad shoulders, massive forearms
     tank: { leg: 0.41, tor: 0.30, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
   };
   // Attack keyframes: fh/bh = hand target relative to the shoulder in arm lengths [forward, down].
