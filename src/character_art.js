@@ -28,6 +28,7 @@
     fulminar: { main: "#14243D", dark: "#080E1B", light: "#397FD1", accent: "#43DFFF", skin: "#e6ecf5", hair: "#E5EDF7", pants: "#14243D", boot: "#14243D", glow: "#43DFFF" },
     mochi: { main: "#C9B6E8", dark: "#5B4A86", light: "#E3D7F5", accent: "#F3B9CB", skin: "#FCE3D6", hair: "#A8E6CF", pants: "#9D8CB9", boot: "#F5F1F7", glow: "#FFF0D5" },
     miette: { main: "#EADFC4", dark: "#2A1B4A", light: "#FFF6DC", accent: "#A050E0", skin: "#FCE3D8", hair: "#3B2320", pants: "#D9A02E", boot: "#1D1826", glow: "#2EC8C8" },
+    deuce: { main: "#17121A", dark: "#0C090E", light: "#F7DA7A", accent: "#8C1230", skin: "#F3D5BE", hair: "#1B1316", pants: "#17121A", boot: "#17121A", glow: "#F7DA7A" },
     errata: { main: "#101019", dark: "#080810", light: "#EEE6D2", accent: "#FF315A", skin: "#EEDDD4", hair: "#EAEDF4", pants: "#252534", boot: "#0b0b13", glow: "#00E5FF" },
     tank: { main: "#c9a032", dark: "#5a3d12", light: "#f2d46e", accent: "#fff0a6", skin: "#b08c74", hair: "#d9a92a", pants: "#7a5518", boot: "#c9a032", glow: "#fff4c2", glowHi: "#ffffff" },
   };
@@ -38,9 +39,10 @@
     assassin: { leg: 0.47, tor: 0.27, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.17, aw: 0.17, arm: 0.36, stride: 0.58, shx: 0.36 }, // Bloodlust: lean, broad-ish shoulders, narrow waist, strong legs, long limbs
     hitter: { leg: 0.40, tor: 0.29, hr: 0.12, sw: 0.72, hw: 0.50, lw: 0.21, aw: 0.19, arm: 0.32, stride: 0.42 },
     monarch: { leg: 0.43, tor: 0.31, hr: 0.10, sw: 0.80, hw: 0.46, lw: 0.22, aw: 0.20, arm: 0.37, stride: 0.40 }, // from the design document: tall, V-shaped, long slim legs
-    marionettist: { leg: 0.45, tor: 0.30, hr: 0.10, sw: 0.62, hw: 0.40, lw: 0.16, aw: 0.11, arm: 0.42, stride: 0.40 }, // tall, slender, narrow shoulders, long limbs
+    marionettist: { leg: 0.45, tor: 0.30, hr: 0.10, sw: 0.62, hw: 0.40, lw: 0.16, aw: 0.11, arm: 0.42, stride: 0.40, shx: 0.26, rearNear: true }, // tall, slender, narrow shoulders, long limbs
     fulminar: { leg: 0.46, tor: 0.30, hr: 0.105, sw: 0.56, hw: 0.42, lw: 0.17, aw: 0.12, arm: 0.38, stride: 0.52 }, // athletic: narrow waist, strong long legs, a long stride
     mochi: { leg: 0.40, tor: 0.30, hr: 0.12, sw: 0.58, hw: 0.50, lw: 0.17, aw: 0.13, arm: 0.36, stride: 0.34 }, // petite adult: head 1/4 of her height, slim limbs under a huge hoodie
+    deuce: { leg: 0.47, tor: 0.30, hr: 0.102, sw: 0.46, hw: 0.36, lw: 0.14, aw: 0.11, arm: 0.41, stride: 0.5, shx: 0.3 }, // slim tailored gambler: long legs, narrow shoulders, a hat taller than his head
     miette: { leg: 0.45, tor: 0.30, hr: 0.108, sw: 0.50, hw: 0.42, lw: 0.15, aw: 0.10, arm: 0.40, stride: 0.46 }, // petite painter: big head, cropped coat, a brush taller than she is
     errata: { leg: 0.46, tor: 0.31, hr: 0.10, sw: 0.50, hw: 0.38, lw: 0.16, aw: 0.11, arm: 0.39, stride: 0.45 }, // tall, slender, elegant
     tank: { leg: 0.41, tor: 0.30, hr: 0.11, sw: 0.98, hw: 0.70, lw: 0.26, aw: 0.24, arm: 0.31, stride: 0.30 },
@@ -142,6 +144,8 @@
       { wind: kf([0.85, -0.55], [0.42, 0.05], -0.08, -1, 0.02), strike: kf([1.08, 0.55], [0.5, 0.18], 0.22, 6, 0.04) },
       { wind: kf([-0.05, -0.95], [0.32, -0.42], -0.3, -4, 0.04), strike: kf([1.1, 0.5], [0.58, 0.1], 0.5, 12, 0.08) },
     ],
+    // Deuce: a casual flick of the wrist: the card hand snaps out flat, the other hand stays loose at his side.
+    deuce: [{ wind: kf([0.2, -0.15], [0.1, 0.6], -0.1, -2, 0.02), strike: kf([1.12, -0.1], [0.1, 0.6], 0.14, 4, 0.02) }],
     // Errata: clean, elegant cuts. 0 slash = lead hand, 1 backhand = the other hand cuts back, 2 rift cut = a lunging two-handed sweep.
     errata: [
       { wind: kf([0.2, 0.2], [0.3, 0.3], -0.08, -2, 0.02), strike: kf([1.1, -0.04], [0.3, 0.3], 0.14, 5, 0.02) },
@@ -307,7 +311,7 @@
       let key = seq.length > 1 ? (id === "fighter" || id === "assassin" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "errata" ? f.chainIndex || 0 : A.atkN) % seq.length : 0;
       if (f.hit.pose !== undefined && seq[f.hit.pose]) key = f.hit.pose; // skill-specific pose
       const K = seq[Math.min(key, seq.length - 1)];
-      const guard = id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "miette" ? kf([0.38, -0.15], [0.34, 0.72], 0.05, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.64], [0.5, 0.56], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
+      const guard = id === "deuce" ? kf([0.5, 0.02], [0.1, 0.62], 0.02, 0, 0) : id === "errata" ? kf([0.45, 0.15], [0.3, 0.3], 0.04, 0, 0) : id === "miette" ? kf([0.38, -0.15], [0.34, 0.72], 0.05, 0, 0) : id === "mochi" ? kf([0.18, 0.9], [0.08, 0.92], 0.06, 0, 0) : id === "fulminar" ? kf([0.45, 0.1], [0.3, 0.32], 0.05, 0, 0) : id === "marionettist" ? kf([0.55, -0.3], [0.15, 0.55], 0.04, 0, 0) : id === "fighter" ? kf([0.62, 0.08], [0.34, 0.2], 0.08, 0, 0) : id === "hitter" ? kf([0.85, 0.64], [0.5, 0.56], 0.04, 0, 0) : id === "tank" ? kf([0.55, 0.2], [0.25, 0.5], 0.03, 0, 0) : kf([0.45, 0.55], [0.12, 0.7], 0.04, 0, 0);
       let t, a, b;
       if (st === S.ATTACK_STARTUP) {
         const wind0 = f.hit.chargeHold && !f.chargeReleased ? f.chargeTicks / Math.max(1, f.hit.chargeTime) : 1 - f.stateTimer / Math.max(1, f.hit.startup);
@@ -371,6 +375,8 @@
       bf = rising ? [-Wd * 0.1, -H * 0.1] : [-Wd * 0.22, -H * 0.04];
       fh = rising ? [0.7, -0.5] : [0.55, -0.6]; bh = rising ? [-0.3, -0.4] : [-0.15, -0.65];
       if (id === "tank") { fh = [0.55, 0.1]; bh = [0.2, 0.2]; } // shield stays up in the air
+      if (id === "marionettist") bh = rising ? [0.3, 0.4] : [0.28, 0.62]; // rear arm stays in front of his body in the air instead of trailing behind the back
+      if (id === "deuce") { fh = rising ? [0.6, -0.1] : [0.5, 0.0]; bh = rising ? [0.0, 0.2] : [0.05, 0.3]; } // card hand ready in the air
       if (id === "miette") { fh = rising ? [0.46, -0.2] : [0.4, -0.08]; bh = rising ? [0.36, 0.62] : [0.34, 0.68]; } // the brush stays held upright in the air
       if (id === "hitter") { fh = [0.85, 0.3]; bh = [0.52, 0.24]; } // rifle held ready in the air (chest height, not chin height)
       if (id === "fighter") { fh = rising ? [0.72, -0.3] : [0.58, -0.05]; bh = rising ? [0.4, -0.2] : [0.3, 0.1]; } // fists stay up in a guard while jumping
@@ -393,6 +399,7 @@
       if (id === "tank") { fh = [0.55 + sw1 * 0.02, 0.2]; bh = [0.25 + sw2 * 0.25, 0.5 - 0.1 * Math.abs(sw2)]; lean += 0.03; } // shield held steady, gauntlet arm swings
       if (id === "hitter") { fh = [0.85 + sw1 * 0.03, 0.6]; bh = [0.5, 0.54 - 0.03 * Math.abs(sw2)]; lean += 0.02; } // rifle at port arms, steady
       if (id === "errata") { fh = [0.3 + sw1 * 0.45, 0.55 - 0.18 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.45, 0.58 - 0.18 * Math.abs(sw2)]; lean += 0.02; } // long easy strides, arms swinging loosely
+      if (id === "deuce") { lean += 0.03; fh = [0.46 + sw1 * 0.1, 0.12 + 0.06 * Math.abs(sw1)]; bh = [0.1 + sw2 * 0.3, 0.6 - 0.12 * Math.abs(sw2)]; } // a confident stroll-run: the card hand stays up, the other swings
       if (id === "miette") { lean += 0.05; fh = [0.38 + sw1 * 0.05, -0.12 + 0.03 * Math.abs(sw1)]; bh = [0.34 + sw2 * 0.05, 0.72 - 0.03 * Math.abs(sw2)]; } // the brush is carried upright, only bobbing a little
       if (id === "mochi") { lean += 0.07; fh = [0.1 + sw1 * 0.22, 0.92 - 0.07 * Math.abs(sw1)]; bh = [0.02 + sw2 * 0.22, 0.94 - 0.07 * Math.abs(sw2)]; } // a sleepy shuffle: long sleeves just dangle and swing a little
       if (id === "fulminar") { lean += 0.0; fh = [0.3 + sw1 * 0.5, 0.5 - 0.2 * Math.abs(sw1)]; bh = [0.2 + sw2 * 0.5, 0.52 - 0.2 * Math.abs(sw2)]; } // sprinter's lean, arms pumping
@@ -441,6 +448,13 @@
         bob = Math.abs(Math.sin(now * 2.0)) * H * 0.005; crouch = H * 0.008;
         ff = [Wd * 0.17, 0]; bf = [-Wd * 0.2, 0];
       }
+      if (id === "deuce") { // relaxed and smug: the card hand floats at chest height as if shuffling, the other hand loose, chin up, weight on one hip
+        const sl = Math.sin(now * 1.7), sh2 = Math.sin(now * 3.1);
+        fh = [0.5 + 0.04 * sl, 0.0 + 0.05 * sh2 + 0.02 * idle]; bh = [0.1, 0.62 - 0.02 * idle];
+        lean = 0.02 + 0.01 * sl; tilt = -0.05 + idle * 0.01;
+        bob = Math.abs(Math.sin(now * 2.0)) * H * 0.005; crouch = H * 0.008;
+        ff = [Wd * 0.2, 0]; bf = [-Wd * 0.24, 0];
+      }
       if (id === "miette") { // dreamy and a little off-balance: the brush stands upright beside her, a slow sway, head tilted
         const sl = Math.sin(now * 1.4);
         fh = [0.38 + 0.02 * sl, -0.15 + 0.02 * idle]; bh = [0.34 + 0.01 * sl, 0.72 - 0.02 * idle];
@@ -457,7 +471,7 @@
       }
       if (id === "marionettist") { // performing for an invisible audience: upright but tilted, one hand raised with relaxed fingers, the other at the waist
         const sl = Math.sin(now * 1.6);
-        fh = [0.52 + 0.03 * sl, -0.3 + 0.05 * idle]; bh = [0.14, 0.52];
+        fh = [0.52 + 0.03 * sl, -0.3 + 0.05 * idle]; bh = [0.3, 0.74]; // rear hand hangs in front of the waist, arm nearly straight so the elbow does not stick out behind the back
         lean = 0.05 + 0.02 * sl; tilt = 0.06 + idle * 0.015;
         bob = idle * H * 0.006; crouch = H * 0.012;
         ff = [Wd * 0.18, 0]; bf = [-Wd * 0.2, 0];
@@ -477,7 +491,7 @@
       ff = [Wd * 0.28, 0]; bf = [-Wd * 0.3, 0]; fh = [0.5, 0.2]; bh = [-0.1, 0.3];
     }
 
-    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
+    if (id === "fighter" || id === "hitter" || id === "tank" || id === "marionettist" || id === "fulminar" || id === "mochi" || id === "miette" || id === "deuce" || id === "errata") { // hands glide between guard / run / air poses instead of snapping; strikes stay exact
       if (attacking || stunned || ko || !A.sfh) { A.sfh = fh.slice(); A.sbh = bh.slice(); }
       else {
         A.sfh = [lerp(A.sfh[0], fh[0], 0.3), lerp(A.sfh[1], fh[1], 0.3)];
@@ -503,7 +517,8 @@
     const legF = ik(hF[0], hF[1], ff[0], ff[1], legSeg, legSeg, -1);
     const legB = ik(hB[0], hB[1], bf[0], bf[1], legSeg, legSeg, -1);
     const armF = ik(shF[0], shF[1], shF0[0] + fh[0] * armL, shF0[1] + fh[1] * armL, armSeg, armSeg, 1);
-    const armB = ik(shB[0], shB[1], shB0[0] + bh[0] * armL, shB0[1] + bh[1] * armL, armSeg, armSeg, 1);
+    const bAim = B.rearNear ? shB : shB0; // rearNear: the rear hand is aimed from the real shoulder, so it stays in front of the back instead of behind it
+    const armB = ik(shB[0], shB[1], bAim[0] + bh[0] * armL, bAim[1] + bh[1] * armL, armSeg, armSeg, 1);
 
     // --- draw ---
     ctx.save();
@@ -1040,6 +1055,13 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
       return;
     }
 
+    // ───────────── DEUCE ─────────────
+    // Drawn in deuce_art.js (casino gentleman: black tailcoat, burgundy waistcoat, gold trim, tilted gambler's hat, fanned cards, a tiny roulette wheel).
+    if (id === "deuce" && MW.Deuce) {
+      MW.Deuce.draw(k, { shW, hipW, hcw, armBw, armFw, windU, strike, stunned });
+      return;
+    }
+
     // ───────────── ERRATA ─────────────
     // Drawn in errata_art.js (elegant man in a black-and-ivory coat whose whole body glitches as one picture).
     if (id === "errata" && MW.Errata) {
@@ -1213,6 +1235,11 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
       }
 
       // back arm, part 1 (BEHIND the body): bare upper arm only. The forearm, bracer, hand and blade are drawn after the torso (see "back arm, part 2").
+         // FRONT arm FIRST: behind the body
+      limb(ctx, armFw, k.aw, col(P.skin));
+    
+   
+      // back arm upper part (still behind the body)
       limb(ctx, [armBw[0], armBw[1]], k.aw, col(P.skin));
 
       // legs: black trousers, dark steel shin guards with a fang at the knee, one armored thigh plate
@@ -1257,24 +1284,9 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
       drawRibbon(ctx, sf0, 3.2, col(P.scarf));
 
       // back arm, part 2 (OVER the torso, so a hand held in front of the chest is not hidden): elbow, forearm, steel bracer with claw spike, glove, reverse-grip fang blade
-      circle(ctx, armBw[1][0], armBw[1][1], k.aw * 0.55, col(P.skin), 1.2); // elbow cap hides the seam
-      limb(ctx, [armBw[1], armBw[2]], k.aw, col(P.skin));
-      limb(ctx, [mid(armBw[1], armBw[2], 0.3), mid(armBw[1], armBw[2], 0.85)], k.aw * 1.3, col(P.steel));
-      {
-        const e = armBw[1], h = armBw[2], bp = mid(e, h, 0.2);
-        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) - 0.35 * d, k.aw * 2.2, k.aw * 0.9, P.steel);
-        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
-      }
-      const bhd = armBw[2];
-      hand(k, bhd, k.aw * 0.8, P.main);
-      {
-        const ax = bhd[0] - armBw[1][0], ay = bhd[1] - armBw[1][1], al = Math.hypot(ax, ay) || 1;
-        const rx = -ax / al, ry = (-ay + al * 0.6) / al, rl = Math.hypot(rx, ry) || 1; // reverse grip: trails behind the fist
-        fang(bhd[0], bhd[1], rx / rl, ry / rl, k.H * 0.24, 0.3, 4.6, -1);
-      }
+ 
 
-      // front arm: bare arm -> big asymmetrical fang pauldron -> steel bracer -> glove -> fang blade
-      limb(ctx, armFw, k.aw, col(P.skin));
+   
       {
         const sf = M(k.shF), r = k.sw * 0.21;
         // lower plate, then the main plate
@@ -1363,6 +1375,22 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
         }
         ctx.restore();
       }
+           circle(ctx, armBw[1][0], armBw[1][1], k.aw * 0.55, col(P.skin), 1.2); // elbow cap hides the seam
+      limb(ctx, [armBw[1], armBw[2]], k.aw, col(P.skin));
+      limb(ctx, [mid(armBw[1], armBw[2], 0.3), mid(armBw[1], armBw[2], 0.85)], k.aw * 1.3, col(P.steel));
+      {
+        const e = armBw[1], h = armBw[2], bp = mid(e, h, 0.2);
+        spike(bp[0], bp[1], Math.atan2(e[1] - h[1], e[0] - h[0]) - 0.35 * d, k.aw * 2.2, k.aw * 0.9, P.steel);
+        veinLine([mid(e, h, 0.25), mid(e, h, 0.8)], 1);
+      }
+      const bhd = armBw[2];
+      hand(k, bhd, k.aw * 0.8, P.main);
+      {
+        const ax = bhd[0] - armBw[1][0], ay = bhd[1] - armBw[1][1], al = Math.hypot(ax, ay) || 1;
+        const rx = -ax / al, ry = (-ay + al * 0.6) / al, rl = Math.hypot(rx, ry) || 1; // reverse grip: trails behind the fist
+        fang(bhd[0], bhd[1], rx / rl, ry / rl, k.H * 0.24, 0.3, 4.6, -1);
+      }
+
 
       return;
     }
@@ -1418,7 +1446,7 @@ A.armMid = [[A.ox + (armFw[1][0] + armFw[2][0]) / 2, A.oy + (armFw[1][1] + armFw
       ctx.beginPath(); ctx.rect(hx - hr * 0.93, hy - hr * 0.34, hr * 1.86, hr * 0.3); fillOut(ctx, col("#2a1a0c"), 1.4);
       ctx.beginPath(); ctx.ellipse(hx, hy + 1, hr * 1.9, hr * 0.3, -d * 0.08, 0, 7); fillOut(ctx, col(P.hatDark), 2.2);
       // front arm + revolver. Carried low, raised to aim during the wind-up, kicks up on the shot.
-      limb(ctx, armFw, k.aw, col(P.shirt));
+
       const gh = armFw[2], gs = (k.H / 74) * 1.45; // oversized six-shooter so it reads at game size
       const aimT = strikeNow ? -0.32 : windU > 0 ? lerp(0.85, 0.0, easeOut(windU)) : recov ? 0.2 : 0.85;
       A.aim = A.aim == null ? aimT : lerp(A.aim, aimT, 0.4);

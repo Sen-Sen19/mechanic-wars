@@ -974,7 +974,34 @@
         ],
       },
     }),
+
+    // DEUCE (internal id "deuce"): The House Always Wins (looks: deuce_art.js, design brief "Deuce - The House Always Wins").
+    // TRIAL ENTRY: looks, stats and the basic attack only. No skills, passive or ultimate yet: every slot is empty.
+    // The brief's props are drawn but not yet used in combat: golden dice, the roulette wheel and the poker chips are for his skills later.
+    // He fights from range with a quick card flick (keep tapping attack): a spinning playing card that flies straight and hits lightly,
+    // fired fast, so he out-ranges the melee heroes but has low HP and armor. Numbers are a first guess to feel him out in the arena.
+    // Slim and agile: narrow hit box, light weight, fast run. Hit box = width x height below (the hat and coat tails are drawn on top of it).
+    deuce: define({
+      id: "deuce",
+      name: "Deuce",
+      title: "The House Always Wins",
+      color: "#8C1230", // casino burgundy: select card, chips, HUD
+      look: "deuce",
+      width: 34,
+      height: 80,
+      maxHP: 210,
+      armor: 6,
+      weight: 70,
+      runSpeed: 5.6,
+      jumpStrength: 13,
+      airJumpStrength: 11.8,
+      attack: {
+        id: "card_flick", type: "projectile",
+        damage: 3.6, startup: 6, recovery: 14, knockback: 1.8,
+        projectile: { speed: 14, range: 520, size: 12, style: "card" },
+      },
+    }),
   };
 
-  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata", "miette"];
+  MW.CHARACTER_ORDER = ["fighter", "mage", "assassin", "hitter", "tank", "monarch", "marionettist", "fulminar", "mochi", "errata", "miette", "deuce"];
 })(globalThis);

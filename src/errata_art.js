@@ -316,44 +316,7 @@ function drawBody(k, e) {
       + Math.sin(now * 2.8 + ph) * 0.7 * w
   ];
 
-  // ---------------------------------------------------------------
-  // BACK COAT: one clean silhouette instead of many small panels.
-  // ---------------------------------------------------------------
-
-  {
-    const pts = [
-      T(torL * 0.92, -sw * 0.28),
-      T(torL * 0.48, -hw * 0.55),
-      T(1, -hw * 0.65),
-      flut(T(-legL * 0.35, -hw * 0.95), 0.4, 0.5),
-      flut(T(-legL * 0.85, -hw * 0.92), 0.85, 1.2),
-      flut(T(-legL * 0.95, -hw * 0.45), 1.0, 2.0),
-      T(-legL * 0.35, -hw * 0.12),
-      T(torL * 0.35, -hw * 0.1)
-    ];
-
-    fillPoly(k, pts, C.coat, C.line, 1.3);
-
-    // Narrow ivory edge, not a large competing panel.
-    taper(
-      k,
-      [
-        pts[2],
-        pts[3],
-        pts[4],
-        pts[5]
-      ],
-      2.0 * u,
-      0.8 * u,
-      C.ivory2,
-      C.line,
-      0.5
-    );
-
-    line(k, [pts[2], pts[3], pts[4]], C.coatHi, 1.2, 0.65);
-    stitch(k, [pts[3], pts[4], pts[5]], 0.8);
-  }
-
+  
   // ---------------------------------------------------------------
   // ARMS: tailored sleeves, compact hands.
   // ---------------------------------------------------------------
@@ -467,8 +430,45 @@ function drawBody(k, e) {
 
     return Gp(5.2, 0);
   };
+  arm(armFw, true); // FIRST: behind everything
+  // ---------------------------------------------------------------
+  // BACK COAT: one clean silhouette instead of many small panels.
+  // ---------------------------------------------------------------
 
-  arm(armBw, false);
+  {
+    const pts = [
+      T(torL * 0.92, -sw * 0.28),
+      T(torL * 0.48, -hw * 0.55),
+      T(1, -hw * 0.65),
+      flut(T(-legL * 0.35, -hw * 0.95), 0.4, 0.5),
+      flut(T(-legL * 0.85, -hw * 0.92), 0.85, 1.2),
+      flut(T(-legL * 0.95, -hw * 0.45), 1.0, 2.0),
+      T(-legL * 0.35, -hw * 0.12),
+      T(torL * 0.35, -hw * 0.1)
+    ];
+
+    fillPoly(k, pts, C.coat, C.line, 1.3);
+
+    // Narrow ivory edge, not a large competing panel.
+    taper(
+      k,
+      [
+        pts[2],
+        pts[3],
+        pts[4],
+        pts[5]
+      ],
+      2.0 * u,
+      0.8 * u,
+      C.ivory2,
+      C.line,
+      0.5
+    );
+
+    line(k, [pts[2], pts[3], pts[4]], C.coatHi, 1.2, 0.65);
+    stitch(k, [pts[3], pts[4], pts[5]], 0.8);
+  }
+
 
   // ---------------------------------------------------------------
   // LEGS: slim tailored trousers and structured boots.
@@ -706,8 +706,6 @@ function drawBody(k, e) {
     stitch(k, [pts[2], pts[3], pts[4]], 0.8);
   }
 
-  // Front arm drawn over the coat.
-  const hand = arm(armFw, true);
 
   // ---------------------------------------------------------------
   // NECK AND COLLAR.
@@ -1197,12 +1195,15 @@ function drawBody(k, e) {
     0.6
   );
 
+    
+  // Back arm: drawn LAST, on top of everything.
+  const hand = arm(armBw, false);
+
   return hand;
 }
 
-
   // ═══════════════════════════════════════════════════════════════════
-  // GLITCH SCHEDULER
+  // GLITCH SCHEDULERdrawBody(
   // Pure calculation: does not mutate fighter or animation state.
   // ═══════════════════════════════════════════════════════════════════
 

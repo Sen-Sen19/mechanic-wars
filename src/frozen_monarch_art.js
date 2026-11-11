@@ -262,8 +262,8 @@
       const vx = wr[0] - el[0], vy = wr[1] - el[1], len = Math.hypot(vx, vy) || 1;
       const tx = vx / len, ty = vy / len, qx = -ty, qy = tx;
       const P = (t, q) => [el[0] + tx * len * t + qx * q * u, el[1] + ty * len * t + qy * q * u];
-      const side = qx * -d > 0 ? 1 : -1; // the outer (backward) side of the forearm gets the fins
-      // elbow cop
+const side = d; // fixed side: fins stay on the same side of the forearm and rotate with it
+//       // elbow cop
       ctx.beginPath(); ctx.arc(el[0], el[1], 4.4 * u, 0, TAU);
       ctx.fillStyle = k.col(front ? C.sv : C.sd); ctx.fill(); edge(k, C.line, 1);
       // forearm gauntlet
@@ -298,9 +298,9 @@
         }
       }
     };
-    arm(armBw, false);
-    pauldron(armBw[0], 0.66, -1);
-
+    // FIRST: front arm + big shoulder guard, behind everything
+    const hand = arm(armFw, true);
+    pauldron(armFw[0], 0.95, 1);
     // ── 4) legs: fitted trousers, silver shin guard, angular knee guard, tall pointed boot with a fur cuff ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
@@ -373,7 +373,7 @@
       ctx.fillStyle = k.col(C.glow); ctx.fill(); edge(k, C.line, 1);
       if (!F) {
         fillPoly(k, [J(cc, ch * 0.7, 0), J(cc, 0, cw2 * 0.5), J(cc, -ch * 0.2, 0), J(cc, 0, -cw2 * 0.5)], C.core, C.core, 0.4);
-        glow(k, cc[0], cc[1], 17 * u, 0.28 + 0.4 * en, "123,230,255");
+       glow(k, cc[0], cc[1], 11 * u, 0.2 + 0.25 * en, "123,230,255");
       }
     }
 
@@ -408,30 +408,7 @@
     leg(k.MP(k.legF), false);
 
     // ── 8) fur-lined mantle over both shoulders, V down the chest ──
-    {
-      const outline = [T(torL * 0.8, -sw * 0.54), T(torL * 1.05, -sw * 0.5), T(torL * 1.13, -sw * 0.18), T(torL * 1.13, sw * 0.2), T(torL * 1.05, sw * 0.56), T(torL * 0.78, sw * 0.54), T(torL * 0.55, sw * 0.1), T(torL * 0.74, -sw * 0.2)];
-      // soft shadow underneath, then the fur itself
-      const shadow = outline.map((p) => [p[0], p[1] + 2.2 * u]);
-      fur(k, shadow, 2.4 * u, C.furSh);
-      const pts = fur(k, outline, 3 * u, C.fur);
-      if (!F) {
-        // brighter tufts on top and tiny frost crystals on the tips
-        for (let i = 2; i < pts.length; i += 4) {
-          const p = pts[i], q = pts[(i + 1) % pts.length];
-          line(k, [mix(p, q, 0.2), mix(p, q, 0.7)], C.frost, 1, 0.8);
-        }
-        for (let i = 4; i < pts.length; i += 9) {
-          const p = pts[i];
-          fillPoly(k, [[p[0] - 1.1, p[1] + 0.8], [p[0], p[1] - 3], [p[0] + 1.1, p[1] + 0.8]], C.ice, C.core, 0.5);
-        }
-      }
-      // two silver clasps with small crystals where the cape joins the mantle
-      for (const [a, b] of [[torL * 0.99, -sw * 0.36], [torL * 0.84, -sw * 0.38]]) {
-        const p = T(a, b);
-        ctx.beginPath(); ctx.arc(p[0], p[1], 2.4 * u, 0, TAU); ctx.fillStyle = k.col(C.sv2); ctx.fill(); edge(k, C.line, 0.9);
-        ctx.beginPath(); ctx.arc(p[0], p[1], 1.1 * u, 0, TAU); ctx.fillStyle = k.col(C.glow); ctx.fill();
-      }
-    }
+   
 
     // ── 9) head: drawn last (over the shoulder guard) so the face is never hidden ──
     // Built like the best faces in the roster: bright face framed by dark hair for contrast, two bold glowing eyes,
@@ -559,12 +536,10 @@
       line(k, [Hp(-0.6, bandB(-0.6)), Hp(0.5, bandB(0.5))], C.ice, 0.8, 0.9);
     };
 
-    // ── 10) front arm and gauntlet ──
-    const hand = arm(armFw, true);
-
-    // ── 11) front shoulder guard (over the top of the arm) ──
-    pauldron(armFw[0], 0.95, 1);
+    // ── 10) head, then LAST: back arm + small shoulder guard on top of everything ──
     drawHead();
+    arm(armBw, false);
+    pauldron(armBw[0], 0.66, -1);
 
     // ── 12) light and little extras: a wind-up / strike glow on the hand, frost drifting off it, snow near the hem ──
     if (!F) {

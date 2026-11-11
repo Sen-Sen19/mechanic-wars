@@ -432,21 +432,31 @@ taper(k, [mix(fer0, fer1, 0.62), fer1], 9.5 * u, 10.2 * u, C.metalHi, C.line, 1)
       let vx = wr[0] - el[0], vy = wr[1] - el[1];
       const len = Math.hypot(vx, vy) || 1;
       vx /= len; vy /= len;
+      const qx = -vy, qy = vx;
       const body = front ? C.coat : C.coatSh, lin = front ? C.lining : C.liningSh;
-      taper(k, [s0, el], 9.5 * u, 12.5 * u, body, C.line, 1.1);
-      taper(k, [el, wr], 12.5 * u, 10 * u, body, C.line, 1.1);
-      dot(k, el, 6 * u, body, null);
-      taper(k, [mix(s0, el, -0.05), mix(s0, el, 0.34)], 10.4 * u, 11.6 * u, lin, C.line, 1);           // purple lining at the dropped shoulder
-      if (front && !F) {
+      // slimmer arm: thinner upper arm, slender forearm
+      taper(k, [s0, el], 7 * u, 8.5 * u, body, C.line, 1.1);
+      taper(k, [el, wr], 8.5 * u, 6.8 * u, body, C.line, 1.1);
+      dot(k, el, 4.2 * u, body, null);
+      taper(k, [mix(s0, el, -0.05), mix(s0, el, 0.34)], 7.4 * u, 8.4 * u, lin, C.line, 1); // purple lining at the dropped shoulder
+      if (!F) {
         line(k, [mix(s0, el, 0.45), mix(s0, el, 0.8)], C.coatHi, 1, 0.8);
-        splat(k, mix(el, wr, 0.4), 1.9 * u, C.orange, 1);
-        splat(k, mix(s0, el, 0.62), 1.4 * u, C.teal, 4);
-        dot(k, mix(el, wr, 0.15), 1.2 * u, C.ink, null);
+        // paint splashes (both arms, front is a bit bigger)
+        const sc = front ? 1 : 0.8;
+        splat(k, mix(el, wr, 0.4), 1.8 * u * sc, C.orange, front ? 1 : 6);
+        splat(k, mix(s0, el, 0.62), 1.4 * u * sc, C.teal, front ? 4 : 2);
+        splat(k, mix(s0, el, 0.3), 1.1 * u * sc, C.pink, front ? 3 : 5);
+        // little paint dots scattered along the sleeve
+        const dots = [[s0, el, 0.2, 2.2], [s0, el, 0.45, -2.4], [s0, el, 0.78, 2], [el, wr, 0.15, -2], [el, wr, 0.55, 2.2], [el, wr, 0.62, -1.6]];
+        for (let i = 0; i < dots.length; i++) {
+          const [a, b, t, o] = dots[i], p = mix(a, b, t);
+          dot(k, [p[0] + qx * o * u, p[1] + qy * o * u], (0.55 + (i % 3) * 0.2) * u, SPLAT[(i * 2 + (front ? 0 : 1)) % SPLAT.length], null);
+        }
+        dot(k, mix(el, wr, 0.3), 1 * u, C.ink, null);
       }
       const c0 = mix(el, wr, 0.72);
-      taper(k, [c0, mix(wr, el, -0.06)], 9.4 * u, 8.4 * u, C.cuff, C.line, 1);
-      const qx = -vy, qy = vx;
-      if (!F) line(k, [[c0[0] - qx * 4.8 * u, c0[1] - qy * 4.8 * u], [c0[0] + qx * 4.8 * u, c0[1] + qy * 4.8 * u]], C.cuffHi, 0.9, 0.9);
+      taper(k, [c0, mix(wr, el, -0.06)], 6.8 * u, 6.2 * u, C.cuff, C.line, 1);
+      if (!F) line(k, [[c0[0] - qx * 3.4 * u, c0[1] - qy * 3.4 * u], [c0[0] + qx * 3.4 * u, c0[1] + qy * 3.4 * u]], C.cuffHi, 0.9, 0.9);
       return wr;
     };
     const fist = (wr) => { // black fingerless glove gripping the handle, bare fingertips
@@ -457,7 +467,7 @@ taper(k, [mix(fer0, fer1, 0.62), fer1], 9.5 * u, 10.2 * u, C.metalHi, C.line, 1)
         line(k, [[wr[0] - 2.4 * u, wr[1] - 1 * u], [wr[0] + 0.6 * u, wr[1] - 2.8 * u]], C.blackHi, 0.8, 0.9);
       }
     };
-    sleeve(armBw, false);
+    sleeve(armFw, true); // FIRST: behind everything
 
     // ── legs: black buckled boots, white socks, mustard wide cropped pants that flare at the hem ──
     const leg = (pts, back) => {
@@ -580,12 +590,7 @@ taper(k, [mix(fer0, fer1, 0.62), fer1], 9.5 * u, 10.2 * u, C.metalHi, C.line, 1)
       if (!F) { line(k, [Tu(25, 5.5), Tu(30, 2.2), Tu(34.6, 6.2)], C.lining, 2 * u, 1); line(k, [Tu(23, 10.5), Tu(29, 10)], C.coatHi, 0.9, 0.8); splat(k, Tu(28, 8), 1.2 * u, C.teal, 2); dot(k, Tu(24, 9), 1 * u, C.ink, null); }
     }
 
-    // ── near arm over the coat, the brush through both fists ──
-    sleeve(armFw, true);
-    const tip = brush(k, armBw[2], armFw[2], u, sp);
-    paintHitFx(k, tip, strike, stunned, u, armBw[2]);
-    fist(armBw[2]);
-    fist(armFw[2]);
+
 
 
     // ── neck, messy short hair, face, bangs and side lock, beret ──
@@ -658,7 +663,12 @@ taper(k, [mix(fer0, fer1, 0.62), fer1], 9.5 * u, 10.2 * u, C.metalHi, C.line, 1)
       }
       taper(k, [Hp(-0.1, -1.88), Hp(-0.2, -2.2)], 0.2 * R, 0.14 * R, C.hatSh, C.line, 0.8);
     }
-
+    // ── LAST: back arm, the brush and both fists, on top of everything ──
+    sleeve(armBw, false);
+    const tip = brush(k, armBw[2], armFw[2], u, sp);
+    paintHitFx(k, tip, strike, stunned, u, armBw[2]);
+    fist(armBw[2]);
+    fist(armFw[2]);
     // ── a doodled swirl above her head when she is hit (cosmetic only) ──
     if (stunned && !F) {
       ctx.save(); ctx.strokeStyle = C.orange; ctx.lineWidth = 1.2; ctx.lineCap = "round"; ctx.globalAlpha = 0.9;

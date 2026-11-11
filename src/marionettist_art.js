@@ -224,16 +224,6 @@
       }
     }
 
-    // ── 2) rear arm: rests near the waist ──
-    {
-      const [s0, el, wr] = armBw;
-      taper(k, [s0, el], 7.4 * u, 6.2 * u, C.coat, C.line, 1.1);
-      taper(k, [el, wr], 6.2 * u, 5 * u, C.coat, C.line, 1.1);
-      const dirB = Math.atan2(wr[1] - el[1], wr[0] - el[0]);
-      taper(k, [mix(el, wr, 0.66), wr], 5.6 * u, 5 * u, C.coat2, C.line, 0.8); // long cuff over the wrist
-      hand(k, wr, dirB, 0.34, 0, false, u);
-    }
-
     // ── 3) rear leg: slim trousers, pointed boot with silver tip ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
@@ -250,7 +240,23 @@
       line(k, [[ft[0] + d * 3.6 * u, ft[1] - 2 * u], [ft[0] + d * 14.5 * u, ft[1] + 0.5 * u]], C.silver, 0.9, 0.9); // silver toe edge
       dot(k, [bt[0] + d * 0.6 * u, bt[1]], 0.8 * u, C.silver, null);
     };
-    leg(k.MP(k.legB), true);
+       leg(k.MP(k.legB), true);
+
+    // ── raised puppeteering arm: now BEHIND the torso and head ──
+    {
+      const [s0, el, wr] = armFw;
+      taper(k, [s0, el], 7.6 * u, 6.4 * u, C.coat, C.line, 1.1);
+      taper(k, [el, wr], 6.4 * u, 5 * u, C.coat, C.line, 1.1);
+      const dirF = Math.atan2(wr[1] - el[1], wr[0] - el[0]);
+      const cuffA = mix(el, wr, 0.64);
+      taper(k, [cuffA, wr], 6.6 * u, 6.0 * u, C.coat2, C.line, 0.9);
+      line(k, [mix(cuffA, wr, 0.5), wr], C.royal, 0.6, 0.8);
+      const busy = windU > 0 || strike;
+      const tips = hand(k, wr, dirF, 0.38 + (strike ? 0.2 : 0), busy ? 0.3 : 0.07, true, u);
+      A.mTips = tips.map((p) => [A.ox + p[0], A.oy + p[1]]);
+      if (!F && busy) glow(k, tips[1][0], tips[1][1], 7 * u, 0.18, "197,165,255");
+    }
+
 
     // ── 4) torso: fitted black high-collar shirt, violet waistcoat with silver buttons, the long tailcoat ──
     fillPoly(k, [T(2, -hw * 0.48), T(torL * 0.96, -sw * 0.36), T(torL * 1.0, sw * 0.34), T(2, hw * 0.46)], C.coat, C.line, 1.3);
@@ -365,23 +371,16 @@
       }
     }
 
-    // ── 6) front arm: raised, long relaxed fingers fanned out (the puppeteering hand) ──
+       // ── idle arm: drawn LAST, on top of the body, head and everything else ──
     {
-      const [s0, el, wr] = armFw;
-      taper(k, [s0, el], 7.6 * u, 6.4 * u, C.coat, C.line, 1.1);
-      taper(k, [el, wr], 6.4 * u, 5 * u, C.coat, C.line, 1.1);
-      const dirF = Math.atan2(wr[1] - el[1], wr[0] - el[0]);
-      // long cuff over the wrist, with purple stitching
-      const cuffA = mix(el, wr, 0.64);
-      taper(k, [cuffA, wr], 6.6 * u, 6.0 * u, C.coat2, C.line, 0.9);
-      line(k, [mix(cuffA, wr, 0.5), wr], C.royal, 0.6, 0.8);
-      const busy = windU > 0 || strike;
-      const tips = hand(k, wr, dirF, 0.38 + (strike ? 0.2 : 0), busy ? 0.3 : 0.07, true, u);
-      // remember the fingertips in world space so the puppet strings can be tied to them (render.js reads A.mTips)
-      A.mTips = tips.map((p) => [A.ox + p[0], A.oy + p[1]]);
-      // subtle lavender sheen on the rings while puppeteering
-      if (!F && busy) glow(k, tips[1][0], tips[1][1], 7 * u, 0.18, "197,165,255");
+      const [s0, el, wr] = armBw;
+      taper(k, [s0, el], 7.4 * u, 6.2 * u, C.coat, C.line, 1.1);
+      taper(k, [el, wr], 6.2 * u, 5 * u, C.coat, C.line, 1.1);
+      const dirB = Math.atan2(wr[1] - el[1], wr[0] - el[0]);
+      taper(k, [mix(el, wr, 0.66), wr], 5.6 * u, 5 * u, C.coat2, C.line, 0.8); // long cuff over the wrist
+      hand(k, wr, dirB, 0.34, 0, false, u);
     }
+
 
     // a few violet motes while he puppeteers
     if (!F && k.spawn && (windU > 0 || strike) && Math.random() < 0.25 && A.mTips) {

@@ -1526,6 +1526,28 @@
     if (Math.random() < 0.6) spawnParticle(p.x - p.dir * 8, p.y + (Math.random() - 0.5) * r, -p.dir * 0.5, (Math.random() - 0.3) * 0.8, Math.random() < 0.5 ? "#e6fbff" : "#a8e4ff", 14, 1.8);
   }
 
+  // Deuce's playing card: a flat ivory card that spins end over end, with a thin gold-and-burgundy streak behind it and a few sparkles.
+  function drawCardShot(ctx, p) {
+    const w = p.size * 0.9, h = p.size * 1.3, spin = p.traveled * 0.22 * p.dir;
+    const L = p.size * 3, x0 = p.x - p.dir * L;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = safeLinearGrad(ctx, x0, p.y, p.x, p.y, [[0, rgba("#8C1230", 0)], [1, rgba("#D9A92E", 0.55)]]);
+    ctx.lineWidth = p.size * 0.5;
+    ctx.beginPath(); ctx.moveTo(x0, p.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.translate(p.x, p.y); ctx.rotate(spin);
+    const flat = Math.abs(Math.cos(spin * 0.5)) * 0.8 + 0.2; // the card turns edge-on as it spins
+    ctx.scale(1, flat);
+    ctx.shadowColor = "#D9A92E"; ctx.shadowBlur = 8;
+    ctx.fillStyle = "#F4EBD6"; ctx.strokeStyle = "#0B0709"; ctx.lineWidth = 1.2; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#C42A2E";
+    ctx.beginPath(); ctx.moveTo(0, -h * 0.22); ctx.lineTo(w * 0.22, 0); ctx.lineTo(0, h * 0.22); ctx.lineTo(-w * 0.22, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    if (Math.random() < 0.45) spawnParticle(p.x - p.dir * 6, p.y + (Math.random() - 0.5) * p.size, -p.dir * 0.4, (Math.random() - 0.5) * 0.8, Math.random() < 0.5 ? "#F7DA7A" : "#C42A4E", 12, 1.5);
+  }
+
   function drawProjectile(ctx, p, alpha) {
     ctx.save();
     ctx.translate((p.px - p.x) * (1 - alpha), (p.py - p.y) * (1 - alpha));
@@ -1539,6 +1561,7 @@
       ctx.restore();
       return;
     }
+    if (p.hit && p.hit.projectile && p.hit.projectile.style === "card") { drawCardShot(ctx, p); ctx.restore(); return; } // Deuce's card flick
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "frost") { drawFrostShard(ctx, p); ctx.restore(); return; }
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "codebreaker") { drawCodeBreakerShot(ctx, p); ctx.restore(); return; } // Errata Code Breaker
     if (p.hit && p.hit.projectile && p.hit.projectile.style === "datacorruption") { if (MW.ErrataWave) MW.ErrataWave.drawWave(ctx, p); else drawDataCorruptionWave(ctx, p); ctx.restore(); return; } // Errata Skill 4: Data Corruption

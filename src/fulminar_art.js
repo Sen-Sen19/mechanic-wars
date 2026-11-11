@@ -256,9 +256,10 @@
       line(k, [J(sP, -2 * s, -5.4 * s), J(sP, 4 * s, -2 * s), J(sP, 3 * s, 3.4 * s)], C.electric, 0.9, 0.9);
       line(k, [J(sP, 8 * s, -3 * s), J(sP, 7 * s, 4 * s)], C.cyan, 0.8, 0.5 + 0.4 * en);
     };
-    arm(armBw, false);
-    pauldron(armBw[0], 0.5);
-
+    // FIRST: front arm + big shoulder guard, behind everything
+    arm(armFw, true);
+    pauldron(armFw[0], 0.8);
+    glowStroke(k, [J(armFw[0], 8 * u * 0.3, 8 * u * 0.2), J(armFw[0], 3.4 * u, 3.2 * u), J(armFw[0], 2.4 * u, 5 * u), J(armFw[0], 6.4 * u, 7 * u)], C.cyan, 0.7, 3, 0.15 + 0.45 * en);
     // ── 3) back leg, then the short asymmetrical waist mantle ──
     const leg = (pts, isBack) => {
       const [h, kn, ft] = pts;
@@ -386,13 +387,7 @@
     leg(k.MP(k.legF), false);
 
     // ── 7a) front arm and gauntlet ──
-    const hand = arm(armFw, true);
-
-    // ── 7b) front (larger) shoulder guard, over the top of the arm ──
-    pauldron(armFw[0], 0.8);
-    // shoulder marking: a few small electric lines
-    glowStroke(k, [J(armFw[0], 8 * u * 0.3, 8 * u * 0.2), J(armFw[0], 3.4 * u, 3.2 * u), J(armFw[0], 2.4 * u, 5 * u), J(armFw[0], 6.4 * u, 7 * u)].map((p) => p), C.cyan, 0.7, 3, 0.15 + 0.45 * en);
-
+   
     // ── 7) head: neck, face, glowing eye, facial bolt marking, hair, loose strands, bolt clip ──
     {
       fillPoly(k, [Hp(-0.3, 0.4), Hp(0.5, 0.5), Hp(0.56, 1.6), Hp(-0.4, 1.55)], C.skinSh, C.line, 1); // neck
@@ -448,7 +443,9 @@
       fillPoly(k, [[tie[0], tie[1] - 2 * u], [tie[0] + 1.7 * u, tie[1]], [tie[0], tie[1] + 2 * u], [tie[0] - 1.7 * u, tie[1]]], C.cyan, C.core, 0.5); // blue gem
       if (!F) glow(k, tie[0], tie[1], 5 * u, 0.12 + 0.2 * en, "67,223,255");
     }
-
+    // LAST: back arm + small shoulder guard, on top of everything
+    arm(armBw, false);
+    pauldron(armBw[0], 0.5);
     // glowing eye lightning: electric behavior, not cloth. Two or three jagged bolts snap back from the eye, re-rolling their shape,
     // length and angle ~22 times a second, flickering off now and then, with little forks and the odd spark. No smooth sway.
  

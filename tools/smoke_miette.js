@@ -70,7 +70,7 @@ check("every stat is a real number (no silent zeros)", ["maxHP", "armor", "weigh
   const clearOfPanels = cells.every((c) => c.x >= sel.rects.left.x + sel.rects.left.w && c.x + c.w <= sel.rects.right.x);
   check("select screen lays out every hero (incl. Miette) on screen", cells.length === roster.length && within, cells.length + " cards");
   check("the roster grid, AI buttons and START do not overlap each other or the side panels", clearOfStart && clearOfPanels);
-  check("Miette is the last card in the roster", order[order.length - 1] === "miette");
+  check("Miette is in the roster (Deuce comes after her)", order.includes("miette") && order.indexOf("deuce") > order.indexOf("miette"));
 }
 console.log(failures ? failures + " check(s) FAILED." : "All Miette checks passed.");
 process.exit(failures ? 1 : 0);

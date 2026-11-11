@@ -24,7 +24,7 @@
     eyeW: "#FAF6FF", iris: "#C47A26", irisDk: "#7A4312",
     shorts: "#9D8CB9", shortsSh: "#7F6F9E",
     shoe: "#F5F1F7", shoeSh: "#D8D0E3",
-    pillow: "#D9CCF0", pillowSh: "#B9A6DA", moonClip: "#D9C8F5",
+pillow: "#F9CFDC", pillowSh: "#E8A9BF", moonClip: "#D9C8F5",
     butter: "#FFE9A8", butterLine: "#E3C477",
   };
 
@@ -273,7 +273,7 @@
       shade(k, body, [Tu(-2, -30), Tu(30, -30), Tu(30, -22), Tu(14, -22.5), Tu(-2, -21)], C.pillowSh, 0.55);
       if (!F) {
         for (const p of [Tu(27.5, -14), Tu(1.5, -15)]) dot(k, p, 1.3 * u, C.pillowSh, null); // pinched pillow corners
-        line(k, [Tu(25, -14), Tu(22, -22)], C.hoodHi, 1, 0.8);
+line(k, [Tu(25, -14), Tu(22, -22)], "#FFE6EE", 1, 0.8);
         const mc = Tu(14, -18);
         moon(k, mc[0], mc[1], 4.2 * u, d, C.cream, C.creamSh); // cream crescent moon
         dot(k, Tu(14, -9.2), 0.9 * u, C.hood, null);
